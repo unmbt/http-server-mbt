@@ -43,8 +43,14 @@ jobs:
       - name: Prepare Artifact (Unix)
         if: runner.os != 'Windows'
         run: |
-          BINARY_PATH=$(find target -name "main" -type f | head -n 1)
-          cp $BINARY_PATH ${{ matrix.artifact_name }}
+          echo "Debugging target output:"
+          find target/native/release/build/src/main -type f
+          BINARY_PATH=$(find target/native/release/build/src/main -type f ! -name "*.*" | head -n 1)
+          if [ -z "$BINARY_PATH" ]; then
+            echo "Error: Could not find binary!"
+            exit 1
+          fi
+          cp "$BINARY_PATH" ${{ matrix.artifact_name }}
 
       - name: Prepare Artifact (Windows)
         if: runner.os == 'Windows'

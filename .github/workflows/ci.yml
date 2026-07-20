@@ -38,7 +38,7 @@ jobs:
         run: moon update
 
       - name: Test
-        run: moon test
+        run: moon test --target native
 
       - name: Build Release
         run: moon build --target native --release

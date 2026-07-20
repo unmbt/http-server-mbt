@@ -19,13 +19,10 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: http-server-mbt-linux-amd64
-            binary_path: target/native/release/build/src/main/main
           - os: macos-latest
             artifact_name: http-server-mbt-macos-arm64
-            binary_path: target/native/release/build/src/main/main
           - os: windows-latest
             artifact_name: http-server-mbt-windows-amd64.exe
-            binary_path: target\native\release\build\src\main\main.exe
 
     steps:
       - name: Checkout Repository
@@ -45,11 +42,15 @@ jobs:
 
       - name: Prepare Artifact (Unix)
         if: runner.os != 'Windows'
-        run: cp ${{ matrix.binary_path }} ${{ matrix.artifact_name }}
+        run: |
+          BINARY_PATH=$(find target -name "main" -type f | head -n 1)
+          cp $BINARY_PATH ${{ matrix.artifact_name }}
 
       - name: Prepare Artifact (Windows)
         if: runner.os == 'Windows'
-        run: copy ${{ matrix.binary_path }} ${{ matrix.artifact_name }}
+        run: |
+          $BINARY_PATH = (Get-ChildItem -Path target -Filter "main.exe" -Recurse -File).FullName | Select-Object -First 1
+          copy $BINARY_PATH ${{ matrix.artifact_name }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

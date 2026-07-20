@@ -1,3 +1,6 @@
+extern "c" fn ext_print_ips(port : Int) = "ext_print_ips"
+extern "c" fn ext_register_ctrl_c() = "ext_register_ctrl_c"
+
 pub(all) struct Config {
   port : Int
   addr : String
@@ -35,7 +38,7 @@ fn print_banner(config : Config) -> Unit {
   println("\{y}\nAvailable on:\{rst}")
   if config.addr == "0.0.0.0" {
     println("  http://127.0.0.1:\{g}\{config.port}\{rst}")
-    println("  http://192.168.x.x:\{g}\{config.port}\{rst} (and other local IPs)")
+    ext_print_ips(config.port)
   } else {
     println("  http://\{config.addr}:\{g}\{config.port}\{rst}")
   }
@@ -53,6 +56,7 @@ pub async fn start_server(config : Config) -> Unit raise {
   let server = @http.Server::Server(addr_with_port)
 
   print_banner(config)
+  ext_register_ctrl_c()
 
   server.run_forever(async fn(req, reader, conn) {
     handle_request(config, req, reader, conn)

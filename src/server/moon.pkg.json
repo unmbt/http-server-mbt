@@ -5,5 +5,6 @@
     { "path": "moonbitlang/async/io", "alias": "io" },
     { "path": "moonbitlang/core/debug", "alias": "debug" },
     { "path": "moonbitlang/x/fs", "alias": "fs" }
-  ]
+  ],
+  "native-stub": ["get_ip.c"]
 }

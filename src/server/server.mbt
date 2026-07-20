@@ -288,6 +288,50 @@ async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : 
   client.close()
 }
 
+fn url_decode(s : String) -> String {
+  let bytes : Array[Byte] = []
+  let mut i = 0
+  
+  fn parse_hex_char(c : Int) -> Int {
+    if c >= 48 && c <= 57 {
+      c - 48
+    } else if c >= 97 && c <= 102 {
+      c - 97 + 10
+    } else if c >= 65 && c <= 70 {
+      c - 65 + 10
+    } else {
+      -1
+    }
+  }
+  
+  while i < s.length() {
+    let ch = s[i].to_int()
+    if ch == 37 && i + 2 < s.length() { // '%'
+      let v1 = parse_hex_char(s[i + 1].to_int())
+      let v2 = parse_hex_char(s[i + 2].to_int())
+      if v1 >= 0 && v2 >= 0 {
+        let val = v1 * 16 + v2
+        bytes.push(val.to_byte())
+        i += 3
+        continue
+      }
+    } else if ch == 43 { // '+'
+      bytes.push(b' ')
+      i += 1
+      continue
+    }
+    let char_str = s[i:i+1]
+    let char_bytes = @utf8.encode(char_str)
+    let mut j = 0
+    while j < char_bytes.length() {
+      bytes.push(char_bytes[j])
+      j += 1
+    }
+    i += 1
+  }
+  @utf8.decode_lossy(Bytes::from_array(bytes[:])[:])
+}
+
 async fn handle_request(
   config : Config,
   req : @http.Request,
@@ -306,6 +350,8 @@ async fn handle_request(
       i += 1
     }
   }
+  
+  req_path = url_decode(req_path)
   
   println("[\{@debug.to_string(req.meth)}] \{req_path}")
   

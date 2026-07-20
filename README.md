@@ -92,6 +92,7 @@ http-server-mbt [options]
 | `--cors` | Enable CORS headers via `Access-Control-Allow-Origin` |
 | `-e`, `--ext <ext>` | Default file extension to serve if no match (e.g. `html`) |
 | `-P`, `--proxy <url>` | Proxy unresolved requests to a given upstream URL |
+| `-D`, `--debug` | Enable debug mode for verbose request logging |
 
 ## 💡 Example
 

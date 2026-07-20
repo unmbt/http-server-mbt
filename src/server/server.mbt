@@ -10,6 +10,7 @@ pub(all) struct Config {
   cors : Bool
   proxy : String?
   root_dir : String
+  debug : Bool
 }
 
 fn get_version() -> String {
@@ -45,7 +46,7 @@ fn get_version() -> String {
       while k < json.length() && json[k] != '"' {
         k += 1
       }
-      return json[start:k].to_string()
+      return json.substring(start~, end=k)
     }
   }
   "unknown"
@@ -115,7 +116,7 @@ fn get_extension(path : String) -> String {
   while i >= 0 {
     let ch = path[i]
     if ch == '.' {
-      return path[i + 1:].to_string()
+      return path.substring(start=i + 1)
     }
     if ch == '/' || ch == '\\' {
       break
@@ -145,7 +146,7 @@ fn get_mime_type(ext : String) -> String {
   }
 }
 
-async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, cors : Bool, cache_time : Int) -> Unit {
+async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, config : Config) -> Unit {
   let bytes = try {
     @fs.read_file_to_bytes(path)
   } catch {
@@ -157,14 +158,18 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
   }
   
   let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string() }
-  if cors {
+  if config.cors {
     headers["Access-Control-Allow-Origin"] = "*"
   }
-  if cache_time > 0 {
-    headers["Cache-Control"] = "public, max-age=\{cache_time}"
+  if config.cache_time > 0 {
+    headers["Cache-Control"] = "public, max-age=\{config.cache_time}"
   }
 
   conn.send_response(200, "OK", extra_headers=headers)
+  
+  if config.debug {
+    println("[DEBUG] Serving file: \{path} (MIME: \{mime}, Size: \{bytes.length()})")
+  }
   
   let mut offset = 0
   let total = bytes.length()
@@ -179,7 +184,7 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
   conn.end_response()
 }
 
-async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, local_path : String) -> Unit {
+async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, local_path : String, config : Config) -> Unit {
   let files = try {
     @fs.read_dir(local_path)
   } catch {
@@ -209,12 +214,15 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   conn.send_response(200, "OK", extra_headers=headers)
   conn.write_string(html)
   conn.end_response()
+  if config.debug {
+    println("[DEBUG] Served directory listing for: \{req_path}")
+  }
 }
 
 async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : @http.Request, config : Config, reader : &@io.Reader) -> Unit {
   let mut proxy_base = proxy_url
   if proxy_base.has_suffix("/") {
-    proxy_base = proxy_base[:proxy_base.length() - 1].to_string()
+    proxy_base = proxy_base.substring(end=proxy_base.length() - 1)
   }
   let uri = proxy_base + req.path
   let client = try {
@@ -243,6 +251,9 @@ async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : 
     let _ = conn.send_response(res.code, res.reason, extra_headers=res.headers)
     let _ = conn.write_reader(client)
     let _ = conn.end_response()
+    if config.debug {
+      println("[DEBUG] Proxied request to: \{uri} -> \{res.code}")
+    }
   } catch {
     _ => {
       let _ = conn.send_response(502, "Bad Gateway")
@@ -264,7 +275,7 @@ async fn handle_request(
     let mut i = 0
     while i < req_path.length() {
       if req_path[i] == '?' {
-        req_path = req_path[:i].to_string()
+        req_path = req_path.substring(end=i)
         break
       }
       i += 1
@@ -284,23 +295,27 @@ async fn handle_request(
     local_path += "/"
   }
   if req_path.has_prefix("/") {
-    local_path += req_path[1:].to_string()
+    local_path += req_path.substring(start=1)
   } else {
     local_path += req_path
   }
 
   let is_dir = try { @fs.is_dir(local_path) } catch { _ => false }
   
+  if config.debug {
+    println("[DEBUG] Local path: \{local_path}, is_dir: \{is_dir}")
+  }
+
   if is_dir {
     let index_file = local_path + (if local_path.has_suffix("/") { "index.html" } else { "/index.html" })
     let has_index = try { @fs.is_file(index_file) } catch { _ => false }
     if has_index {
-      serve_file(conn, index_file, "text/html", config.cors, config.cache_time)
+      serve_file(conn, index_file, "text/html", config)
       return
     }
 
     if config.dir_listing {
-      serve_dir_listing(conn, req_path, local_path)
+      serve_dir_listing(conn, req_path, local_path, config)
       return
     }
   } else {
@@ -311,7 +326,7 @@ async fn handle_request(
         ext = config.ext
       }
       let mime = get_mime_type(ext)
-      serve_file(conn, local_path, mime, config.cors, config.cache_time)
+      serve_file(conn, local_path, mime, config)
       return
     }
   }
@@ -323,6 +338,9 @@ async fn handle_request(
       conn.send_response(404, "Not Found", extra_headers={"Content-Length": content.length().to_string()})
       conn.write_string(content)
       conn.end_response()
+      if config.debug {
+        println("[DEBUG] 404 Not Found: \{local_path}")
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ async fn main {
   let mut cors = false
   let mut proxy : String? = None
   let mut root_dir = "./"
+  let mut debug = false
 
   let mut i = 1
   while i < args.length() {
@@ -59,6 +60,7 @@ async fn main {
           proxy = Some(args[i])
         }
       }
+      "-D" | "--debug" => debug = true
       _ => {
         if arg.has_prefix("-") == false {
           root_dir = arg
@@ -76,7 +78,8 @@ async fn main {
     cache_time,
     cors,
     proxy,
-    root_dir
+    root_dir,
+    debug
   }
   
   try {

@@ -92,6 +92,7 @@ http-server-mbt [选项]
 | `--cors` | 启用跨域支持，注入 `Access-Control-Allow-Origin` 响应头 |
 | `-e`, `--ext <ext>` | 找不到文件时的默认文件扩展名（例如 `html`） |
 | `-P`, `--proxy <url>` | 代理转发未命中请求（404）到指定的上游 URL |
+| `-D`, `--debug` | 开启 Debug 模式，在终端打印详细的请求和执行日志 |
 
 ## 💡 示例
 

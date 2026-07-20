@@ -220,11 +220,23 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   }
   
   html += "</ul><hr></body></html>"
-  let headers = { "Content-Type": "text/html", "Content-Length": html.length().to_string(), "Connection": "close" }
+  let bytes = @utf8.encode(html)
+  let headers = { "Content-Type": "text/html", "Content-Length": bytes.length().to_string(), "Connection": "close" }
   if config.debug { println("[DEBUG] serve_dir_listing: sending headers") }
   let _ = conn.send_response(200, "OK", extra_headers=headers)
   if config.debug { println("[DEBUG] serve_dir_listing: writing html") }
-  let _ = conn.write_string(html)
+  
+  let mut offset = 0
+  let total = bytes.length()
+  while offset < total {
+    let written = conn.write_once(bytes, offset~, len=total - offset)
+    if config.debug { println("[DEBUG] serve_dir_listing: wrote \{written} bytes") }
+    if written == 0 {
+      break
+    }
+    offset += written
+  }
+  
   if config.debug { println("[DEBUG] serve_dir_listing: ending response") }
   let _ = conn.end_response()
   if config.debug {

@@ -1,0 +1,255 @@
+pub(all) struct Config {
+  port : Int
+  addr : String
+  dir_listing : Bool
+  ext : String
+  cache_time : Int
+  cors : Bool
+  proxy : String?
+  root_dir : String
+}
+
+fn print_banner(config : Config) -> Unit {
+  let cors_str = if config.cors { "true" } else { "false" }
+  let dir_listing_str = if config.dir_listing { "visible" } else { "hidden" }
+  let ext_str = if config.ext == "" { "none" } else { config.ext }
+  
+  println("Starting up http-server, serving \{config.root_dir}")
+  println("\nhttp-server version: 0.1.0\n")
+  println("http-server settings:")
+  println("CORS: \{cors_str}")
+  println("Cache: \{config.cache_time} seconds")
+  println("Connection Timeout: 120 seconds")
+  println("Directory Listings: \{dir_listing_str}")
+  println("AutoIndex: visible")
+  println("Serve GZIP Files: false")
+  println("Serve Brotli Files: false")
+  println("Default File Extension: \{ext_str}\n")
+  
+  println("Available on:")
+  if config.addr == "0.0.0.0" {
+    println("  http://127.0.0.1:\{config.port}")
+    println("  http://192.168.x.x:\{config.port} (and other local IPs)")
+  } else {
+    println("  http://\{config.addr}:\{config.port}")
+  }
+  println("Hit CTRL-C to stop the server")
+}
+
+pub async fn start_server(config : Config) -> Unit raise {
+  let addr_with_port = @socket.Addr::parse("\{config.addr}:\{config.port}")
+  let server = @http.Server::Server(addr_with_port)
+
+  print_banner(config)
+
+  server.run_forever(async fn(req, reader, conn) {
+    handle_request(config, req, reader, conn)
+  })
+}
+
+fn get_extension(path : String) -> String {
+  let mut i = path.length() - 1
+  while i >= 0 {
+    let ch = path[i]
+    if ch == '.' {
+      return path[i + 1:].to_string()
+    }
+    if ch == '/' || ch == '\\' {
+      break
+    }
+    i -= 1
+  }
+  ""
+}
+
+fn get_mime_type(ext : String) -> String {
+  match ext {
+    "html" | "htm" => "text/html"
+    "js" => "application/javascript"
+    "css" => "text/css"
+    "json" => "application/json"
+    "png" => "image/png"
+    "jpg" | "jpeg" => "image/jpeg"
+    "gif" => "image/gif"
+    "svg" => "image/svg+xml"
+    "txt" => "text/plain"
+    "xml" => "text/xml"
+    "pdf" => "application/pdf"
+    "mp4" => "video/mp4"
+    "mp3" => "audio/mpeg"
+    "wasm" => "application/wasm"
+    _ => "application/octet-stream"
+  }
+}
+
+async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, cors : Bool, cache_time : Int) -> Unit {
+  let bytes = try {
+    @fs.read_file_to_bytes(path)
+  } catch {
+    _ => {
+      conn.send_response(500, "Internal Server Error")
+      conn.end_response()
+      return
+    }
+  }
+  
+  let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string() }
+  if cors {
+    headers["Access-Control-Allow-Origin"] = "*"
+  }
+  if cache_time > 0 {
+    headers["Cache-Control"] = "public, max-age=\{cache_time}"
+  }
+
+  conn.send_response(200, "OK", extra_headers=headers)
+  let _ = conn.write_once(bytes, offset=0, len=bytes.length())
+  conn.end_response()
+}
+
+async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, local_path : String) -> Unit {
+  let files = try {
+    @fs.read_dir(local_path)
+  } catch {
+    _ => {
+      conn.send_response(500, "Internal Server Error")
+      conn.end_response()
+      return
+    }
+  }
+
+  let mut html = "<html><head><title>Index of \{req_path}</title></head><body>"
+  html += "<h1>Index of \{req_path}</h1><hr><ul>"
+  if req_path != "/" {
+    html += "<li><a href=\"../\">../</a></li>"
+  }
+  
+  let mut i = 0
+  while i < files.length() {
+    let file = files[i]
+    let path = if req_path.has_suffix("/") { req_path + file } else { req_path + "/" + file }
+    html += "<li><a href=\"\{path}\">\{file}</a></li>"
+    i += 1
+  }
+  
+  html += "</ul><hr></body></html>"
+  let headers = { "Content-Type": "text/html", "Content-Length": html.length().to_string() }
+  conn.send_response(200, "OK", extra_headers=headers)
+  conn.write_string(html)
+  conn.end_response()
+}
+
+async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : @http.Request, config : Config, reader : &@io.Reader) -> Unit {
+  let mut proxy_base = proxy_url
+  if proxy_base.has_suffix("/") {
+    proxy_base = proxy_base[:proxy_base.length() - 1].to_string()
+  }
+  let uri = proxy_base + req.path
+  let client = try {
+    @http.Client::Client(uri)
+  } catch {
+    _ => {
+      let _ = conn.send_response(502, "Bad Gateway")
+      let _ = conn.end_response()
+      return
+    }
+  }
+
+  let extra_headers = Map::new()
+  req.headers.each(fn(k, v) {
+    let lower = k.to_lower()
+    if lower != "host" && lower != "transfer-encoding" {
+      extra_headers.set(k, v)
+    }
+  })
+
+  try {
+    let _ = client.request(req.meth, req.path, extra_headers=extra_headers)
+    let _ = client.write_reader(reader)
+    let res = client.end_request()
+
+    let _ = conn.send_response(res.code, res.reason, extra_headers=res.headers)
+    let _ = conn.write_reader(client)
+    let _ = conn.end_response()
+  } catch {
+    _ => {
+      let _ = conn.send_response(502, "Bad Gateway")
+      let _ = conn.end_response()
+    }
+  }
+  client.close()
+}
+
+async fn handle_request(
+  config : Config,
+  req : @http.Request,
+  reader : &@io.Reader,
+  conn : @http.ServerConnection
+) -> Unit {
+  let mut req_path = req.path
+  
+  if req_path.contains("?") {
+    let mut i = 0
+    while i < req_path.length() {
+      if req_path[i] == '?' {
+        req_path = req_path[:i].to_string()
+        break
+      }
+      i += 1
+    }
+  }
+  
+  println("[\{@debug.to_string(req.meth)}] \{req_path}")
+  
+  if req_path.contains("..") {
+    conn.send_response(403, "Forbidden")
+    conn.end_response()
+    return
+  }
+
+  let mut local_path = config.root_dir
+  if local_path.has_suffix("/") == false && local_path.has_suffix("\\") == false {
+    local_path += "/"
+  }
+  if req_path.has_prefix("/") {
+    local_path += req_path[1:].to_string()
+  } else {
+    local_path += req_path
+  }
+
+  let is_dir = try { @fs.is_dir(local_path) } catch { _ => false }
+  
+  if is_dir {
+    let index_file = local_path + (if local_path.has_suffix("/") { "index.html" } else { "/index.html" })
+    let has_index = try { @fs.is_file(index_file) } catch { _ => false }
+    if has_index {
+      serve_file(conn, index_file, "text/html", config.cors, config.cache_time)
+      return
+    }
+
+    if config.dir_listing {
+      serve_dir_listing(conn, req_path, local_path)
+      return
+    }
+  } else {
+    let is_file = try { @fs.is_file(local_path) } catch { _ => false }
+    if is_file {
+      let mut ext = get_extension(local_path)
+      if ext == "" {
+        ext = config.ext
+      }
+      let mime = get_mime_type(ext)
+      serve_file(conn, local_path, mime, config.cors, config.cache_time)
+      return
+    }
+  }
+
+  match config.proxy {
+    Some(proxy_url) => proxy_request(conn, proxy_url, req, config, reader)
+    None => {
+      let content = "Not Found"
+      conn.send_response(404, "Not Found", extra_headers={"Content-Length": content.length().to_string()})
+      conn.write_string(content)
+      conn.end_response()
+    }
+  }
+}

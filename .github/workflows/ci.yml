@@ -40,23 +40,9 @@ jobs:
       - name: Build Release
         run: moon build --target native --release --target-dir target
 
-      - name: Prepare Artifact (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          echo "Debugging target output:"
-          find target/native/release/build/src/main -type f
-          BINARY_PATH=$(find target/native/release/build/src/main -type f ! -name "*.*" | head -n 1)
-          if [ -z "$BINARY_PATH" ]; then
-            echo "Error: Could not find binary!"
-            exit 1
-          fi
-          cp "$BINARY_PATH" ${{ matrix.artifact_name }}
-
-      - name: Prepare Artifact (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          $BINARY_PATH = (Get-ChildItem -Path target -Filter "main.exe" -Recurse -File).FullName | Select-Object -First 1
-          copy $BINARY_PATH ${{ matrix.artifact_name }}
+      - name: Prepare Artifact
+        shell: bash
+        run: cp target/native/release/build/src/main/main.exe ${{ matrix.artifact_name }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

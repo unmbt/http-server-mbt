@@ -46,7 +46,7 @@ fn get_version() -> String {
       while k < json.length() && json[k] != '"' {
         k += 1
       }
-      return json.substring(start~, end=k)
+      return json[start:k].to_owned()
     }
   }
   "unknown"
@@ -116,7 +116,7 @@ fn get_extension(path : String) -> String {
   while i >= 0 {
     let ch = path[i]
     if ch == '.' {
-      return path.substring(start=i + 1)
+      return path[i + 1:].to_owned()
     }
     if ch == '/' || ch == '\\' {
       break
@@ -157,7 +157,7 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
     }
   }
   
-  let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string() }
+  let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string(), "Connection": "close" }
   if config.cors {
     headers["Access-Control-Allow-Origin"] = "*"
   }
@@ -210,7 +210,7 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   }
   
   html += "</ul><hr></body></html>"
-  let headers = { "Content-Type": "text/html", "Content-Length": html.length().to_string() }
+  let headers = { "Content-Type": "text/html", "Content-Length": html.length().to_string(), "Connection": "close" }
   conn.send_response(200, "OK", extra_headers=headers)
   conn.write_string(html)
   conn.end_response()
@@ -222,7 +222,7 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
 async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : @http.Request, config : Config, reader : &@io.Reader) -> Unit {
   let mut proxy_base = proxy_url
   if proxy_base.has_suffix("/") {
-    proxy_base = proxy_base.substring(end=proxy_base.length() - 1)
+    proxy_base = proxy_base[:proxy_base.length() - 1].to_owned()
   }
   let uri = proxy_base + req.path
   let client = try {
@@ -235,7 +235,7 @@ async fn proxy_request(conn : @http.ServerConnection, proxy_url : String, req : 
     }
   }
 
-  let extra_headers = Map::new()
+  let extra_headers : Map[String, String] = Map([])
   req.headers.each(fn(k, v) {
     let lower = k.to_lower()
     if lower != "host" && lower != "transfer-encoding" {
@@ -275,7 +275,7 @@ async fn handle_request(
     let mut i = 0
     while i < req_path.length() {
       if req_path[i] == '?' {
-        req_path = req_path.substring(end=i)
+        req_path = req_path[:i].to_owned()
         break
       }
       i += 1
@@ -295,7 +295,7 @@ async fn handle_request(
     local_path += "/"
   }
   if req_path.has_prefix("/") {
-    local_path += req_path.substring(start=1)
+    local_path += req_path[1:].to_owned()
   } else {
     local_path += req_path
   }
@@ -335,7 +335,7 @@ async fn handle_request(
     Some(proxy_url) => proxy_request(conn, proxy_url, req, config, reader)
     None => {
       let content = "Not Found"
-      conn.send_response(404, "Not Found", extra_headers={"Content-Length": content.length().to_string()})
+      conn.send_response(404, "Not Found", extra_headers={"Content-Length": content.length().to_string(), "Connection": "close"})
       conn.write_string(content)
       conn.end_response()
       if config.debug {

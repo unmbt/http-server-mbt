@@ -149,7 +149,7 @@ fn get_mime_type(ext : String) -> String {
 async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, config : Config) -> Unit {
   if config.debug { println("[DEBUG] serve_file: reading bytes for \{path}") }
   let bytes = try {
-    @fs.read_file_to_bytes(path)
+    @fs.read_file(path).binary()
   } catch {
     _ => {
       if config.debug { println("[DEBUG] read_file_to_bytes error") }
@@ -194,7 +194,7 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
 async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, local_path : String, config : Config) -> Unit {
   if config.debug { println("[DEBUG] serve_dir_listing: reading dir \{local_path}") }
   let files = try {
-    @fs.read_dir(local_path)
+    @fs.readdir(local_path)
   } catch {
     _ => {
       if config.debug { println("[DEBUG] read_dir error") }
@@ -205,7 +205,7 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   }
   if config.debug { println("[DEBUG] serve_dir_listing: read \{files.length()} files") }
 
-  let mut html = "<html><head><title>Index of \{req_path}</title></head><body>"
+  let mut html = "<html><head><meta charset=\"utf-8\"><title>Index of \{req_path}</title></head><body>"
   html += "<h1>Index of \{req_path}</h1><hr><ul>"
   if req_path != "/" {
     html += "<li><a href=\"../\">../</a></li>"
@@ -221,7 +221,7 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   
   html += "</ul><hr></body></html>"
   let bytes = @utf8.encode(html)
-  let headers = { "Content-Type": "text/html", "Content-Length": bytes.length().to_string(), "Connection": "close" }
+  let headers = { "Content-Type": "text/html; charset=utf-8", "Content-Length": bytes.length().to_string(), "Connection": "close" }
   if config.debug { println("[DEBUG] serve_dir_listing: sending headers") }
   let _ = conn.send_response(200, "OK", extra_headers=headers)
   if config.debug { println("[DEBUG] serve_dir_listing: writing html") }
@@ -325,7 +325,7 @@ async fn handle_request(
     local_path += req_path
   }
 
-  let is_dir = try { @fs.is_dir(local_path) } catch { _ => false }
+  let is_dir = try { @fs.kind(local_path) == @fs.Directory } catch { _ => false }
   
   if config.debug {
     println("[DEBUG] Local path: \{local_path}, is_dir: \{is_dir}")
@@ -334,7 +334,7 @@ async fn handle_request(
   if is_dir {
     let index_file = local_path + (if local_path.has_suffix("/") { "index.html" } else { "/index.html" })
     if config.debug { println("[DEBUG] Checking index_file: \{index_file}") }
-    let has_index = try { @fs.is_file(index_file) } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
+    let has_index = try { @fs.kind(index_file) == @fs.Regular } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
     
     if has_index {
       if config.debug { println("[DEBUG] Found index.html, calling serve_file") }
@@ -349,7 +349,7 @@ async fn handle_request(
     }
   } else {
     if config.debug { println("[DEBUG] Path is file, checking existence") }
-    let has_file = try { @fs.is_file(local_path) } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
+    let has_file = try { @fs.kind(local_path) == @fs.Regular } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
     if has_file {
       if config.debug { println("[DEBUG] File exists, calling serve_file") }
       let mut ext = get_extension(local_path)

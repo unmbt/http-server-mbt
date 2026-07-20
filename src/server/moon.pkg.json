@@ -4,7 +4,7 @@
     { "path": "moonbitlang/async/socket", "alias": "socket" },
     { "path": "moonbitlang/async/io", "alias": "io" },
     { "path": "moonbitlang/core/debug", "alias": "debug" },
-    { "path": "moonbitlang/x/fs", "alias": "fs" },
+    { "path": "moonbitlang/async/fs", "alias": "fs" },
     { "path": "moonbitlang/core/env", "alias": "env" },
     { "path": "moonbitlang/core/encoding/utf8", "alias": "utf8" }
   ],

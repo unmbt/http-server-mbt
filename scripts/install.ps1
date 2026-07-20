@@ -15,7 +15,7 @@ if ($Uninstall) {
     } else {
         Write-Host "Not installed." -ForegroundColor Yellow
     }
-    exit
+    return
 }
 
 $Arch = $env:PROCESSOR_ARCHITECTURE.ToLower()
@@ -23,7 +23,7 @@ if ($Arch -eq "amd64") {
     $AssetArch = "amd64"
 } else {
     Write-Host "Unsupported architecture: $Arch" -ForegroundColor Red
-    exit 1
+    return
 }
 
 $AssetName = "http-server-mbt-windows-$AssetArch.exe"
@@ -35,12 +35,12 @@ try {
     $DownloadUrl = ($Release.assets | Where-Object { $_.name -eq $AssetName }).browser_download_url
 } catch {
     Write-Host "Failed to fetch release info. Please check your network or check if a Release exists." -ForegroundColor Red
-    exit 1
+    return
 }
 
 if (-not $LatestVersion -or -not $DownloadUrl) {
     Write-Host "Failed to find the asset for Windows in the latest release." -ForegroundColor Red
-    exit 1
+    return
 }
 
 if (Test-Path $BinPath) {
@@ -48,7 +48,7 @@ if (Test-Path $BinPath) {
     $CurrentVersion = & $BinPath -v
     if ($CurrentVersion -eq $LatestVersion) {
         Write-Host "✨ You already have the latest version ($LatestVersion) installed at $BinPath." -ForegroundColor Green
-        exit
+        return
     } else {
         Write-Host "🚀 Updating from $CurrentVersion to $LatestVersion..." -ForegroundColor Cyan
     }

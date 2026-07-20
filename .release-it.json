@@ -5,9 +5,9 @@
     "commitMessage": "chore: release v${version}"
   },
   "hooks": {
-    "before:init": ["echo Starting release process, current version: ${version}"],
+    "before:init": ["echo Starting release process..."],
     "after:bump": [
-      "node -e \"const fs=require('fs');const f='moon.mod.json';const d=JSON.parse(fs.readFileSync(f));d.version='${version}';fs.writeFileSync(f,JSON.stringify(d,null,2));\""
+      "node scripts/bump.js ${version}"
     ]
   },
   "npm": {

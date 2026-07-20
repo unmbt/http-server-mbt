@@ -1,0 +1,19 @@
+{
+  "git": {
+    "requireCleanWorkingDir": false,
+    "tagName": "v${version}",
+    "commitMessage": "chore: release v${version}"
+  },
+  "hooks": {
+    "before:init": ["echo Starting release process, current version: ${version}"],
+    "after:bump": [
+      "node -e \"const fs=require('fs');const f='moon.mod.json';const d=JSON.parse(fs.readFileSync(f));d.version='${version}';fs.writeFileSync(f,JSON.stringify(d,null,2));\""
+    ]
+  },
+  "npm": {
+    "publish": false
+  },
+  "github": {
+    "release": false
+  }
+}

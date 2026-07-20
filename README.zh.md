@@ -8,7 +8,7 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/unmbt/http-server-mbt/ci.yml?branch=master&logo=github)](https://github.com/unmbt/http-server-mbt/actions)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Cross Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-success)](#)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
@@ -129,6 +129,11 @@ Hit CTRL-C to stop the server
 - **底层 Native C-FFI**: 为了达到完美的体验，真实网卡 IP 的嗅探和 `SIGINT` (Ctrl+C) 中断信号拦截等功能是由 C 语言编写的 (`src/server/get_ip.c`)，并通过 MoonBit 的 Native 后端实现了无缝桥接与跨平台编译。
 - **编译期配置嵌入**: 使用了 MoonBit 的 `:embed` 宏指令，在代码编译期间直接将项目版本号等配置元数据硬编码打入最终的二进制产物中。
 
+## 🤖 特别鸣谢
+
+本项目全程使用 **[Google Antigravity CLI](https://github.com/google/antigravity)** 与 **Google Gemini AI** 结对编程开发。
+它展现了在像 MoonBit 这种前沿系统级语言中，人机协同不仅能极速完成跨平台的底层架构搭建，还能将代码的性能与优雅发挥到极致！
+
 ## 📄 许可证
 
-本项目基于 Apache 2.0 许可证开源。
+本项目基于 [MIT 许可证](LICENSE) 开源。

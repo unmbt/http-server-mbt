@@ -8,7 +8,7 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/unmbt/http-server-mbt/ci.yml?branch=master&logo=github)](https://github.com/unmbt/http-server-mbt/actions)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Cross Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-success)](#)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
@@ -129,6 +129,11 @@ Hit CTRL-C to stop the server
 - **Native C-FFI**: Network interface enumeration and graceful `SIGINT` (Ctrl+C) capture are written in C (`src/server/get_ip.c`) and bridged seamlessly via MoonBit's Native backend.
 - **Embedded Config**: Uses MoonBit's `:embed` macro tool to pack configuration metadata right into the binary at compile time.
 
+## 🤖 Powered By
+
+This project was developed with the assistance of **[Google Antigravity CLI](https://github.com/google/antigravity)** and **Google Gemini AI**.
+It demonstrates how human-AI pair programming can rapidly prototype and build high-performance, cross-platform systems in cutting-edge languages like MoonBit.
+
 ## 📄 License
 
-This project is licensed under the Apache 2.0 License.
+This project is licensed under the [MIT License](LICENSE).

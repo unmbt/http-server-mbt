@@ -10,29 +10,41 @@ pub(all) struct Config {
 }
 
 fn print_banner(config : Config) -> Unit {
-  let cors_str = if config.cors { "true" } else { "false" }
-  let dir_listing_str = if config.dir_listing { "visible" } else { "hidden" }
-  let ext_str = if config.ext == "" { "none" } else { config.ext }
+  let y = "\u001b[33m"
+  let c = "\u001b[36m"
+  let r = "\u001b[31m"
+  let g = "\u001b[32m"
+  let rst = "\u001b[39m"
+
+  let cors_str = if config.cors { c + "true" + rst } else { r + "disabled" + rst }
+  let dir_listing_str = if config.dir_listing { c + "visible" + rst } else { r + "not visible" + rst }
+  let ext_str = if config.ext == "" { r + "none" + rst } else { c + config.ext + rst }
   
-  println("Starting up http-server, serving \{config.root_dir}")
-  println("\nhttp-server version: 0.1.0\n")
-  println("http-server settings:")
-  println("CORS: \{cors_str}")
-  println("Cache: \{config.cache_time} seconds")
-  println("Connection Timeout: 120 seconds")
-  println("Directory Listings: \{dir_listing_str}")
-  println("AutoIndex: visible")
-  println("Serve GZIP Files: false")
-  println("Serve Brotli Files: false")
-  println("Default File Extension: \{ext_str}\n")
+  println("\{y}Starting up http-server, serving \{rst}\{c}\{config.root_dir}\{rst}")
+  println("\{y}\nhttp-server version: \{rst}\{c}0.1.0\{rst}")
+  println("\{y}\nhttp-server settings: \{rst}")
+  println("\{y}CORS: \{rst}\{cors_str}")
+  println("\{y}Cache: \{rst}\{c}\{config.cache_time} seconds\{rst}")
+  println("\{y}Connection Timeout: \{rst}\{c}120 seconds\{rst}")
+  println("\{y}Directory Listings: \{rst}\{dir_listing_str}")
+  println("\{y}AutoIndex: \{rst}\{c}visible\{rst}")
+  println("\{y}Serve GZIP Files: \{rst}\{r}false\{rst}")
+  println("\{y}Serve Brotli Files: \{rst}\{r}false\{rst}")
+  println("\{y}Default File Extension: \{rst}\{ext_str}")
   
-  println("Available on:")
+  println("\{y}\nAvailable on:\{rst}")
   if config.addr == "0.0.0.0" {
-    println("  http://127.0.0.1:\{config.port}")
-    println("  http://192.168.x.x:\{config.port} (and other local IPs)")
+    println("  http://127.0.0.1:\{g}\{config.port}\{rst}")
+    println("  http://192.168.x.x:\{g}\{config.port}\{rst} (and other local IPs)")
   } else {
-    println("  http://\{config.addr}:\{config.port}")
+    println("  http://\{config.addr}:\{g}\{config.port}\{rst}")
   }
+
+  match config.proxy {
+    Some(proxy_url) => println("Unhandled requests will be served from: " + proxy_url)
+    None => ()
+  }
+  
   println("Hit CTRL-C to stop the server")
 }
 
@@ -102,7 +114,17 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
   }
 
   conn.send_response(200, "OK", extra_headers=headers)
-  let _ = conn.write_once(bytes, offset=0, len=bytes.length())
+  
+  let mut offset = 0
+  let total = bytes.length()
+  while offset < total {
+    let written = conn.write_once(bytes, offset~, len=total - offset)
+    if written == 0 {
+      break
+    }
+    offset += written
+  }
+  
   conn.end_response()
 }
 

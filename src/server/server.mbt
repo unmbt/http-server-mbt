@@ -12,6 +12,45 @@ pub(all) struct Config {
   root_dir : String
 }
 
+fn get_version() -> String {
+  let target = "\"version\":"
+  let json = moon_mod_json
+  let mut idx = -1
+  let mut i = 0
+  while i <= json.length() - target.length() {
+    let mut matched = true
+    let mut j = 0
+    while j < target.length() {
+      if json[i + j] != target[j] {
+        matched = false
+        break
+      }
+      j += 1
+    }
+    if matched {
+      idx = i
+      break
+    }
+    i += 1
+  }
+  
+  if idx >= 0 {
+    let mut k = idx + target.length()
+    while k < json.length() && (json[k] == ' ' || json[k] == '\t') {
+      k += 1
+    }
+    if k < json.length() && json[k] == '"' {
+      k += 1
+      let start = k
+      while k < json.length() && json[k] != '"' {
+        k += 1
+      }
+      return json[start:k].to_string()
+    }
+  }
+  "unknown"
+}
+
 fn print_banner(config : Config) -> Unit {
   let y = "\u001b[33m"
   let c = "\u001b[36m"
@@ -24,7 +63,7 @@ fn print_banner(config : Config) -> Unit {
   let ext_str = if config.ext == "" { r + "none" + rst } else { c + config.ext + rst }
   
   println("\{y}Starting up http-server, serving \{rst}\{c}\{config.root_dir}\{rst}")
-  println("\{y}\nhttp-server version: \{rst}\{c}0.1.0\{rst}")
+  println("\{y}\nhttp-server version: \{rst}\{c}\{get_version()}\{rst}")
   println("\{y}\nhttp-server settings: \{rst}")
   println("\{y}CORS: \{rst}\{cors_str}")
   println("\{y}Cache: \{rst}\{c}\{config.cache_time} seconds\{rst}")

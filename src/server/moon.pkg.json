@@ -6,5 +6,12 @@
     { "path": "moonbitlang/core/debug", "alias": "debug" },
     { "path": "moonbitlang/x/fs", "alias": "fs" }
   ],
+  "pre-build": [
+    {
+      "input": "../../moon.mod.json",
+      "output": "embedded_mod.mbt",
+      "command": ":embed -i $input -o $output --name moon_mod_json"
+    }
+  ],
   "native-stub": ["get_ip.c"]
 }

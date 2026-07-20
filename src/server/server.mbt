@@ -147,15 +147,19 @@ fn get_mime_type(ext : String) -> String {
 }
 
 async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, config : Config) -> Unit {
+  if config.debug { println("[DEBUG] serve_file: reading bytes for \{path}") }
   let bytes = try {
     @fs.read_file_to_bytes(path)
   } catch {
     _ => {
-      conn.send_response(500, "Internal Server Error")
-      conn.end_response()
+      if config.debug { println("[DEBUG] read_file_to_bytes error") }
+      let _ = conn.send_response(500, "Internal Server Error")
+      let _ = conn.end_response()
       return
     }
   }
+  
+  if config.debug { println("[DEBUG] serve_file: sending headers") }
   
   let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string(), "Connection": "close" }
   if config.cors {
@@ -167,33 +171,39 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
 
   conn.send_response(200, "OK", extra_headers=headers)
   
-  if config.debug {
-    println("[DEBUG] Serving file: \{path} (MIME: \{mime}, Size: \{bytes.length()})")
-  }
-  
+  if config.debug { println("[DEBUG] serve_file: writing body") }
   let mut offset = 0
   let total = bytes.length()
   while offset < total {
     let written = conn.write_once(bytes, offset~, len=total - offset)
+    if config.debug { println("[DEBUG] serve_file: wrote \{written} bytes") }
     if written == 0 {
       break
     }
     offset += written
   }
+  if config.debug { println("[DEBUG] serve_file: ending response") }
   
   conn.end_response()
+  
+  if config.debug {
+    println("[DEBUG] Serving file: \{path} (MIME: \{mime}, Size: \{bytes.length()})")
+  }
 }
 
 async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, local_path : String, config : Config) -> Unit {
+  if config.debug { println("[DEBUG] serve_dir_listing: reading dir \{local_path}") }
   let files = try {
     @fs.read_dir(local_path)
   } catch {
     _ => {
-      conn.send_response(500, "Internal Server Error")
-      conn.end_response()
+      if config.debug { println("[DEBUG] read_dir error") }
+      let _ = conn.send_response(500, "Internal Server Error")
+      let _ = conn.end_response()
       return
     }
   }
+  if config.debug { println("[DEBUG] serve_dir_listing: read \{files.length()} files") }
 
   let mut html = "<html><head><title>Index of \{req_path}</title></head><body>"
   html += "<h1>Index of \{req_path}</h1><hr><ul>"
@@ -211,9 +221,12 @@ async fn serve_dir_listing(conn : @http.ServerConnection, req_path : String, loc
   
   html += "</ul><hr></body></html>"
   let headers = { "Content-Type": "text/html", "Content-Length": html.length().to_string(), "Connection": "close" }
-  conn.send_response(200, "OK", extra_headers=headers)
-  conn.write_string(html)
-  conn.end_response()
+  if config.debug { println("[DEBUG] serve_dir_listing: sending headers") }
+  let _ = conn.send_response(200, "OK", extra_headers=headers)
+  if config.debug { println("[DEBUG] serve_dir_listing: writing html") }
+  let _ = conn.write_string(html)
+  if config.debug { println("[DEBUG] serve_dir_listing: ending response") }
+  let _ = conn.end_response()
   if config.debug {
     println("[DEBUG] Served directory listing for: \{req_path}")
   }
@@ -308,19 +321,25 @@ async fn handle_request(
 
   if is_dir {
     let index_file = local_path + (if local_path.has_suffix("/") { "index.html" } else { "/index.html" })
-    let has_index = try { @fs.is_file(index_file) } catch { _ => false }
+    if config.debug { println("[DEBUG] Checking index_file: \{index_file}") }
+    let has_index = try { @fs.is_file(index_file) } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
+    
     if has_index {
+      if config.debug { println("[DEBUG] Found index.html, calling serve_file") }
       serve_file(conn, index_file, "text/html", config)
       return
     }
 
     if config.dir_listing {
+      if config.debug { println("[DEBUG] Calling serve_dir_listing") }
       serve_dir_listing(conn, req_path, local_path, config)
       return
     }
   } else {
-    let is_file = try { @fs.is_file(local_path) } catch { _ => false }
-    if is_file {
+    if config.debug { println("[DEBUG] Path is file, checking existence") }
+    let has_file = try { @fs.is_file(local_path) } catch { _ => { if config.debug { println("[DEBUG] is_file error") }; false } }
+    if has_file {
+      if config.debug { println("[DEBUG] File exists, calling serve_file") }
       let mut ext = get_extension(local_path)
       if ext == "" {
         ext = config.ext
@@ -330,6 +349,8 @@ async fn handle_request(
       return
     }
   }
+  
+  if config.debug { println("[DEBUG] 404 Not Found, checking proxy") }
 
   match config.proxy {
     Some(proxy_url) => proxy_request(conn, proxy_url, req, config, reader)

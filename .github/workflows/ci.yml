@@ -19,13 +19,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: http-server-mbt-linux-amd64
-            binary_path: _build/native/release/build/src/main/main
+            binary_path: target/native/release/build/src/main/main
           - os: macos-latest
             artifact_name: http-server-mbt-macos-arm64
-            binary_path: _build/native/release/build/src/main/main
+            binary_path: target/native/release/build/src/main/main
           - os: windows-latest
             artifact_name: http-server-mbt-windows-amd64.exe
-            binary_path: _build\native\release\build\src\main\main.exe
+            binary_path: target\native\release\build\src\main\main.exe
 
     steps:
       - name: Checkout Repository
@@ -41,7 +41,7 @@ jobs:
         run: moon test --target native
 
       - name: Build Release
-        run: moon build --target native --release
+        run: moon build --target native --release --target-dir target
 
       - name: Prepare Artifact (Unix)
         if: runner.os != 'Windows'

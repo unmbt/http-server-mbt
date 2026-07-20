@@ -91,6 +91,14 @@ fn print_banner(config : Config) -> Unit {
 }
 
 pub async fn start_server(config : Config) -> Unit raise {
+  let env_args = @env.args()
+  for i = 0; i < env_args.length(); i = i + 1 {
+    if env_args[i] == "-v" || env_args[i] == "--version" {
+      println(get_version())
+      return
+    }
+  }
+
   let addr_with_port = @socket.Addr::parse("\{config.addr}:\{config.port}")
   let server = @http.Server::Server(addr_with_port)
 

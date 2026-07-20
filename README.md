@@ -1,5 +1,7 @@
 <div align="center">
 
+[English](./README.md) | [简体中文](./README.zh.md)
+
 # 🚀 http-server-mbt
 
 *A blazing fast, zero-dependency, static HTTP server written in [MoonBit](https://moonbitlang.com).*
@@ -24,24 +26,52 @@
 
 ## 📦 Installation
 
-### The Easy Way (Pre-compiled Binaries)
-Go to the [Releases page](https://github.com/unmbt/http-server-mbt/releases) and download the executable for your operating system. Put it in a directory that is in your system's `PATH`.
+We provide automated installation scripts for Windows, macOS, and Linux. The scripts will automatically download the correct binary, place it in `~/.unmbt`, and gracefully handle version updates.
 
-### Build from Source
+### 🍎/🐧 macOS & Linux
+
+Open your terminal and run the following command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
+```
+
+> **Note:** The script will automatically append `~/.unmbt` to your `~/.bashrc` or `~/.zshrc`. You may need to restart your terminal for it to take effect.
+
+### 🪟 Windows
+
+Open PowerShell as Administrator (or standard user) and run:
+
+```powershell
+irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
+```
+
+> **Note:** The script will automatically attempt to add `~/.unmbt` to your User Environment Variables (Path). You may need to restart your terminal for it to take effect.
+
+---
+
+### 🔄 Updating
+
+Updating is seamless! Simply re-run the exact same installation command for your OS. The script will automatically detect your current version, check for a newer release, and update it in-place only if necessary!
+
+### 🗑️ Uninstallation
+
+- **macOS/Linux**: Run `bash -c "$(curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh)" -- uninstall`
+- **Windows**: Run `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Uninstall`
+
+<details>
+<summary><b>🛠️ Build from Source</b></summary>
+
 Ensure you have the [MoonBit toolchain](https://docs.moonbitlang.com/en/latest/commands/installation.html) installed.
 
 ```bash
-# Clone the repository
 git clone https://github.com/unmbt/http-server-mbt.git
 cd http-server-mbt
-
-# Install dependencies
-moon install
-
-# Build the native executable
-moon build --target native --release
+moon update
+moon build --target native --release --target-dir target
 ```
-The binary will be located at `_build/native/release/build/src/main/main` (or `.exe` on Windows).
+The compiled binary will be located inside the `target/native/release/build/src/main/` directory.
+</details>
 
 ## 🚀 Usage
 

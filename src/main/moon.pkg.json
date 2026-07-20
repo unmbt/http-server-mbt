@@ -1,7 +1,7 @@
 {
   "is_main": true,
   "import": [
-    { "path": "wyate/http-server-mbt/src/server", "alias": "server" },
+    { "path": "unmbt/http-server-mbt/src/server", "alias": "server" },
     { "path": "moonbitlang/async", "alias": "async" },
     { "path": "moonbitlang/core/env", "alias": "env" },
     { "path": "moonbitlang/core/string", "alias": "string" }
@@ -9,7 +9,7 @@
   "link": {
     "native": {
       "exports": [
-        "wyate/http-server-mbt/src/main"
+        "unmbt/http-server-mbt/src/main"
       ]
     }
   }

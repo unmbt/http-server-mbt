@@ -5,7 +5,7 @@
 *A blazing fast, zero-dependency, static HTTP server written in [MoonBit](https://moonbitlang.com).*
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/wyate/http-server-mbt/ci.yml?branch=master&logo=github)](https://github.com/wyate/http-server-mbt/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/unmbt/http-server-mbt/ci.yml?branch=master&logo=github)](https://github.com/unmbt/http-server-mbt/actions)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Cross Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-success)](#)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
@@ -25,14 +25,14 @@
 ## 📦 Installation
 
 ### The Easy Way (Pre-compiled Binaries)
-Go to the [Releases page](https://github.com/wyate/http-server-mbt/releases) and download the executable for your operating system. Put it in a directory that is in your system's `PATH`.
+Go to the [Releases page](https://github.com/unmbt/http-server-mbt/releases) and download the executable for your operating system. Put it in a directory that is in your system's `PATH`.
 
 ### Build from Source
 Ensure you have the [MoonBit toolchain](https://docs.moonbitlang.com/en/latest/commands/installation.html) installed.
 
 ```bash
 # Clone the repository
-git clone https://github.com/wyate/http-server-mbt.git
+git clone https://github.com/unmbt/http-server-mbt.git
 cd http-server-mbt
 
 # Install dependencies

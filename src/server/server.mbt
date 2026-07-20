@@ -148,20 +148,23 @@ fn get_mime_type(ext : String) -> String {
 
 async fn serve_file(conn : @http.ServerConnection, path : String, mime : String, config : Config) -> Unit {
   if config.debug { println("[DEBUG] serve_file: reading bytes for \{path}") }
-  let bytes = try {
-    @fs.read_file(path).binary()
+  let file = try {
+    @fs.open(path, mode=ReadOnly)
   } catch {
     _ => {
-      if config.debug { println("[DEBUG] read_file_to_bytes error") }
+      if config.debug { println("[DEBUG] serve_file: open error") }
       let _ = conn.send_response(500, "Internal Server Error")
       let _ = conn.end_response()
       return
     }
   }
+  defer file.close()
+
+  let file_size = file.size()
   
   if config.debug { println("[DEBUG] serve_file: sending headers") }
   
-  let headers = { "Content-Type": mime, "Content-Length": bytes.length().to_string(), "Connection": "close" }
+  let headers = { "Content-Type": mime, "Content-Length": file_size.to_string(), "Connection": "close" }
   if config.cors {
     headers["Access-Control-Allow-Origin"] = "*"
   }
@@ -172,22 +175,40 @@ async fn serve_file(conn : @http.ServerConnection, path : String, mime : String,
   conn.send_response(200, "OK", extra_headers=headers)
   
   if config.debug { println("[DEBUG] serve_file: writing body") }
-  let mut offset = 0
-  let total = bytes.length()
-  while offset < total {
-    let written = conn.write_once(bytes, offset~, len=total - offset)
-    if config.debug { println("[DEBUG] serve_file: wrote \{written} bytes") }
-    if written == 0 {
+  
+  let chunk_size = 65536
+  let buf = FixedArray::make(chunk_size, b'\x00')
+  let buf_bytes = buf.unsafe_reinterpret_as_bytes()
+  let mut total_written = 0L
+
+  while true {
+    let n = file.read(buf)
+    if n <= 0 {
       break
     }
-    offset += written
+    
+    let mut offset = 0
+    while offset < n {
+      let written = conn.write_once(buf_bytes, offset~, len=n - offset)
+      if config.debug { println("[DEBUG] serve_file: wrote \{written} bytes") }
+      if written <= 0 {
+        break
+      }
+      offset += written
+      total_written += written.to_int64()
+    }
+    
+    if offset < n {
+      break
+    }
   }
+
   if config.debug { println("[DEBUG] serve_file: ending response") }
   
   conn.end_response()
   
   if config.debug {
-    println("[DEBUG] Serving file: \{path} (MIME: \{mime}, Size: \{bytes.length()})")
+    println("[DEBUG] Serving file: \{path} (MIME: \{mime}, Size: \{total_written})")
   }
 }
 

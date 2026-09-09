@@ -1,0 +1,13 @@
+name = "unmbt/http-server-mbt"
+
+version = "0.1.5"
+
+import {
+  "moonbitlang/async@0.21.3",
+}
+
+readme = "README.md"
+
+repository = ""
+
+license = "MIT"

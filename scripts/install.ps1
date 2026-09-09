@@ -45,7 +45,7 @@ if (-not $LatestVersion -or -not $DownloadUrl) {
 
 if (Test-Path $BinPath) {
     # Execute to get version
-    $CurrentVersion = & $BinPath -v
+    $CurrentVersion = & $BinPath -V
     if ($CurrentVersion -eq $LatestVersion) {
         Write-Host "✨ You already have the latest version ($LatestVersion) installed at $BinPath." -ForegroundColor Green
         return
@@ -61,7 +61,19 @@ if (-not (Test-Path $InstallDir)) {
 }
 
 Write-Host "Downloading $AssetName..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinPath
+$TempPath = Join-Path $InstallDir "$BinName.download"
+try {
+    Remove-Item -Path $TempPath -Force -ErrorAction SilentlyContinue
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempPath -ErrorAction Stop
+    if (-not (Test-Path $TempPath) -or (Get-Item $TempPath).Length -eq 0) {
+        throw "The downloaded file is empty."
+    }
+    Move-Item -Path $TempPath -Destination $BinPath -Force -ErrorAction Stop
+} catch {
+    Remove-Item -Path $TempPath -Force -ErrorAction SilentlyContinue
+    Write-Host "Failed to download $AssetName. The existing installation was not changed." -ForegroundColor Red
+    throw
+}
 
 Write-Host "`n✅ Installed http-server-mbt v$LatestVersion successfully to $BinPath" -ForegroundColor Green
 

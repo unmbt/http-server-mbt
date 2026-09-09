@@ -40,7 +40,10 @@ ASSET_NAME="${BIN_NAME}-${OS}-${ARCH}"
 
 # Fetch latest release info
 echo "Fetching latest version info from GitHub..."
-LATEST_RELEASE=$(curl -s https://api.github.com/repos/$REPO/releases/latest)
+if ! LATEST_RELEASE=$(curl --fail --silent --show-error --location "https://api.github.com/repos/$REPO/releases/latest"); then
+    echo "Failed to fetch release info. Please check your network or check if a Release exists."
+    exit 1
+fi
 LATEST_VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
 DOWNLOAD_URL=$(echo "$LATEST_RELEASE" | grep "browser_download_url.*$ASSET_NAME" | cut -d '"' -f 4)
 
@@ -51,7 +54,7 @@ fi
 
 # Check if already installed and version matches
 if [ -f "$BIN_PATH" ]; then
-    CURRENT_VERSION=$("$BIN_PATH" -v 2>/dev/null || echo "unknown")
+    CURRENT_VERSION=$("$BIN_PATH" -V 2>/dev/null || echo "unknown")
     if [ "$CURRENT_VERSION" == "$LATEST_VERSION" ]; then
         echo "✨ You already have the latest version ($LATEST_VERSION) installed at $BIN_PATH."
         exit 0
@@ -65,8 +68,25 @@ fi
 mkdir -p "$INSTALL_DIR"
 
 echo "Downloading $ASSET_NAME..."
-curl -L -o "$BIN_PATH" "$DOWNLOAD_URL"
-chmod +x "$BIN_PATH"
+TEMP_PATH=$(mktemp "$INSTALL_DIR/${BIN_NAME}.download.XXXXXX")
+cleanup() {
+    rm -f "$TEMP_PATH"
+}
+trap cleanup EXIT
+
+if ! curl --fail --show-error --location --output "$TEMP_PATH" "$DOWNLOAD_URL"; then
+    echo "Failed to download $ASSET_NAME. The existing installation was not changed."
+    exit 1
+fi
+
+if [ ! -s "$TEMP_PATH" ]; then
+    echo "Failed to download $ASSET_NAME: the downloaded file is empty."
+    exit 1
+fi
+
+chmod +x "$TEMP_PATH"
+mv -f "$TEMP_PATH" "$BIN_PATH"
+trap - EXIT
 
 echo ""
 echo "✅ Installed $BIN_NAME v$LATEST_VERSION successfully to $BIN_PATH"

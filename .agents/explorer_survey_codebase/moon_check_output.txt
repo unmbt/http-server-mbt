@@ -1,0 +1,323 @@
+Warning: [0067]
+     ╭─[ D:\project\moonbit\http-server-mbt\cmd\http-server-mbt\main.mbt:103:40 ]
+     │
+ 103 │   @server.with_server_at(config, port, async fn(_server) {
+     │                                        ──┬──  
+     │                                          ╰──── Warning (unused_async): This `async` annotation is useless.
+─────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:12:3 ]
+    │
+ 12 │   pub method : Method
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field method is public by default
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:12:7 ]
+    │
+ 12 │   pub method : Method
+    │       ───┬──  
+    │          ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:13:3 ]
+    │
+ 13 │   pub target : String
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field target is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:14:3 ]
+    │
+ 14 │   pub headers : Map[String, String]
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field headers is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:20:3 ]
+    │
+ 20 │   pub root : String
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field root is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:21:3 ]
+    │
+ 21 │   pub base_url : String
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field base_url is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:22:3 ]
+    │
+ 22 │   pub default_ext : String?
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field default_ext is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:23:3 ]
+    │
+ 23 │   pub gzip : Bool
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field gzip is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:24:3 ]
+    │
+ 24 │   pub brotli : Bool
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field brotli is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:25:3 ]
+    │
+ 25 │   pub auto_index : Bool
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field auto_index is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:26:3 ]
+    │
+ 26 │   pub show_dir : Bool
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field show_dir is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:27:3 ]
+    │
+ 27 │   pub show_dotfiles : Bool
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field show_dotfiles is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:28:3 ]
+    │
+ 28 │   pub cache_control : String
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field cache_control is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:50:3 ]
+    │
+ 50 │   pub start : Int64
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field start is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:51:3 ]
+    │
+ 51 │   pub end : Int64
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field end is public by default
+────╯
+Warning: [0027]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:63:21 ]
+    │
+ 63 │     value.contains("\x00") {
+    │                     ──┬─  
+    │                       ╰─── Warning (deprecated_syntax): The syntax `\x..` in string literal for type String is deprecated. Use `\u..` instead.
+────╯
+Warning: [0027]
+    ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:83:20 ]
+    │
+ 83 │     path.contains("\x00") ||
+    │                    ──┬─  
+    │                      ╰─── Warning (deprecated_syntax): The syntax `\x..` in string literal for type String is deprecated. Use `\u..` instead.
+────╯
+Warning: [0006]
+     ╭─[ D:\project\moonbit\http-server-mbt\core\core.mbt:141:3 ]
+     │
+ 141 │   InvalidRoot(String)
+     │   ─────┬─────  
+     │        ╰─────── Warning (unused_constructor): Variant 'InvalidRoot' is never constructed
+─────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:11:3 ]
+    │
+ 11 │   use : async (StaticEngine) -> T,
+    │   ─┬─  
+    │    ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:14:3 ]
+    │
+ 14 │   use(engine)
+    │   ─┬─  
+    │    ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:28:3 ]
+    │
+ 28 │   pub status : Int
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field status is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:29:3 ]
+    │
+ 29 │   pub headers : Map[String, String]
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field headers is public by default
+────╯
+Warning: [0008]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:30:3 ]
+    │
+ 30 │   pub body : Bytes
+    │   ─┬─  
+    │    ╰─── Warning (redundant_modifier): The public modifier is redundant here since field body is public by default
+────╯
+Warning: [0006]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:62:3 ]
+    │
+ 62 │   NotFound
+    │   ────┬───  
+    │       ╰───── Warning (unused_constructor): Variant 'NotFound' is never constructed
+────╯
+Warning: [0006]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:64:3 ]
+    │
+ 64 │   Closed
+    │   ───┬──  
+    │      ╰──── Warning (unused_constructor): Variant 'Closed' is never constructed
+────╯
+Warning: [0020]
+     ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:244:26 ]
+     │
+ 244 │         data = Some(html.to_bytes())
+     │                          ────┬───  
+     │                              ╰───── Warning (deprecated): Check `@encoding/utf8.encode`
+─────╯
+Warning: [0020]
+     ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:270:60 ]
+     │
+ 270 │         output = body[r.start.to_int():r.end.to_int() + 1].to_bytes()
+     │                                                            ────┬───  
+     │                                                                ╰───── Warning (deprecated): Use `to_owned` to allocate an owned `Bytes` from a `BytesView`
+─────╯
+Warning: [0020]
+     ╭─[ D:\project\moonbit\http-server-mbt\engine.mbt:304:16 ]
+     │
+ 304 │     body: text.to_bytes(),
+     │                ────┬───  
+     │                    ╰───── Warning (deprecated): Check `@encoding/utf8.encode`
+─────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine_test.mbt:17:5 ]
+    │
+ 17 │     method: @core.Method::Get,
+    │     ───┬──  
+    │        ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine_test.mbt:31:5 ]
+    │
+ 31 │     method: @core.Method::Head,
+    │     ───┬──  
+    │        ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine_test.mbt:40:5 ]
+    │
+ 40 │     method: @core.Method::Get,
+    │     ───┬──  
+    │        ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine_test.mbt:65:5 ]
+    │
+ 65 │     method: @core.Method::Get,
+    │     ───┬──  
+    │        ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\engine_test.mbt:78:5 ]
+    │
+ 78 │     method: @core.Method::Get,
+    │     ───┬──  
+    │        ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0029]
+   ╭─[ D:\project\moonbit\http-server-mbt\moon.pkg:2:3 ]
+   │
+ 2 │   "moonbitlang/async",
+   │   ─────────┬─────────  
+   │            ╰─────────── Warning (unused_package): Unused package 'moonbitlang/async'
+───╯
+Warning: [0029]
+   ╭─[ D:\project\moonbit\http-server-mbt\moon.pkg:4:3 ]
+   │
+ 4 │   "moonbitlang/async/http",
+   │   ────────────┬───────────  
+   │               ╰───────────── Warning (unused_package): Unused package 'moonbitlang/async/http'
+───╯
+Warning: [0029]
+   ╭─[ D:\project\moonbit\http-server-mbt\server\moon.pkg:4:3 ]
+   │
+ 4 │   "moonbitlang/async",
+   │   ─────────┬─────────  
+   │            ╰─────────── Warning (unused_package): Unused package 'moonbitlang/async'
+───╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:12:3 ]
+    │
+ 12 │   use : async (Server) -> Unit,
+    │   ─┬─  
+    │    ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:14:32 ]
+    │
+ 14 │   with_server_at(config, 8080, use)
+    │                                ─┬─  
+    │                                 ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:24:3 ]
+    │
+ 24 │   use : async (Server) -> Unit,
+    │   ─┬─  
+    │    ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:30:3 ]
+    │
+ 30 │   use(server)
+    │   ─┬─  
+    │    ╰─── Warning (reserved_keyword): The word `use` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:32:9 ]
+    │
+ 32 │     let method = match request.meth {
+    │         ───┬──  
+    │            ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0020]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:35:45 ]
+    │
+ 35 │       _ => @core.Method::Other(request.meth.to_string())
+    │                                             ────┬────  
+    │                                                 ╰────── Warning (deprecated): `Show` implementation for this type is deprecated, use `Debug` related API, or use `@debug.to_string` instead.
+────╯
+Warning: [0020]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:37:41 ]
+    │
+ 37 │     let headers : Map[String, String] = Map::new()
+    │                                         ────┬───  
+    │                                             ╰───── Warning (deprecated): Use `Map([], capacity=...)` instead
+────╯
+Warning: [0035]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:41:41 ]
+    │
+ 41 │     let result = server.engine.handle({ method, target: request.path, headers, })
+    │                                         ───┬──  
+    │                                            ╰──── Warning (reserved_keyword): The word `method` is reserved for possible future use. Please consider using another name.
+────╯
+Warning: [0020]
+    ╭─[ D:\project\moonbit\http-server-mbt\server\server.mbt:44:62 ]
+    │
+ 44 │         let out : Map[@http.CaseInsensitiveString, String] = Map::new()
+    │                                                              ────┬───  
+    │                                                                  ╰───── Warning (deprecated): Use `Map([], capacity=...)` instead
+────╯
+Finished. moon: ran 7 tasks, now up to date (46 warnings, 0 errors)

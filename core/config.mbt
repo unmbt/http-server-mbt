@@ -1,0 +1,303 @@
+///|
+/// Configuration validation error hierarchy.
+/// All errors are detected and raised during pre-listen startup.
+pub(all) suberror ConfigError {
+  InvalidBaseUrl(String)
+  InvalidRoot(String)
+  InvalidPort(String)
+  InvalidTryFiles(String)
+  ConflictingBaseUrl(String)
+  ConflictingRouting(String)
+  InvalidProxy(String)
+  InvalidAuth(String)
+  InvalidHeader(String)
+  InvalidTimeout(String)
+} derive(Eq, Debug)
+
+///|
+/// Normalized static-server configuration model.
+/// Contains all configuration settings for protocol, static resolution,
+/// routing mounts, SPA fallback, security policies, and upstream proxies.
+pub(all) struct Config {
+  // --- Filesystem & Network ---
+  root : String // Filesystem root directory (default "." or "public")
+  port : Int // TCP listen port (0..65535, 0 = ephemeral)
+  address : String // Bind address ("0.0.0.0", "::", etc.)
+
+  // --- Routing & Mounts ---
+  base_url : String // Normalized URL mount prefix (e.g. "/", "/app")
+  default_ext : String? // Default file extension completion (e.g. Some("html"))
+  spa : Bool // SPA fallback to root index.html
+  try_files : String? // Custom fallback file relative to root
+
+  // --- Compression ---
+  gzip : Bool // Detect & serve pre-compressed .gz files
+  brotli : Bool // Detect & serve pre-compressed .br files
+  force_content_encoding : Bool // Force Content-Encoding for files ending in .gz/.br
+
+  // --- Directory Handling ---
+  auto_index : Bool // Serve index.html when requesting a directory
+  show_dir : Bool // Render HTML directory listing if no index file
+  show_dotfiles : Bool // Include hidden/dotfiles in directory listing
+  dir_overrides_404 : Bool // Directory listing takes precedence over custom 404.html
+
+  // --- Caching & ETag ---
+  cache_seconds : Int // Cache duration in seconds (-1 = no-cache, no-store)
+  cache_control : String? // Explicit Cache-Control header override
+  weak_etags : Bool // Generate weak ETags (W/"...")
+  weak_compare : Bool // Compare ETags using weak comparison
+
+  // --- Security & Headers ---
+  cors : Bool // Enable CORS headers (Access-Control-Allow-Origin: *)
+  cors_headers : String? // Custom Access-Control-Allow-Headers
+  coop : Bool // Cross-Origin-Opener-Policy: same-origin
+  coop_header : String? // Custom Cross-Origin-Opener-Policy value
+  pna : Bool // Access-Control-Allow-Private-Network: true
+  basic_auth : (String, String)? // (username, password) for HTTP Basic Auth
+  host_whitelist : Array[String] // Allowed Host header values (empty = allow all)
+  custom_headers : Map[String, String] // User-defined headers injected into all responses
+  robots : Bool // Serve default User-agent: *\nDisallow: / for /robots.txt
+
+  // --- Proxy & Upstream ---
+  proxy : String? // Upstream proxy target (e.g. "http://127.0.0.1:3000")
+  proxy_all : String? // Proxy all requests upstream (requires proxy to be set)
+  proxy_options : Map[String, String] // Upstream proxy options (must be empty if fallback active)
+
+  // --- Lifecycle & Error Handling ---
+  handle_error : Bool // If false, delegates 404/errors to host (middleware Next)
+  idle_timeout_ms : Int // Socket idle timeout in ms (0 = disabled, default 120000)
+  mime_types : Map[String, String] // Custom extension -> MIME type overrides
+} derive(Debug)
+
+///|
+/// Build Server & CLI defaults for a filesystem root directory.
+pub fn Config::default(root : String) -> Config {
+  {
+    root,
+    port: 8080,
+    address: "0.0.0.0",
+    base_url: "/",
+    default_ext: Some("html"),
+    spa: false,
+    try_files: None,
+    gzip: false, // Server/CLI default is false per AD-02
+    brotli: false,
+    force_content_encoding: false,
+    auto_index: true,
+    show_dir: true,
+    show_dotfiles: false,
+    dir_overrides_404: false,
+    cache_seconds: 3600,
+    cache_control: None,
+    weak_etags: true,
+    weak_compare: true,
+    cors: false,
+    cors_headers: None,
+    coop: false,
+    coop_header: None,
+    pna: false,
+    basic_auth: None,
+    host_whitelist: [],
+    custom_headers: Map([]),
+    robots: false,
+    proxy: None,
+    proxy_all: None,
+    proxy_options: Map([]),
+    handle_error: true,
+    idle_timeout_ms: 120000, // 120 seconds per AD-03
+    mime_types: Map([]),
+  }
+}
+
+///|
+/// Build Core Middleware defaults for a filesystem root directory (AD-02 compatibility).
+pub fn Config::middleware_default(root : String) -> Config {
+  {
+    ..Config::default(root),
+    gzip: true, // Core middleware default is true per AD-02
+  }
+}
+
+///|
+/// Determine active page fallback mode.
+pub fn Config::fallback_mode(self : Config) -> FallbackMode {
+  if self.spa {
+    FallbackMode::Spa
+  } else {
+    match self.try_files {
+      Some(f) => FallbackMode::TryFiles(f)
+      None => FallbackMode::None
+    }
+  }
+}
+
+///|
+/// Returns whether any fallback mode is enabled.
+pub fn Config::has_fallback(self : Config) -> Bool {
+  self.spa || self.try_files is Some(_)
+}
+
+///|
+/// Returns whether any upstream proxy mode is configured.
+pub fn Config::has_proxy(self : Config) -> Bool {
+  self.proxy is Some(_) ||
+  self.proxy_all is Some(_) ||
+  !self.proxy_options.is_empty()
+}
+
+///|
+/// Returns the relative file path to serve on fallback, if enabled.
+pub fn Config::fallback_target_file(self : Config) -> String? {
+  if self.spa {
+    Some("index.html")
+  } else {
+    self.try_files
+  }
+}
+
+///|
+/// Returns the effective Cache-Control header string.
+pub fn Config::effective_cache_control(self : Config) -> String {
+  match self.cache_control {
+    Some(custom) => custom
+    None =>
+      if self.cache_seconds < 0 {
+        "no-cache, no-store, must-revalidate"
+      } else {
+        "max-age=" + self.cache_seconds.to_string()
+      }
+  }
+}
+
+///|
+/// Validate a filesystem root directory path.
+pub fn validate_root(root : String) -> String raise ConfigError {
+  if root == "" || root.contains("\u0000") {
+    raise ConfigError::InvalidRoot("root cannot be empty or contain null bytes")
+  }
+  root
+}
+
+///|
+/// Validate a user-specified try_files relative path.
+pub fn validate_try_files_path(path : String) -> String raise ConfigError {
+  if path == "" {
+    raise ConfigError::InvalidTryFiles("try_files path cannot be empty")
+  }
+  if path[0] == '/' {
+    raise ConfigError::InvalidTryFiles(
+      "try_files path must be relative to root, cannot start with '/'",
+    )
+  }
+  if path.contains("\u0000") ||
+    path.contains("\\") ||
+    path.contains("\r") ||
+    path.contains("\n") {
+    raise ConfigError::InvalidTryFiles(
+      "try_files path contains invalid characters",
+    )
+  }
+  if path.contains("$uri") ||
+    path.contains("=404") ||
+    path.contains(" ") ||
+    path.contains(",") {
+    raise ConfigError::InvalidTryFiles(
+      "try_files does not support Nginx multi-candidate or variable syntax",
+    )
+  }
+  let parts = path.split("/").to_array()
+  for part in parts {
+    if part == ".." || part == "." {
+      raise ConfigError::InvalidTryFiles(
+        "try_files path cannot contain dot segments",
+      )
+    }
+    if part == "" {
+      raise ConfigError::InvalidTryFiles(
+        "try_files path cannot contain consecutive slashes",
+      )
+    }
+  }
+  path
+}
+
+///|
+/// Validate upstream proxy URL format (http:// or https:// with valid host/port).
+pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
+  if !url.has_prefix("http://") && !url.has_prefix("https://") {
+    raise ConfigError::InvalidProxy(
+      "proxy URL must start with http:// or https://",
+    )
+  }
+}
+
+///|
+/// Validate all configuration settings before creating any network listener.
+/// Raises ConfigError on any syntactic defect or mutual exclusion conflict.
+pub fn validate_config(config : Config) -> Unit raise ConfigError {
+  ignore(validate_root(config.root))
+  ignore(normalize_base_url(config.base_url))
+
+  if config.port < 0 || config.port > 65535 {
+    raise ConfigError::InvalidPort("port must be between 0 and 65535")
+  }
+
+  if config.idle_timeout_ms < 0 {
+    raise ConfigError::InvalidTimeout("idle_timeout_ms cannot be negative")
+  }
+
+  match config.try_files {
+    Some(tf) => ignore(validate_try_files_path(tf))
+    None => ()
+  }
+
+  if config.spa && config.try_files is Some(_) {
+    raise ConfigError::ConflictingRouting(
+      "cannot specify both --spa and --try-files (mutual exclusion violation)",
+    )
+  }
+
+  let has_fallback = config.spa || config.try_files is Some(_)
+  let has_proxy = config.proxy is Some(_) ||
+    config.proxy_all is Some(_) ||
+    !config.proxy_options.is_empty()
+
+  if has_fallback && has_proxy {
+    raise ConfigError::ConflictingRouting(
+      "cannot combine page fallback (--spa or --try-files) with proxy configuration",
+    )
+  }
+
+  if config.proxy_all is Some(_) && config.proxy is None {
+    raise ConfigError::InvalidProxy(
+      "--proxy-all requires --proxy to be configured",
+    )
+  }
+  match config.proxy {
+    Some(p) => validate_proxy_url(p)
+    None => ()
+  }
+
+  match config.basic_auth {
+    Some((username, password)) =>
+      if username.contains(":") ||
+        username.contains("\u0000") ||
+        password.contains("\u0000") {
+        raise ConfigError::InvalidAuth(
+          "username cannot contain ':' or null bytes",
+        )
+      }
+    None => ()
+  }
+
+  for k, v in config.custom_headers {
+    if k.contains("\r") ||
+      k.contains("\n") ||
+      v.contains("\r") ||
+      v.contains("\n") {
+      raise ConfigError::InvalidHeader(
+        "custom headers cannot contain CRLF characters",
+      )
+    }
+  }
+}

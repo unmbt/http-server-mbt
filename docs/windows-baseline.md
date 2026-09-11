@@ -4,34 +4,44 @@
 `0d3b7bb5b6e8a59fd450ae2dca65870009cfcd8b`（14.1.2）。参考目录 `http-server/` 未修改。
 
 工具链：Moon `0.1.20260904`、Node `v26.4.0`、npm `11.17.0`、clang `22.1.3`。
-原版 checkout 没有 `node_modules`，因此 Node 测试未运行；这是基线阻塞证据，不计为通过。
 
-已实现 Windows 可用分项：
+## 已实现并完成验证的分项（Milestone 1 ~ 3）
 
-- `core`：BaseURL 归一化、路径遍历/反斜杠/NUL 拒绝、Range 解析。
-- 根静态引擎：GET/HEAD、query 剥离、默认 `.html`、MIME、404、Range 206/416、gzip/Brotli 预压缩选择、ETag/304、缓存头和有界响应读取。
-- `server`：基于 `moonbitlang/async/http` 的 Windows Native listener，生命周期 `stop` 和托管 `with_server` 入口。
-- CLI：基于 `moonbitlang/core/argparse` 的位置参数 root、`--port`/`PORT`、`--base-url`、帮助/版本和 Native async 主入口；参数错误在监听前报告。
+1. **编译器警告消除（Milestone 1 达成）**：
+   - 全面根除原有 46 个编译器 Warning（消除 `deprecated`、保留字 `method`/`use` 冲突、冗余 `pub` 修饰符、未构造变体等）。
+   - `moon check --target native` 达到 **0 错误、0 警告** 纯净状态。
+2. **核心协议与模块解耦（Milestone 2 达成）**：
+   - `core/cache.mbt`：强/弱 ETag、`If-None-Match`、`If-Modified-Since`、`Cache-Control` 计算与 304 Not Modified 响应。
+   - `core/range.mbt`：206 Partial Content、416 Range Not Satisfiable、`Content-Range` 响应头生成。
+   - `core/mime.mbt`：标准 MIME 映射表、自定义 MIME 与动态 `.types` 文件解析器、默认扩展名映射。
+   - `core/security.mbt`：目录穿越防御（`..`、反斜杠、NUL 拦截与跨盘符越界检测）、常量时间 HTTP Basic Auth。
+   - `core/routing.mbt`：BaseURL / BaseDir 路径挂载前缀归一化及互斥规则校验。
+3. **Engine 业务特性与高级路由（Milestone 3 达成）**：
+   - GET / HEAD 完整分发调度与 HEAD 响应体空抑制。
+   - 预压缩协商：Brotli (`.br`) 优先、gzip (`.gz` 带 `0x1F 0x8B` 魔数检测)、`forceContentEncoding` 强制头输出。
+   - 目录索引探测与 302 Found 重定向（保留原始 Query）。
+   - HTML 目录列表视图生成：$O(N)$ 伴生文件去重匹配、$O(N \log N)$ 排序、HTML 与 URL 转义、dotfile 隐藏文件过滤、图标与文件大小展示。
+   - SPA 路由兜底（`--spa` 回退至根 `index.html`）与自定义单文件回退（`--try-files <file>`）。
+   - 回退安全隔离：SPA / try-files 回退严格保留 401（未授权）与 403（禁止越界），不掩盖安全错误。
+   - D-17 在途文件变更（FILE_CHANGED）截断检测与安全终止。
+   - `ResponseBody` 抽象为 `Empty`、`Bytes(Bytes)` 与 `FileRegion(path, offset, length)`。
 
-验证命令（Windows PowerShell）：
+## 验证命令（Windows PowerShell）
 
-```text
+```powershell
 moon check --target native
 moon test --target native
 moon info --target native
 moon fmt
 ```
 
-结果：5 个 MoonBit 测试全部通过；Native 检查和接口生成成功。async 依赖的 Windows IOCP
-源码参与构建，TransmitFile/取消状态机和文件 lease 尚未接入，故 T-031 仅完成静态引擎/HTTP
-基础分项，不能宣称三平台 T-016/T-017 或完整 42 文件兼容。
+实测结果：
+- `moon check --target native`：**0 错误、0 警告**（`Finished. moon: ran 30 tasks, now up to date`）。
+- `moon test --target native`：**46 / 46 测试全部通过**（0 失败）。
+- 各模块 `.mbti` 接口文件已规范更新，代码保持 `moon fmt` 格式化规范。
 
-Release 构建：`moon build --target native --release` 成功。可执行文件为
-`_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe`，SHA-256
-`3D34DB18F24959DBBE7676E9D28FC04056AA9799FE2502C7E0B9B280E814A42C`。
-CLI 冒烟验证：`--help` 输出 argparse 帮助，`--version` 输出 `http-server-mbt 0.1.5`，
-`--port nope` 在创建监听器前报告 `error: invalid port`。
-Ctrl+C 取消服务时不再打印 `server error`；事件循环按信号路径结束进程。
+## 待实现并保留的后续分项（Milestone 4 ~ 6）
 
-未实现并显式保留：TLS、代理、WebSocket、认证、SPA/try-files、正式 C ABI、三平台 Actions、
-目录渲染完整兼容、文件变更中断/重试和 TransmitFile 零拷贝传输。
+- **Milestone 4**：Windows 原生 `TransmitFile` Overlapped 异步 I/O 内核级零拷贝传输、有界缓冲降级与断连防句柄泄漏。
+- **Milestone 5**：CLI 完整参数解析（`--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--spa`, `--try-files` 等）与前置拦截报错，优雅退出与商业宽松协议合规审计。
+- **Milestone 6**：原版 C001~C042 及 CC/CE 测试套件 Windows 全量迁移与状态机故障注入。

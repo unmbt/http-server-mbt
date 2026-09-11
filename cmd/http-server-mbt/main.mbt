@@ -100,7 +100,7 @@ async fn run() -> Unit {
     }
   }
   let config : @core.Config = { ..config0, base_url, }
-  @server.with_server_at(config, port, async fn(_server) {
+  @server.with_server_at(config, port, fn(_server) {
     println("Listening on port \{port}")
   }) catch {
     _ if @async.is_being_cancelled() => ()

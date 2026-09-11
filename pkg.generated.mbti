@@ -13,12 +13,22 @@ pub async fn[T] with_engine(@core.Config, async (StaticEngine) -> T) -> T
 pub suberror ServerError {
   InvalidRequest(String)
   Forbidden(String)
-  NotFound
   Io(String)
-  Closed
+  FileChanged(String)
 } derive(@debug.Debug)
+pub fn ServerError::forbidden(String) -> Self
+pub fn ServerError::invalid_request(String) -> Self
+pub fn ServerError::io(String) -> Self
 
 // Types and methods
+pub struct FileLease {
+  path : String
+  initial_size : Int64
+  initial_mtime : (Int64, Int)
+} derive(@debug.Debug)
+pub async fn FileLease::acquire(String) -> Self?
+pub async fn FileLease::is_mutated(Self) -> Bool
+
 pub(all) enum HandleResult {
   Handled(Response)
   Next
@@ -28,13 +38,15 @@ pub(all) enum HandleResult {
 pub struct Response {
   status : Int
   headers : Map[String, String]
-  body : Bytes
+  body : @core.ResponseBody
 } derive(@debug.Debug)
 pub fn Response::close(Self) -> Unit
-pub fn Response::read(Self, offset? : Int, max_len? : Int) -> Bytes
+pub async fn Response::read(Self, offset? : Int, max_len? : Int) -> Bytes
+pub async fn Response::to_bytes(Self) -> Bytes
 
 pub struct StaticEngine {
   config : @core.Config
+  mime_registry : @core.MimeRegistry
 }
 pub async fn StaticEngine::handle(Self, @core.Request) -> HandleResult
 pub fn StaticEngine::new(@core.Config) -> Self

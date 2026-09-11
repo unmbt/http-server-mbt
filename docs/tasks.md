@@ -38,8 +38,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：请求头/正文 framing、重复头、响应计划、keep-alive/流水线顺序、状态处理和协议错误限额。
   - 验收：N-11 全部通过，分片输入和 TE/CL 不造成请求混淆，HEAD/304 无正文；只使用受控测试传输不视为生产运行时完成。
 
-- [ ] **T-005 安全路径与文件句柄抽象** — 状态：未开始。需求：R-COMPAT、R-SAFE、R-N15；设计：D-03、D-05、D-17；依赖：T-002、T-003。
-  - 交付：根目录锚定、组件解码与边界验证、含身份/变更观察信息的文件 lease、元数据与错误分类、三平台特殊路径；下载不主动持有拒绝写入的锁。
+- [ ] **T-005 安全路径与文件句柄抽象** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-SAFE、R-N15；设计：D-03、D-05、D-17；依赖：T-002、T-003。已交付：根目录锚定、路径穿越拒绝（..、\、NUL、跨盘符越界）、D-17 动态变更截断检测；证据见 [windows-baseline](windows-baseline.md) 与 [progress](progress.md)。
   - 验收：C017～C021 及 N-04 路径案例；symlink/reparse 竞态不得越界，ENOENT/ENOTDIR 与权限失败区分，取消释放句柄。
 
 - [ ] **T-006 静态文件、MIME 与索引解析** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-SAFE；设计：D-03；依赖：T-003、T-004、T-005。已交付：GET/HEAD、默认扩展名、MIME、404 和 index 文件的基础实现；证据见 [windows-baseline](windows-baseline.md)。
@@ -54,13 +53,13 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：64 位区间、206/416、Brotli/gzip 选择、gzip 魔数、forceContentEncoding 与压缩索引/404。
   - 验收：C004～C007 和 CC 压缩案例，错误正文及头完整；HEAD+Range 不输出 body，字节区间与选定表示一致。
 
-- [ ] **T-009 目录行为与渲染基线** — 状态：未开始。需求：R-COMPAT、R-N05；设计：D-03、D-06；依赖：T-006。
+- [ ] **T-009 目录行为与渲染基线** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-N05；设计：D-03、D-06；依赖：T-006。已交付：O(N) 伴生文件匹配、O(N log N) 排序、HTML/URL 转义、点文件隐藏与美观目录列表渲染；证据见 [windows-baseline](windows-baseline.md) 与 [progress](progress.md)。
   - 交付：扫描分类、排序、可配置列/图标、转义与 query 导航；先固定正确输出。
   - 验收：C016、C019、C022～C024、CC 目录案例；旧模式 404/index/listing 优先级准确，平台文件名限制显式报告。
 
 ### 阶段三：应用层兼容与嵌入语义
 
-- [ ] **T-010 安全和响应策略** — 状态：未开始。需求：R-COMPAT、R-SAFE；设计：D-03；依赖：T-003、T-004、T-005。
+- [ ] **T-010 安全和响应策略** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-SAFE；设计：D-03；依赖：T-003、T-004、T-005。已交付：常量时间 HTTP Basic Auth 比较、安全响应头基础、认证先于文件探测；证据见 [windows-baseline](windows-baseline.md) 与 [progress](progress.md)。
   - 交付：Basic Auth 常量时间比较、Host、自定义头、CORS/COOP/PNA、robots 与日志钩子。
   - 验收：C026～C030、C042 策略/认证组与 N-04；错误认证先于文件探测，数字密码归一化，空头值和预检准确，错误文本不泄露凭据。
 
@@ -100,8 +99,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ### 阶段五：独立 BaseURL 和页面回退
 
-- [ ] **T-019 新路由特性与互斥校验** — 状态：未开始。需求：R-N07、R-SAFE；设计：D-04；依赖：T-003、T-007、T-008、T-009、T-010、T-011、T-015。
-  - 交付：独立 base-url/base-dir、spa、单文件 try-files、共享配置冲突与一次性回退解析。
+- [ ] **T-019 新路由特性与互斥校验** — 状态：进行中（Windows 分项）。需求：R-N07、R-SAFE；设计：D-04；依赖：T-003、T-007、T-008、T-009、T-010、T-011、T-015。已交付：独立 base-url/base-dir 归一化、spa、try-files 运行时回退与互斥校验，回退保留 401/403 安全错误；证据见 [windows-baseline](windows-baseline.md) 与 [progress](progress.md)。
   - 验收：N-01～N-03 全组合；新参数关闭时旧 C/CC 行为不变，回退不吞鉴权/权限/路径错误，GET/HEAD 缺失 JS/API 也按约定回退，文件删除后最终 404。
 
 ### 阶段六：嵌入、分发、实验后端和交付

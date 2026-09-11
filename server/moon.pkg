@@ -1,10 +1,10 @@
 import {
   "unmbt/http-server-mbt" @root,
   "unmbt/http-server-mbt/core",
-  "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
+  "moonbitlang/core/debug",
 }
 
 options(

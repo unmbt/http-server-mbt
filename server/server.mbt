@@ -9,9 +9,9 @@ pub struct Server {
 /// Start a server and run the handler until the scope exits.
 pub async fn with_server(
   config : @core.Config,
-  use : async (Server) -> Unit,
+  action : async (Server) -> Unit,
 ) -> Unit {
-  with_server_at(config, 8080, use)
+  with_server_at(config, 8080, action)
 }
 
 ///|
@@ -21,32 +21,39 @@ pub async fn with_server(
 pub async fn with_server_at(
   config : @core.Config,
   port : Int,
-  use : async (Server) -> Unit,
+  action : async (Server) -> Unit,
 ) -> Unit {
   let engine = @root.StaticEngine::new(config)
   let listener = @http.Server::Server(@socket.Addr::new(0, port))
   let server = { inner: listener, engine, }
   defer listener.close()
-  use(server)
+  action(server)
   listener.run_forever((request, _body, conn) => {
-    let method = match request.meth {
+    let meth = match request.meth {
       @http.RequestMethod::Get => @core.Method::Get
       @http.RequestMethod::Head => @core.Method::Head
-      _ => @core.Method::Other(request.meth.to_string())
+      _ => @core.Method::Other(@debug.to_string(request.meth))
     }
-    let headers : Map[String, String] = Map::new()
+    let headers : Map[String, String] = Map([])
     for key, value in request.headers {
       headers[key.to_string()] = value
     }
-    let result = server.engine.handle({ method, target: request.path, headers, })
+    let result = server.engine.handle({ meth, target: request.path, headers, })
     match result {
       @root.HandleResult::Handled(response) => {
-        let out : Map[@http.CaseInsensitiveString, String] = Map::new()
+        let out : Map[@http.CaseInsensitiveString, String] = Map([])
         for key, value in response.headers {
           out[@http.CaseInsensitiveString(key)] = value
         }
         conn.send_response(response.status, "OK", extra_headers=out)
-        conn.write(response.body)
+        match response.body {
+          Empty => ()
+          Bytes(b) => conn.write(b)
+          FileRegion(_) => {
+            let bytes = response.read(offset=0, max_len=response.body.length())
+            conn.write(bytes)
+          }
+        }
       }
       @root.HandleResult::Next => {
         conn.send_response(404, "Not Found")

@@ -6,17 +6,106 @@ import {
 }
 
 // Values
-pub fn normalize_base_url(String) -> String raise
+pub fn apply_default_ext(String, String) -> String
+
+pub fn apply_security_headers(Map[String, String], Config, Method) -> Unit
+
+pub fn base64_decode_string(StringView) -> String?
+
+pub fn check_host_allowed(String?, Array[String]) -> Bool
+
+pub fn crypto_equals(String, String) -> Bool
+
+pub fn decode_percent(StringView) -> String raise PathError
+
+pub fn etag_matches(String, EntityTag, Bool) -> Bool
+
+pub fn evaluate_security_policies(Config, Request) -> SecurityDecision
+
+pub fn extract_extension(String) -> String
+
+pub fn extract_hostname(String) -> String
+
+pub fn find_header_case_insensitive(Map[String, String], String) -> String?
+
+pub fn format_cache_control(CachePolicy) -> String
+
+pub fn format_content_range(Int64, Int64, Int64) -> String
+
+pub fn format_content_range_unsatisfiable(Int64) -> String
+
+pub fn format_dir_redirect(String, String?) -> String
+
+pub fn format_http_date(Int64) -> String
+
+pub fn has_file_extension(String) -> Bool
+
+pub fn if_none_match_matches(String, EntityTag, Bool) -> Bool
+
+pub fn is_text_mime(String) -> Bool
+
+pub fn match_and_strip_base_url(String, String) -> String?
+
+pub fn normalize_base_url(String) -> String raise ConfigError
+
+pub fn normalize_charset(String) -> String
+
+pub fn normalize_extension(String) -> String
+
+pub fn parse_basic_auth_header(String) -> (String, String)?
+
+pub fn parse_http_date(String) -> Int64?
 
 pub fn parse_range(String, Int64) -> ByteRange?
 
+pub fn parse_range_spec(String, Int64) -> RangeResult
+
+pub fn parse_types(String) -> Map[String, String]
+
+pub fn resolve_base_url(String?, String?) -> String raise ConfigError
+
+pub fn resolve_content_type(String, MimeRegistry, String, sample_bytes? : Bytes) -> String
+
+pub fn resolve_path(String, String, String) -> Result[String, PathError]
+
+pub fn should_return_304(String?, String?, Int64, EntityTag, Bool) -> Bool
+
+pub fn sniff_html_charset(Bytes) -> String?
+
+pub fn validate_config(Config) -> Unit raise ConfigError
+
+pub fn validate_proxy_url(String) -> Unit raise ConfigError
+
 pub fn validate_relative_path(String) -> Bool
 
+pub fn validate_root(String) -> String raise ConfigError
+
+pub fn validate_try_files_path(String) -> String raise ConfigError
+
+pub fn validate_uri_encoding(String) -> Bool
+
+pub fn verify_basic_auth(String?, (String, String)) -> Bool
+
 // Errors
-pub suberror ConfigError {
+pub(all) suberror ConfigError {
   InvalidBaseUrl(String)
   InvalidRoot(String)
-} derive(@debug.Debug)
+  InvalidPort(String)
+  InvalidTryFiles(String)
+  ConflictingBaseUrl(String)
+  ConflictingRouting(String)
+  InvalidProxy(String)
+  InvalidAuth(String)
+  InvalidHeader(String)
+  InvalidTimeout(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) suberror PathError {
+  MalformedUri(String)
+  OutsideBaseUrl(String)
+  TraversalForbidden(String)
+  NotFound(String)
+} derive(Eq, @debug.Debug)
 
 // Types and methods
 pub(all) struct ByteRange {
@@ -24,18 +113,69 @@ pub(all) struct ByteRange {
   end : Int64
 } derive(Eq, @debug.Debug)
 
+pub(all) enum CachePolicy {
+  MaxAge(Int)
+  NoCache
+  Exact(String)
+} derive(Eq, @debug.Debug)
+
 pub(all) struct Config {
   root : String
+  port : Int
+  address : String
   base_url : String
   default_ext : String?
+  spa : Bool
+  try_files : String?
   gzip : Bool
   brotli : Bool
+  force_content_encoding : Bool
   auto_index : Bool
   show_dir : Bool
   show_dotfiles : Bool
-  cache_control : String
-}
+  dir_overrides_404 : Bool
+  cache_seconds : Int
+  cache_control : String?
+  weak_etags : Bool
+  weak_compare : Bool
+  cors : Bool
+  cors_headers : String?
+  coop : Bool
+  coop_header : String?
+  pna : Bool
+  basic_auth : (String, String)?
+  host_whitelist : Array[String]
+  custom_headers : Map[String, String]
+  robots : Bool
+  proxy : String?
+  proxy_all : String?
+  proxy_options : Map[String, String]
+  handle_error : Bool
+  idle_timeout_ms : Int
+  mime_types : Map[String, String]
+} derive(@debug.Debug)
 pub fn Config::default(String) -> Self
+pub fn Config::effective_cache_control(Self) -> String
+pub fn Config::fallback_mode(Self) -> FallbackMode
+pub fn Config::fallback_target_file(Self) -> String?
+pub fn Config::has_fallback(Self) -> Bool
+pub fn Config::has_proxy(Self) -> Bool
+pub fn Config::middleware_default(String) -> Self
+
+pub(all) struct EntityTag {
+  tag : String
+  is_weak : Bool
+} derive(Eq, @debug.Debug)
+pub fn EntityTag::from_metadata(Int64, Int64, Bool) -> Self
+pub fn EntityTag::new(String, Bool) -> Self
+pub fn EntityTag::parse(String) -> Self?
+pub fn EntityTag::to_header_value(Self) -> String
+
+pub(all) enum FallbackMode {
+  None
+  Spa
+  TryFiles(String)
+} derive(Eq, @debug.Debug)
 
 pub(all) enum Method {
   Get
@@ -43,11 +183,40 @@ pub(all) enum Method {
   Other(String)
 } derive(Eq, @debug.Debug)
 
+pub(all) struct MimeRegistry {
+  table : Map[String, String]
+}
+pub fn MimeRegistry::lookup(Self, String, default_type? : String) -> String
+pub fn MimeRegistry::new() -> Self
+pub fn MimeRegistry::register(Self, String, String) -> Unit
+pub fn MimeRegistry::set(Self, String, String) -> Unit
+pub fn MimeRegistry::set_all(Self, Map[String, String]) -> Unit
+
+pub(all) enum RangeResult {
+  Satisfiable(ByteRange)
+  NotSatisfiable
+  NotApplicable
+} derive(Eq, @debug.Debug)
+
 pub(all) struct Request {
-  method : Method
+  meth : Method
   target : String
   headers : Map[String, String]
 }
+
+pub(all) enum ResponseBody {
+  Empty
+  Bytes(Bytes)
+  FileRegion(String, Int64, Int64)
+} derive(Eq, @debug.Debug)
+pub fn ResponseBody::length(Self) -> Int
+
+pub(all) enum SecurityDecision {
+  Proceed
+  Unauthorized(Map[String, String], Bytes)
+  Forbidden(Map[String, String], Bytes)
+  Preflight(Map[String, String])
+} derive(@debug.Debug)
 
 // Type aliases
 

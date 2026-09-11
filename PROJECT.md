@@ -3,7 +3,7 @@
 ## Architecture
 - `core/`: Pure logic protocol layer (Request, Response, ResponseBody, ETag/Cache, Range, MIME, Security/Auth, Routing/SPA). Zero platform I/O dependencies.
 - `engine.mbt`: Static file serving engine (`StaticEngine::handle`). Manages security checks, directory traversal defense, HTTP Basic Auth, trailing slash 302 redirects, index resolution, directory listing rendering, MIME dispatch, content negotiation (.br/.gz), D-17 file change detection, and SPA/try-files graceful fallback.
-- `server/`: Network hosting layer. Win32 `TransmitFile` Overlapped zero-copy kernel transmission for `ResponseBody::FileRegion`, paired with `@socket.TcpServer` and `@http.ServerConnection`. Bounded 64KB buffer fallback for in-memory responses and non-zero-copy paths.
+- `server/`: Network hosting layer. Win32 `TransmitFile` Overlapped zero-copy kernel transmission for `ResponseBody::FileRegion`, paired with `@socket.TcpServer` and `@http.ServerConnection`. Bounded 64KB buffer fallback for in-memory responses and non-zero-copy paths. Stepped non-blocking cooperative state machine with `@async.pause()` to prevent single-threaded coroutine deadlock.
 - `cmd/http-server-mbt/`: CLI entrypoint and argument parser.
 
 ## Feature Inventory
@@ -28,8 +28,8 @@
 | 3 | M3 Review & Gate Fixes | Fix C016 empty_dir fixture, fix Terminal 404 in `engine.mbt:940`, verify StaticEngine precedence chain, achieve 100% test pass (66/66) | none | DONE |
 | 3.5 | M3 Local Git Commit Gate | Execute `git add -A` and local `git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证"` (NEVER PUSH) | M3 | DONE |
 | 4 | M4 Windows TransmitFile & IOCP (T-031) | Win32 TransmitFile C stub, FFI binding, zero-copy `FileRegion` dispatch in `server/`, bounded buffer fallback, handle leak check, integration tests in `server/server_test.mbt` | M3.5 | DONE |
-| 4.5 | M4 Local Git Commit Gate | Execute `git add -A` and local `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"` (NEVER PUSH) before Reviewers & Auditors | M4 | DONE |
-| 5 | M4 Gate Verification | 2 Reviewers, 2 Challengers, 1 Forensic Auditor gate verification | M4.5 | PLANNED |
+| 4.5 | M4 Local Git Commit Gate | Execute `git add -A` and local `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"` (NEVER PUSH) | M4 | DONE |
+| 5 | M4 Gate Verification | 2 Reviewers, 2 Challengers, 1 Forensic Auditor gate verification | M4.5 | DONE |
 
 ## Interface Contracts
 ### `engine.mbt` ↔ `server/server.mbt`
@@ -38,7 +38,7 @@
   - `Bytes(b)`: in-memory byte array, sent via bounded buffer streaming.
   - `FileRegion(path, offset, length)`: absolute/relative file path, Int64 offset, Int64 length.
 - Server examines `ResponseBody`:
-  - On Windows Native, `FileRegion` is dispatched to Win32 `TransmitFile` zero-copy transfer.
+  - On Windows Native, `FileRegion` is dispatched to Win32 `TransmitFile` zero-copy transfer with stepped non-blocking IOCP Overlapped I/O.
   - Fallback/non-Windows path reads and streams in bounded 64KB chunks.
 
 ## Code Layout

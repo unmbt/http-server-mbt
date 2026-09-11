@@ -25,7 +25,7 @@ Complete Milestone 3 review/hardening/gate fixes and implement Milestone 4 Windo
 - **Delivered results**: [none]
 
 ## Project Status
-- **Phase**: in progress (Milestone 3 gate passed; Milestone 3.5 local commit `4780bce1` executed without push; Milestone 4 worker_m4 encountered deadlock, replaced per escalation protocol with worker_m4_gen2 `d959a70c-5826-4861-b6cc-45ca92f432ba`)
+- **Phase**: in progress (Milestone 4 code implemented and committed locally `e4e06fa` without push; Challenger server_challenger_test.mbt added; 79/80 tests pass; reviving Orchestrator to fix handle leak assertion failure at server_test.mbt:234, pass all tests, secure gate approvals, and complete M4 commit)
 
 ## Victory Audit Status
 - **Triggered**: no

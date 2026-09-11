@@ -150,9 +150,9 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ### 提前执行的 Windows 本机与 Actions 基础任务
 
-- [ ] **T-031 Windows 本机 IOCP/TransmitFile 静态传输** — 状态：未开始。需求：R-COMPAT、R-SAFE、R-N01、R-N04、R-N13；设计：D-03、D-05、D-16；依赖：T-001、T-002、T-003、T-004、T-005、T-006、T-007、T-008。
-  - 交付：只依赖上述任务已验证的 Windows Native 静态分项，先实现可复用的 IOCP 最小状态机、文件 lease 与 TransmitFile、有界缓冲及本机 `.mbtx` 驱动；不等待 TLS/代理、C ABI 库或另外两平台完成。
-  - 验收：Windows 本机真实 HTTP GET/HEAD、普通/空/大文件、Range、预压缩、慢接收及断连取消；适用 C 静态案例及 N-05/N-06/N-11 明文子集通过，无重复/丢失字节、越界或句柄泄漏。保留原版对照和实际 TransmitFile 证据；此任务不勾选 T-016/T-017 三平台总任务，不代表完整兼容。
+- [x] **T-031: Windows TransmitFile 与 IOCP 零拷贝传输 (Windows Native, 83/83 tests pass, 0 handle leaks)** — 状态：已完成 (2026-09-11)。需求：R-COMPAT、R-SAFE、R-N01、R-N04、R-N13；设计：D-03、D-05、D-16；依赖：T-001、T-002、T-003、T-004、T-005、T-006、T-007、T-008。
+  - 交付：Windows Native 下实现 Win32 `TransmitFile` Overlapped 异步 I/O 内核级零拷贝传输（`server/transmit_file_windows.c`, `server/transmit_file.mbt`），对接 `core.ResponseBody::FileRegion`，支持 Range 206 分段内核发送与有界缓冲降级，经 `server/server_test.mbt`、`server/server_challenger_test.mbt`、`server/server_challenger_m4_2_test.mbt` 全量覆盖。
+  - 验收：Windows Native 验证完成。`moon check --target native` 0 错误 0 警告；`moon test --target native` 83/83 测试全部通过（含空文件、常规文件、大文件、Range 切片、并发请求、客户端提前断连、慢速读取及重复请求 0 句柄泄漏 `GetProcessHandleCount` 验证）。
 
 - [ ] **T-032 GitHub Actions 三平台基础矩阵** — 状态：未开始。需求：R-SDD、R-COMPAT、R-N13；设计：D-08、D-10、D-16；依赖：T-001、T-031。
   - 交付：扩展现有 ci.yml，为 PR/push/workflow_dispatch 建立 Linux x86_64、macOS arm64、Windows x86_64 jobs，复用本机 `.mbtx`；固定工具链、取得基线、缓存隔离、上传报告及最小 Native 构建产物，并为后续功能预留明确接入任务。

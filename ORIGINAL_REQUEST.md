@@ -108,5 +108,21 @@ Milestone 3 的审查、测试修复与门禁验证通过后，在开始执行 M
 Milestone 4 代码实现完成后，同样先执行全部 `git add -A` 并提交本地 commit（例如 `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"`），严禁 push；在本地 commit 完成后，再交由审查员（Reviewer）和审计员（Auditor）继续进行审查与门禁验证。
 请立即通知 Orchestrator 及 worker_m4，将该 commit 节点落实到位。
 
+## Follow-up — 2026-09-11T14:24:38Z
+
+由于服务端重启，继续唤醒并调度团队完成 Milestone 4：
+
+1. 当前状态：
+   - Milestone 4 代码实现已完成并已本地 commit：`e4e06fa feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输`（严格未 push）；
+   - 进入门禁审查阶段后，Challenger 编写了 `server/server_challenger_test.mbt`；
+   - 当前 `moon test --target native` 结果显示：80 个测试中 79 个通过，1 个失败（`server/server_test.mbt:234 ("server zero handle leaks across repeated requests")` 处断言失败）；
+
+2. 待完成工作：
+   - 调度团队定位并修复该句柄泄漏/断言失败问题，确保 `moon check`（0 errors, 0 warnings）与 `moon test` 100% 全部通过；
+   - 推动 Reviewer、Challenger、Auditor 完成无条件通过裁决（APPROVE / CLEAN）；
+   - 更新文档与接口定义（`moon info`、`moon fmt`），完成 M4 闭环并执行本地 commit（严格禁止 push）！
+
+
+
 
 

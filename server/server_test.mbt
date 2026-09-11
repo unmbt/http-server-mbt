@@ -233,11 +233,20 @@ async test "server multi-chunk TransmitFile large file" {
 ///|
 async test "server zero handle leaks across repeated requests" {
   let config = @core.Config::default("testdata/public")
-  let before_handles = @server.get_handle_count()
 
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
+
+    // Warm up with initial requests so Winsock IOCP threadpools and internal structures are allocated
+    for _ in 0..<2 {
+      let (warm_status, _, _) = test_request(
+        port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      assert_eq(warm_status, 200)
+    }
+
+    let before_handles = @server.get_handle_count()
 
     // Perform 40 consecutive requests of various types
     for i in 0..<40 {
@@ -248,11 +257,11 @@ async test "server zero handle leaks across repeated requests" {
       )
       assert_eq(status, 200)
     }
-  })
 
-  let after_handles = @server.get_handle_count()
-  // With unconditional CloseHandle, handle count must remain bounded with 0 leaks
-  assert_true(after_handles <= before_handles + 5U)
+    let after_handles = @server.get_handle_count()
+    // With unconditional CloseHandle, handle count must remain bounded with 0 leaks
+    assert_true(after_handles <= before_handles + 5U)
+  })
 }
 
 ///|

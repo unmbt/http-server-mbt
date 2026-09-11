@@ -51,3 +51,21 @@ Milestone 4 代码实现完成后，在交由审查员（Reviewer）和审计员
 同样必须先执行全部 `git add -A` 并提交本地 commit（例如 `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"`），【绝对严禁 push】！
 确认本地 commit 完成后，再交由 Reviewer 和 Auditor 继续开展门禁验证。
 请立即通知 worker_m4 并在流程规划及 `PROJECT.md` 中落实此 commit 节点！
+
+## 2026-09-11T14:25:37Z
+
+【系统恢复与任务唤醒指令】
+服务端发生重启，现唤醒总指挥团队继续推进 Milestone 4 闭环：
+
+1. 当前工程状态：
+   - Milestone 4 代码实现已完成并已本地 commit：`e4e06fa feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输`（严格未 push）。
+   - Challenger 已补充编写 `server/server_challenger_test.mbt`。
+   - 当前测试套件运行状况：80 个测试中 79 个通过，1 个失败——位于 `server/server_test.mbt:234 ("server zero handle leaks across repeated requests")` 处断言失败。
+
+2. 立即执行的任务：
+   - 派遣 Worker 针对 `server/server_test.mbt:234` 句柄泄漏断言失败进行定位与修复（核查 Win32 `TransmitFile`、套接字关闭或句柄计数采样时机与资源释放逻辑）。
+   - 确保 `moon check --target native` 持续 0 error、0 warning，且 `moon test --target native` 达到 100% 通过（全部 80+ 个测试无失败）。
+   - 推进 Reviewer、Challenger、Auditor 开展终验并获取无条件通过裁决（APPROVE / CLEAN）。
+   - 运行 `moon info --target native` 更新 `.mbti` 接口，运行 `moon fmt` 保持风格规范。
+   - 验收通过后执行本地 git commit（`git add -A` 并提交，严格禁止 push）！
+   - 全部就绪后向哨兵（Sentinel）提交完成宣告（Victory Claim），由哨兵调遣独立 Victory Auditor 审核。

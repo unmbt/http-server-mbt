@@ -1,9 +1,9 @@
 # 项目阶段进度与任务接续指南
 
 > 记录日期：2026-09-11  
-> 当前状态：**Milestone 1、2、3 全部完成，已按指令暂停后续自动执行，就地待命**。  
-> 编译器状态：`moon check --target native` **0 错误、0 警告**（原 46 个 warning 全部清零）。  
-> 测试状态：`moon test --target native` **46 / 46 测试全部通过**。
+> 当前状态：**Milestone 1、2、3、4 全部完成，门禁测试全部闭环**。  
+> 编译器状态：`moon check --target native` **0 错误、0 警告**。  
+> 测试状态：`moon test --target native` **83 / 83 测试全部通过**（0 失败、0 阻塞、0 句柄泄漏）。
 
 ---
 
@@ -14,7 +14,7 @@
 | **M1** | **警告消除与干净基线** | **已完成 (CLEAN)** | 彻底根除代码中所有 46 个编译器告警（保留字冲突、`deprecated` API、冗余修饰符等），生成规范 `.mbti` 接口，格式化全量代码。 |
 | **M2** | **核心协议、MIME、安全与配置** | **已完成 (PASS)** | 模块化解耦 `core/` 包；实现 ETag/304 缓存、Range 206/416、MIME 字典与 `.types` 解析、目录穿越/越界防御、常量时间 Basic Auth、BaseURL/BaseDir 路径挂载归一化。覆盖 30 个单元与对抗测试。 |
 | **M3** | **Engine 业务特性与路由回退** | **已完成 (PASS)** | 落地全部 9 项特性：HTTP/1.1 GET/HEAD 分发、`.br`/`.gz` 预压缩协商、`forceContentEncoding`、目录探测与 302 重定向、美观 HTML 目录列表视图生成、SPA 与 try-files 兜底（严格保留 401/403）、D-17 文件变更截断检测、`ResponseBody` 零拷贝抽象。全量测试提升至 46/46。 |
-| **M4** | **Windows Native TransmitFile 与 IOCP 零拷贝** | **待启动 (PAUSED)** | Win32 `TransmitFile` Overlapped 异步 I/O 内核级静态大文件与 Range 区间发送；有界缓冲降级保护；断连取消与防句柄泄漏机制。 |
+| **M4** | **Windows Native TransmitFile 与 IOCP 零拷贝** | **已完成 (PASS)** | Win32 `TransmitFile` Overlapped 异步 I/O 内核级静态大文件与 Range 区间发送；有界缓冲降级保护；断连取消与防句柄泄漏机制。经 Reviewer、Challenger 与 Auditor 门禁审查，83/83 测试通过，多次请求 0 句柄泄漏。 |
 | **M5** | **CLI 完整性、生命周期与架构规范** | **待启动 (PAUSED)** | 完整命令行参数解析（`--port`, root, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth` 等）；监听前拦截非法配置；优雅信号处理（Ctrl+C）与排空退出；MIT/Apache-2.0 商业协议审计。 |
 | **M6** | **原版全量测试套件迁移与对抗加固** | **待启动 (PAUSED)** | 对齐 `docs/tasks.md` 逐例迁移矩阵（C001～C042 及 CC-01～CC-28、CE-01～CE-02）；真实 HTTP 客户端集成测试；状态机故障注入与并发健壮性验证。 |
 
@@ -69,7 +69,7 @@ http-server-mbt/
 # 1. 验证编译与类型检查（必须保持 0 错误、0 警告）
 moon check --target native
 
-# 2. 执行全量单元与集成测试（实测 46/46 全部通过）
+# 2. 执行全量单元与集成测试（实测 83/83 全部通过，0 句柄泄漏）
 moon test --target native
 
 # 3. 更新并校验公开接口描述文件
@@ -80,8 +80,10 @@ moon fmt
 ```
 
 实测输出证据：
-- `moon check --target native`：`Finished. moon: ran 30 tasks, now up to date`（**0 错误、0 警告**）。
-- `moon test --target native`：`Total tests: 46, passed: 46, failed: 0`。
+- `moon check --target native`：`Finished. moon: no work to do`（**0 错误、0 警告**）。
+- `moon test --target native`：`Total tests: 83, passed: 83, failed: 0`。
+- Win32 TransmitFile 内核零拷贝验证：`server/transmit_file_windows.c` 与 `server/transmit_file.mbt` 经普通文件、大文件、Range 切片传输真实验证，Overlapped 异步 I/O 无阻塞。
+- 句柄泄漏排查验证：`server_test.mbt`、`server_challenger_test.mbt` 与 `server_challenger_m4_2_test.mbt` 经重复请求、慢速读取、并发及异常断连压测，`GetProcessHandleCount` 差异为 0，实现 0 handle leak。
 
 ---
 
@@ -90,18 +92,15 @@ moon fmt
 当您准备继续推进项目时，可直接运行：
 
 ```text
-/teamwork-preview 继续推进 Milestone 4（Windows TransmitFile 零拷贝传输）及后续任务
+/teamwork-preview 继续推进 Milestone 5（CLI 完整性、生命周期与架构规范）及后续任务
 ```
 
 调度器与 Worker 将按以下顺序自动无缝接续：
-1. **启动 Milestone 4**：
-   - 在 Windows Native 下实现 Win32 `TransmitFile` Overlapped 异步 I/O；
-   - 对接 `engine.mbt` 中的 `FileRegion(path, offset, length)`；
-   - 实现慢客户端与断连取消处理，确保不泄漏文件与 Socket 句柄；
-   - 维持有界缓冲降级保护。
-2. **启动 Milestone 5**：
+1. **启动 Milestone 5**：
    - 完善 CLI 参数解析（补充 `--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--spa`, `--try-files` 等完整命令行映射）；
-   - 实现监听前非法参数校验报错；
+   - 实现监听前非法参数校验报错与端口冲突防护；
+   - 完善优雅信号处理（Ctrl+C）与排空退出；
    - 补充商业友好协议（MIT/Apache-2.0）合规审计与 Release 构建冒烟测试。
-3. **启动 Milestone 6**：
+2. **启动 Milestone 6**：
    - 对照 `docs/tasks.md` 中的 C001~C042 及 CC/CE 测试用例表，补充端到端真实 HTTP 测试用例与状态机故障注入测试。
+

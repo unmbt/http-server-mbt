@@ -5,6 +5,7 @@ pub struct Server {
   engine : @root.StaticEngine
   mut stopped : Bool
   mut task : @async.Task[Unit]?
+  active_requests : Ref[Int]
 }
 
 ///|
@@ -27,7 +28,13 @@ pub async fn with_server_at(
 ) -> Unit {
   let engine = @root.StaticEngine::new(config)
   let listener = @socket.TcpServer(@socket.Addr::new(0, port))
-  let server : Server = { inner: listener, engine, stopped: false, task: None, }
+  let server : Server = {
+    inner: listener,
+    engine,
+    stopped: false,
+    task: None,
+    active_requests: { val: 0, },
+  }
   defer listener.close()
   @async.with_task_group() <| group => {
     let server_task = group.spawn(allow_failure=true, () => {
@@ -40,9 +47,13 @@ pub async fn with_server_at(
       server.stop()
       server_task.cancel()
     }
-    action(server)
-    server.stop()
+    let action_res = Ok(action(server)) catch { err => Err(err) }
+    server.stop_and_drain()
     server_task.cancel()
+    match action_res {
+      Ok(_) => ()
+      Err(err) => raise err
+    }
   }
 }
 
@@ -55,6 +66,34 @@ pub fn Server::stop(self : Server) -> Unit {
       t.cancel()
     }
   }
+}
+
+///|
+/// Stop accepting new connections and drain active in-flight requests.
+pub async fn Server::stop_and_drain(
+  self : Server,
+  timeout_ms? : Int = 5000,
+) -> Unit {
+  if !self.stopped {
+    self.stopped = true
+    @async.protect_from_cancel(() => {
+      let mut waited = 0
+      let step = 10
+      while self.active_requests.val > 0 && waited < timeout_ms {
+        @async.sleep(step)
+        waited += step
+      }
+    })
+    if self.task is Some(t) {
+      t.cancel()
+    }
+  }
+}
+
+///|
+/// Return the count of active in-flight requests.
+pub fn Server::active_request_count(self : Server) -> Int {
+  self.active_requests.val
 }
 
 ///|
@@ -74,7 +113,11 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
   let http_conn = @http.ServerConnection::new(tcp_conn)
   defer tcp_conn.close()
   for ;; {
+    if server.stopped {
+      break
+    }
     let request = http_conn.read_request() catch { _ => break }
+    server.active_requests.val += 1
     let meth = match request.meth {
       @http.RequestMethod::Get => @core.Method::Get
       @http.RequestMethod::Head => @core.Method::Head
@@ -92,6 +135,7 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
       @root.HandleResult::Error(_) =>
         send_fallback_status(tcp_conn, 500, "Internal Server Error")
     }
+    server.active_requests.val -= 1
     if !ok {
       break
     }
@@ -99,7 +143,7 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
       Some(v) => v.to_lower()
       None => ""
     }
-    if conn_val == "close" {
+    if conn_val == "close" || server.stopped {
       break
     }
   }

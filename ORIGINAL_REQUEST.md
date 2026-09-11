@@ -122,7 +122,59 @@ Milestone 4 代码实现完成后，同样先执行全部 `git add -A` 并提交
    - 推动 Reviewer、Challenger、Auditor 完成无条件通过裁决（APPROVE / CLEAN）；
    - 更新文档与接口定义（`moon info`、`moon fmt`），完成 M4 闭环并执行本地 commit（严格禁止 push）！
 
+## Follow-up — 2026-09-11T15:23:34Z
 
+<USER_REQUEST>
+实现 Milestone 5（CLI 完整性、生命周期与架构规范）：为 `cmd/http-server-mbt` 提供原版对齐的完整命令行参数解析、监听前拦截非法配置、优雅信号退出与许可证合规审计。
 
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
+Integrity mode: benchmark
+Requested team: Full multi-agent team
 
+## References
+- 规格设计与实施契约: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md` (重点参考 T-011)
+- 阶段进度说明: `docs/progress.md`
+- 当前 Windows 基线: `docs/windows-baseline.md`
+- 架构规则: `AGENTS.md` (遵守 SDD 流程、0 Warning 原则、资源安全与所有权规范)
 
+## Requirements
+
+### R1. 完整命令行参数解析与配置映射 (CLI Feature Parity)
+- 完善 `cmd/http-server-mbt` 命令行参数体系，全面支持并对齐原版参数：
+  - 基础网络与路径：`--port` / `-p`、根目录位置参数 `root`、`--base-url`、`--base-dir`；
+  - 路由与回退：`--spa`、`--try-files <file>`；
+  - 目录与索引：`--autoIndex` / `-i` / `--no-autoIndex`（默认 true）、`--showDir` / `-d` / `--no-showDir`（默认 true）；
+  - 缓存与头部：`--cache` / `-c <sec>`（支持数值与 max-age 格式）、`--cors`（跨域安全头）；
+  - 认证与安全：`--auth` / `-a <username:password>`（Basic Auth 凭证）；
+  - 日志与提示：`--log-ip` / `-l`、`--silent` / `-s`、`--help` / `-h`、`--version` / `-v`。
+- 参数解析严格映射到 `core.Config` 并保持参数名和类型健壮性。
+
+### R2. 监听前非法参数拦截与配置互斥预检 (Pre-flight Validation)
+- 在启动监听前严格拦截非法配置：无效端口号（超出 1-65535）、不存在的 root 目录、非法 base-url / base-dir 路径格式、以及互斥配置（如 `--spa` 与互斥路由组合）。
+- 发生配置错误时，向 stderr 输出友好错误提示并以非 0 状态退出，绝不进入 TCP 监听或泄露异常栈。
+
+### R3. 进程生命周期与优雅退出 (Graceful Lifecycle)
+- 接入跨平台/Windows Native 优雅中断信号捕获（Ctrl+C / SIGINT），在退出时安全关闭监听 Socket 并排空在途请求；
+- 杜绝资源与句柄残留，确保命令行可执行文件具备干净的启动与退出生命周期。
+
+### R4. 流程与提交约束 (Git Workflow)
+- **【核心流程约束】Milestone 5 代码实现完成后，必须先执行全部 `git add -A` 并创建本地 commit（例如 `feat: 实现 Milestone 5 完整 CLI 参数与生命周期`），严禁 push；确认成功后再交由 Reviewer 和 Auditor 审查；全量审查与门禁验证通过后，再次本地 commit 闭环！**
+
+### R5. 架构整洁度、0 Warnings 与开源协议合规
+- 保持全模块 `moon check --target native` 持续 **0 错误、0 警告**；
+- 规范更新各包 `.mbti` 接口定义，运行 `moon fmt`；
+- 执行开源依赖与源码引用许可证审计，严格限定为 MIT、Apache-2.0、BSD-3-Clause 等宽松商业友好协议。
+
+## Acceptance Criteria
+
+### 编译与接口
+- [ ] `moon check --target native` 输出结果为 0 错误、0 警告。
+- [ ] `moon info --target native` 规范生成 `.mbti`，`moon fmt` 格式化无异常差异。
+
+### CLI 功能与测试验证
+- [ ] 编译生成 Release CLI 可执行文件，通过端到端命令行启动冒烟测试。
+- [ ] 参数解析覆盖完整矩阵（`--port`, `root`, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--silent` 等）。
+- [ ] 非法参数（如非法端口、非法路径）在监听前精准阻断并给出清晰错误提示，非 0 退出。
+- [ ] 命令行优雅响应 Ctrl+C 中断信号，退出时释放所有资源与套接字。
+- [ ] 现有 83 项单元与集成测试持续 100% 通过，并为 CLI 增加单元与集成测试。
+</USER_REQUEST>

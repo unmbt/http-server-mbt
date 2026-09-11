@@ -52,6 +52,8 @@ pub fn normalize_charset(String) -> String
 
 pub fn normalize_extension(String) -> String
 
+pub fn parse_auth_credential(String) -> (String, String)?
+
 pub fn parse_basic_auth_header(String) -> (String, String)?
 
 pub fn parse_http_date(String) -> Int64?
@@ -99,6 +101,8 @@ pub(all) suberror ConfigError {
   InvalidHeader(String)
   InvalidTimeout(String)
 } derive(Eq, @debug.Debug)
+pub fn ConfigError::to_string(Self) -> String
+pub impl Show for ConfigError
 
 pub(all) suberror PathError {
   MalformedUri(String)
@@ -153,6 +157,8 @@ pub(all) struct Config {
   handle_error : Bool
   idle_timeout_ms : Int
   mime_types : Map[String, String]
+  log_ip : Bool
+  silent : Bool
 } derive(@debug.Debug)
 pub fn Config::default(String) -> Self
 pub fn Config::effective_cache_control(Self) -> String
@@ -161,6 +167,7 @@ pub fn Config::fallback_target_file(Self) -> String?
 pub fn Config::has_fallback(Self) -> Bool
 pub fn Config::has_proxy(Self) -> Bool
 pub fn Config::middleware_default(String) -> Self
+pub fn Config::validate(Self) -> Unit raise ConfigError
 
 pub(all) struct EntityTag {
   tag : String

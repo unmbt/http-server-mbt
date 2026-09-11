@@ -15,6 +15,27 @@ pub(all) suberror ConfigError {
 } derive(Eq, Debug)
 
 ///|
+pub fn ConfigError::to_string(self : ConfigError) -> String {
+  match self {
+    InvalidBaseUrl(s) => "InvalidBaseUrl: " + s
+    InvalidRoot(s) => "InvalidRoot: " + s
+    InvalidPort(s) => "InvalidPort: " + s
+    InvalidTryFiles(s) => "InvalidTryFiles: " + s
+    ConflictingBaseUrl(s) => "ConflictingBaseUrl: " + s
+    ConflictingRouting(s) => "ConflictingRouting: " + s
+    InvalidProxy(s) => "InvalidProxy: " + s
+    InvalidAuth(s) => "InvalidAuth: " + s
+    InvalidHeader(s) => "InvalidHeader: " + s
+    InvalidTimeout(s) => "InvalidTimeout: " + s
+  }
+}
+
+///|
+pub impl Show for ConfigError with fn output(self, logger) {
+  logger.write_string(self.to_string())
+}
+
+///|
 /// Normalized static-server configuration model.
 /// Contains all configuration settings for protocol, static resolution,
 /// routing mounts, SPA fallback, security policies, and upstream proxies.
@@ -67,6 +88,10 @@ pub(all) struct Config {
   handle_error : Bool // If false, delegates 404/errors to host (middleware Next)
   idle_timeout_ms : Int // Socket idle timeout in ms (0 = disabled, default 120000)
   mime_types : Map[String, String] // Custom extension -> MIME type overrides
+
+  // --- Logging & Output ---
+  log_ip : Bool // Enable logging of client IP address (default false)
+  silent : Bool // Suppress console log messages (default false)
 } derive(Debug)
 
 ///|
@@ -106,6 +131,8 @@ pub fn Config::default(root : String) -> Config {
     handle_error: true,
     idle_timeout_ms: 120000, // 120 seconds per AD-03
     mime_types: Map([]),
+    log_ip: false,
+    silent: false,
   }
 }
 
@@ -290,6 +317,10 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
     None => ()
   }
 
+  if config.cache_seconds < -1 {
+    raise ConfigError::InvalidHeader("cache_seconds cannot be less than -1")
+  }
+
   for k, v in config.custom_headers {
     if k.contains("\r") ||
       k.contains("\n") ||
@@ -299,5 +330,24 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
         "custom headers cannot contain CRLF characters",
       )
     }
+  }
+}
+
+///|
+/// Method syntax for validating a Config instance.
+pub fn Config::validate(self : Config) -> Unit raise ConfigError {
+  validate_config(self)
+}
+
+///|
+/// Helper to parse CLI basic auth credentials in format "username:password".
+pub fn parse_auth_credential(str : String) -> (String, String)? {
+  match str.find(":") {
+    Some(idx) => {
+      let username = str[:idx].to_owned()
+      let password = str[idx + 1:].to_owned()
+      Some((username, password))
+    }
+    None => None
   }
 }

@@ -1,33 +1,31 @@
-# Sentinel Final Handoff Report
+# Sentinel Handoff Report — Milestone 5 Dispatch
 
 ## Observation
-User requested to complete Milestone 3 code review, adversarial testing, and gate fixes, and implement Milestone 4 Windows Native TransmitFile / IOCP zero-copy static file and Range transfer (T-031), with strict zero-warning, 100% test pass, handle leak prevention, and mandatory local-only git commits between milestones (never push).
-
-The multi-agent team under `teamwork_preview_orchestrator` completed all phases:
-1. Milestone 3 fixes (C016 directory listing vs 404 precedence, SPA terminal 404) verified with unanimous reviewer/challenger/auditor approval and committed locally (`4780bce1`).
-2. Milestone 4 implemented true Win32 `TransmitFile` with Overlapped stepped asynchronous I/O (`server/transmit_file_windows.c`), MoonBit FFI (`server/transmit_file.mbt`), zero-copy `FileRegion` dispatch in `server/server.mbt`, 64KB bounded streaming buffer fallback, and comprehensive tests in `server/server_test.mbt` & `server_challenger_test.mbt`. Committed locally (`e4e06fa` and `c401ccc`).
-3. Handle leak test at `server/server_test.mbt:234` was resolved, bringing `moon test --target native` to 83/83 tests passing (100%).
-4. `teamwork_preview_victory_auditor` independently performed a 3-phase audit and issued `VERDICT: VICTORY CONFIRMED`.
+User requested implementation of Milestone 5 (CLI 完整性、生命周期与架构规范):
+- R1: Complete CLI argument parsing and config mapping in `cmd/http-server-mbt` aligned with upstream `http-server` (`--port`, `root`, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--log-ip`, `--silent`, `--help`, `--version`).
+- R2: Pre-flight validation blocking invalid configs (invalid port, nonexistent root, invalid base-url/dir, mutex route combinations like spa + mutex) before listening with clear stderr message and non-zero exit.
+- R3: Graceful lifecycle: cross-platform/Windows Native Ctrl+C/SIGINT signal capture, safe socket closure and in-flight request draining.
+- R4: Git workflow: MUST run `git add -A` and local commit after M5 implementation finishes (STRICTLY NO PUSH) before Reviewer/Auditor inspection, then final commit after verification.
+- R5: 0 warnings, 0 errors, `.mbti` up-to-date, `moon fmt`, permissive open-source license audit (MIT, Apache-2.0, BSD-3-Clause).
+- All existing 83 tests continue to pass 100%, plus new CLI unit and integration tests.
 
 ## Logic Chain
-1. Routed request via General Path to `teamwork_preview_orchestrator` (due to multi-milestone and explicit multi-agent team request).
-2. Monitored orchestration lifecycle through progress reporting and liveness check crons.
-3. Transferred user constraints (local git commits after M3 and M4, strictly NO push) to orchestrator and locked them as hard gates.
-4. On victory claim, blocked final reporting and dispatched independent `teamwork_preview_victory_auditor`.
-5. Upon receiving `VICTORY CONFIRMED` from the victory auditor:
-   - Cancelled background crons (`task-243` and `task-245`).
-   - Terminated all active subagents via `manage_subagents(action="kill_all")`.
-   - Formulated structured human report for user delivery.
+1. Recorded verbatim request with UTC timestamp into `ORIGINAL_REQUEST.md` and `.agents/ORIGINAL_REQUEST.md`.
+2. Applied Task Routing Decision Table: Routed to `teamwork_preview_orchestrator` (General path) as requested team is "Full multi-agent team" with comprehensive requirements.
+3. Created working directory `.agents/orchestrator_m5` and initialized `context.md`.
+4. Spawned Project Orchestrator (`1d1f0f44-178d-4d9d-aec3-2a13ccae568f`).
+5. Scheduled Cron 1 (*/8 * * * *) for progress reporting and Cron 2 (*/10 * * * *) for liveness check.
+6. Updated `BRIEFING.md` preserving all append-only sections.
 
 ## Caveats
-- The 3 local commits (`4780bce1`, `e4e06fa`, `c401ccc`) exist solely on the local branch and have NOT been pushed to origin/master, per user instruction.
-- Win32 `TransmitFile` zero-copy acceleration operates on Windows Native targets; on non-Windows platforms or non-file responses, it gracefully falls back to the 64KB bounded streaming buffer.
+- Mandatory git workflow gate: local commit only after M5 implementation before reviewer handoff, strictly NO PUSH.
+- Zero warnings and 0 errors (`moon check --target native`) is a strict blocking criterion.
+- Victory audit is mandatory before project completion report.
 
 ## Conclusion
-Milestone 3 and Milestone 4 requirements have been 100% fulfilled, independently audited, and verified with zero errors, zero warnings, 100% test pass rate, and zero handle leaks.
+Project Orchestrator has been spawned and active monitoring is running. Awaiting milestone implementation, review, adversarial testing, gate verification, and victory audit.
 
 ## Verification Method
-- Independent Victory Auditor verdict: `VICTORY CONFIRMED` (`.agents/victory_auditor_1/handoff.md`).
-- `moon check --target native`: 0 errors, 0 warnings.
-- `moon test --target native`: 83/83 passed (100%).
-- Git history: 3 local commits, 0 remote push.
+- Active subagents: `teamwork_preview_orchestrator` (`1d1f0f44-178d-4d9d-aec3-2a13ccae568f`).
+- Background cron tasks: Task-32 (Progress reporting), Task-34 (Liveness check).
+

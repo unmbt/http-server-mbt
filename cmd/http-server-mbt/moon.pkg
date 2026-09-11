@@ -2,6 +2,8 @@ import {
   "unmbt/http-server-mbt/server",
   "unmbt/http-server-mbt/core",
   "moonbitlang/async",
+  "moonbitlang/async/stdio",
+  "moonbitlang/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/argparse",
 }

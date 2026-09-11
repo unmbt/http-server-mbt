@@ -1,12 +1,20 @@
 import {
   "unmbt/http-server-mbt" @root,
   "unmbt/http-server-mbt/core",
+  "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
+  "moonbitlang/async/types",
   "moonbitlang/core/debug",
 }
 
+import {
+  "moonbitlang/async/fs",
+  "moonbitlang/core/encoding/utf8",
+} for "test"
+
 options(
+  "native-stub": [ "transmit_file_windows.c" ],
   targets: { "*.mbt": [ "native" ] },
 )

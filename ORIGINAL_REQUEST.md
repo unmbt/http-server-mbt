@@ -103,4 +103,10 @@ Milestone 3 的审查、测试修复与门禁验证通过后，在开始执行 M
 必须先执行全部 `git add -A` 并创建本地 commit（例如 `git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证"`），但【绝对不要 push】！
 确认本地 commit 完成后，再启动 Milestone 4 的实施。请立即同步通知 Orchestrator 并在流程规划中执行此约束。
 
+## Follow-up — 2026-09-11T12:50:10Z
+
+Milestone 4 代码实现完成后，同样先执行全部 `git add -A` 并提交本地 commit（例如 `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"`），严禁 push；在本地 commit 完成后，再交由审查员（Reviewer）和审计员（Auditor）继续进行审查与门禁验证。
+请立即通知 Orchestrator 及 worker_m4，将该 commit 节点落实到位。
+
+
 

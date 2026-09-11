@@ -17,14 +17,15 @@ Complete Milestone 3 review/hardening/gate fixes and implement Milestone 4 Windo
 - Two crons required: Cron 1 (*/8 * * * *) for progress reporting, Cron 2 (*/10 * * * *) for liveness check
 - Cleanup all crons and subagents upon verified completion
 - MANDATORY GATE CONSTRAINT: After Milestone 3 review, test fixes, and gate verification pass, MUST run git add -A and create a local commit (e.g. git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证") BEFORE starting Milestone 4 implementation. DO NOT PUSH!
+- MANDATORY GATE CONSTRAINT: After Milestone 4 code implementation finishes, MUST run git add -A and create a local commit (e.g. git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输") BEFORE passing to Reviewers and Auditor. DO NOT PUSH!
 
 ## User Context
-- **Last user request**: 接续 docs/progress.md 进度，全面完成 Milestone 3 的代码审查、对抗测试与门禁修复，并实现 Milestone 4 的 Windows Native TransmitFile 与 IOCP 零拷贝静态传输与 Range 支持。在完成 M3 并开始 M4 之前，必须执行 git add -A 并创建本地 commit（绝对不 push）。
+- **Last user request**: 接续 docs/progress.md 进度，全面完成 Milestone 3 的代码审查、对抗测试与门禁修复，并实现 Milestone 4 的 Windows Native TransmitFile 与 IOCP 零拷贝静态传输与 Range 支持。M3 与 M4 完成后均须在进入下一环节前执行本地 commit，严禁 push。
 - **Pending clarifications**: none
 - **Delivered results**: [none]
 
 ## Project Status
-- **Phase**: in progress (Survey phase: Orchestrator dispatched 3 parallel Explorers for M3 gate fixes, M4 TransmitFile/IOCP architecture, and test/license baseline)
+- **Phase**: in progress (Milestone 3 gate passed; Milestone 3.5 local commit `4780bce1` executed without push; Milestone 4 worker_m4 encountered deadlock, replaced per escalation protocol with worker_m4_gen2 `d959a70c-5826-4861-b6cc-45ca92f432ba`)
 
 ## Victory Audit Status
 - **Triggered**: no

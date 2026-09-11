@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-11T12:45:30Z
+# BRIEFING — 2026-09-11T13:20:30Z
 
 ## Mission
 Complete Milestone 3 code review, adversarial testing, and gate fixes, and implement Milestone 4 Windows Native TransmitFile/IOCP zero-copy transmission (T-031) with 100% passing tests and zero warnings.
@@ -13,7 +13,7 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 ## 🔒 My Workflow
 - **Pattern**: Project Pattern (Dual Track: Implementation + E2E Testing)
 - **Scope document**: E:\project\moonbit\unmbt\http-server-mbt\PROJECT.md
-1. **Decompose**: Decompose scope into milestone tracks (M3 Review & Hardening, M3.5 Git Commit Gate, M4 TransmitFile/IOCP Zero-Copy).
+1. **Decompose**: Decompose scope into milestone tracks (M3 Review & Hardening, M3.5 Git Commit Gate, M4 TransmitFile/IOCP Zero-Copy, M4.5 Git Commit Gate, M4 Gate Verification).
 2. **Dispatch & Execute**:
    - **Direct (iteration loop)**: Explorer (3 in parallel) -> Worker -> Reviewer (2 in parallel) + Challenger (2 in parallel) -> Auditor (teamwork_preview_auditor) -> Gate check (strict AND).
 3. **On failure** (in this order):
@@ -27,11 +27,12 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 - **Work items**:
   1. Survey & Project Specification (`PROJECT.md`) [done]
   2. Milestone 3 Review, Adversarial Testing, and Gate Fixes (C016 precedence, SPA terminal 404, directory listing) [done]
-  3. Milestone 3.5 Local Git Commit Gate (`git add -A` & `git commit`, NEVER push) [in-progress]
-  4. Milestone 4 Windows Native TransmitFile & IOCP Zero-Copy Transmission (T-031) [pending]
-  5. Full Verification & Forensic Audit (0 errors, 0 warnings, 100% test pass, handle leak check, license audit) [pending]
-- **Current phase**: 2
-- **Current focus**: Work item 3 (Milestone 3.5 Local Git Commit Gate)
+  3. Milestone 3.5 Local Git Commit Gate (`git add -A` & `git commit`, NEVER push) [done]
+  4. Milestone 4 Windows Native TransmitFile & IOCP Zero-Copy Transmission (T-031) [in-progress]
+  5. Milestone 4.5 Local Git Commit Gate (`git add -A` & `git commit`, NEVER push) [pending]
+  6. Milestone 4 Gate Verification & Victory Audit (0 errors, 0 warnings, 100% test pass, handle leak check, license audit) [pending]
+- **Current phase**: 3
+- **Current focus**: Work item 4 (Milestone 4 Windows Native TransmitFile & IOCP Zero-Copy)
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -40,7 +41,7 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 - Binary veto: If Forensic Auditor reports INTEGRITY VIOLATION, milestone fails unconditionally.
 - Zero warnings: Maintain `moon check --target native` 0 error, 0 warning.
 - License compliance: Permissive commercial-friendly open source licenses only (MIT, Apache-2.0, BSD-3-Clause).
-- Mandatory Gate: Must execute `git add -A` and local `git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证"` (NEVER PUSH) before Milestone 4 begins.
+- Mandatory Gate: Must execute `git add -A` and local `git commit -m "feat: 实现 Milestone 4 Windows TransmitFile 零拷贝传输"` (NEVER PUSH) before Reviewers & Auditors start.
 - Never reuse a subagent after it has delivered its handoff — always spawn fresh.
 
 ## Current Parent
@@ -49,9 +50,9 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 
 ## Key Decisions Made
 - Survey phase completed by 3 Explorers. `PROJECT.md` synthesized.
-- `worker_m3` completed M3 fixes: `empty_dir/.gitkeep` added, `make_terminal_404_response` added per D-04 line 136.
-- Milestone 3 Gate Verification PASSED unconditionally: Reviewer 1 (APPROVE), Reviewer 2 (APPROVE), Challenger 1 (APPROVE, 66 tests), Challenger 2 (APPROVE, 8-block stress harness), Forensic Auditor (CLEAN).
-- Dispatched `worker_git_commit` (`36fe4ea6-7901-49bd-b9ba-d479de89cf03`) to execute local git commit per user mandate before M4.
+- Milestone 3 Gate Verification PASSED unconditionally.
+- Milestone 3.5 local Git commit executed: commit `4780bce1b134fd08f9521203ca3adda589aa9ccd`.
+- `worker_m4` stalled on test task group deadlock; escalated per Fault Tolerance step 2 (Replace): killed `worker_m4` and spawned `worker_m4_gen2` (`d959a70c-5826-4861-b6cc-45ca92f432ba`) with exact root cause diagnosis.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
@@ -65,12 +66,14 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 | challenger_m3_1 | teamwork_preview_challenger | M3 Adversarial Verification 1 | completed | a0eefec9-b08f-4c0a-9e55-16c8d904def1 |
 | challenger_m3_2 | teamwork_preview_challenger | M3 Adversarial Verification 2 | completed | 5e84d5eb-dc54-4053-ba48-2883b0f4909e |
 | auditor_m3_1 | teamwork_preview_auditor | M3 Forensic Integrity Audit | completed | e6254fb4-2907-43d6-a3f0-18d82c6564b0 |
-| worker_git_commit | teamwork_preview_worker | M3.5 Local Git Commit Gate | running | 36fe4ea6-7901-49bd-b9ba-d479de89cf03 |
+| worker_git_commit | teamwork_preview_worker | M3.5 Local Git Commit Gate | completed | 36fe4ea6-7901-49bd-b9ba-d479de89cf03 |
+| worker_m4 | teamwork_preview_worker | Milestone 4 TransmitFile Implementation | failed (hung) | 3c76fc72-fb75-4883-8cd8-141388b27ff8 |
+| worker_m4_gen2 | teamwork_preview_worker | Milestone 4 TransmitFile Implementation (Replacement) | running | d959a70c-5826-4861-b6cc-45ca92f432ba |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 10 / 16
-- Pending subagents: 36fe4ea6-7901-49bd-b9ba-d479de89cf03
+- Spawn count: 12 / 16
+- Pending subagents: d959a70c-5826-4861-b6cc-45ca92f432ba
 - Predecessor: none
 - Successor: not yet spawned
 
@@ -88,3 +91,4 @@ Complete Milestone 3 code review, adversarial testing, and gate fixes, and imple
 - E:\project\moonbit\unmbt\http-server-mbt\.agents\orchestrator_1\BRIEFING.md — Situational awareness
 - E:\project\moonbit\unmbt\http-server-mbt\.agents\orchestrator_1\progress.md — Progress heartbeat
 - E:\project\moonbit\unmbt\http-server-mbt\.agents\worker_m3\handoff.md — Worker M3 handoff
+- E:\project\moonbit\unmbt\http-server-mbt\.agents\worker_git_commit\handoff.md — Git commit gate handoff

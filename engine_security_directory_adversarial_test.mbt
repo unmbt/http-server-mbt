@@ -410,7 +410,9 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      assert_true(adv_bytes_to_string(res.to_bytes()).contains("File not found"))
+      assert_true(
+        adv_bytes_to_string(res.to_bytes()).contains("File not found"),
+      )
     }
     _ => fail("expected terminal 404")
   }
@@ -429,7 +431,9 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      assert_true(adv_bytes_to_string(res.to_bytes()).contains("File not found"))
+      assert_true(
+        adv_bytes_to_string(res.to_bytes()).contains("File not found"),
+      )
     }
     _ => fail("expected terminal 404 for try_files")
   }
@@ -632,8 +636,197 @@ async test "adversarial: Directory listing HTML escaping and XSS defense (C023)"
       assert_eq(res.status, 200)
       let html = adv_bytes_to_string(res.to_bytes())
       assert_true(!html.contains("<script>evil()</script>"))
-      assert_true(html.contains("attacker.com&#x3C;script&#x3E;evil()&#x3C;/script&#x3E;"))
+      assert_true(
+        html.contains("attacker.com&#x3C;script&#x3E;evil()&#x3C;/script&#x3E;"),
+      )
     }
     _ => fail("expected Host header escaping")
+  }
+}
+
+///|
+async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and Directory Listing" {
+  // 1. Terminal 404 with HEAD request
+  let config_try : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    try_files: Some("missing_fallback.html"),
+  }
+  let engine_try = StaticEngine::new(config_try)
+  let r1 = engine_try.handle({
+    meth: @core.Method::Head,
+    target: "/unmatched/path",
+    headers: Map([]),
+  })
+  match r1 {
+    Handled(res) => {
+      assert_eq(res.status, 404)
+      assert_eq(res.body.length(), 0)
+      assert_eq(res.headers["Content-Length"], "18")
+      assert_eq(res.headers["Content-Type"], "text/plain; charset=UTF-8")
+    }
+    _ => fail("expected HEAD terminal 404")
+  }
+
+  // 2. Custom 404 with HEAD request
+  let config_custom : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+  }
+  let engine_custom = StaticEngine::new(config_custom)
+  let r2 = engine_custom.handle({
+    meth: @core.Method::Head,
+    target: "/nonexistent/route",
+    headers: Map([]),
+  })
+  match r2 {
+    Handled(res) => {
+      assert_eq(res.status, 404)
+      assert_eq(res.body.length(), 0)
+      let expected_len = (@fs.file_size("testdata/public/404.html") catch {
+        _ => 0L
+      }).to_string()
+      assert_eq(res.headers["Content-Length"], expected_len)
+      assert_eq(res.headers["Content-Type"], "text/html; charset=UTF-8")
+    }
+    _ => fail("expected HEAD custom 404")
+  }
+
+  // 3. Directory listing with HEAD request
+  let config_dir : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    auto_index: false,
+    show_dir: true,
+    dir_overrides_404: true,
+  }
+  let engine_dir = StaticEngine::new(config_dir)
+  let r3 = engine_dir.handle({
+    meth: @core.Method::Head,
+    target: "/empty_dir/",
+    headers: Map([]),
+  })
+  match r3 {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      assert_eq(res.body.length(), 0)
+      assert_eq(res.headers["Content-Type"], "text/html; charset=UTF-8")
+      let cl = res.headers["Content-Length"]
+      assert_true(cl.length() > 0 && cl != "0")
+    }
+    _ => fail("expected HEAD directory listing")
+  }
+}
+
+///|
+async test "adversarial: SPA precedence over Custom 404 for existing empty directory" {
+  // D-04 §2: fallback mode defers custom 404 rendering, displayable directory takes precedence
+  let config_spa_dir : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    auto_index: false,
+    show_dir: true,
+    dir_overrides_404: false,
+    spa: true,
+  }
+  let engine_spa_dir = StaticEngine::new(config_spa_dir)
+  let r = engine_spa_dir.handle({
+    meth: @core.Method::Get,
+    target: "/empty_dir/",
+    headers: Map([]),
+  })
+  match r {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      let body = adv_bytes_to_string(res.to_bytes())
+      assert_true(body.contains("Index of /empty_dir/"))
+    }
+    _ => fail("expected 200 directory listing in SPA mode over custom 404")
+  }
+}
+
+///|
+async test "adversarial: Dotfile hiding and visibility in empty_dir (.gitkeep)" {
+  // When show_dotfiles is false (default): .gitkeep MUST be hidden
+  let config_hide : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    auto_index: false,
+    show_dir: true,
+    dir_overrides_404: true,
+    show_dotfiles: false,
+  }
+  let engine_hide = StaticEngine::new(config_hide)
+  let r1 = engine_hide.handle({
+    meth: @core.Method::Get,
+    target: "/empty_dir/",
+    headers: Map([]),
+  })
+  match r1 {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      let html = adv_bytes_to_string(res.to_bytes())
+      assert_true(!html.contains(".gitkeep"))
+    }
+    _ => fail("expected 200 directory listing hiding .gitkeep")
+  }
+
+  // When show_dotfiles is true: .gitkeep MUST be displayed
+  let config_show : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    auto_index: false,
+    show_dir: true,
+    dir_overrides_404: true,
+    show_dotfiles: true,
+  }
+  let engine_show = StaticEngine::new(config_show)
+  let r2 = engine_show.handle({
+    meth: @core.Method::Get,
+    target: "/empty_dir/",
+    headers: Map([]),
+  })
+  match r2 {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      let html = adv_bytes_to_string(res.to_bytes())
+      assert_true(html.contains(".gitkeep"))
+    }
+    _ => fail("expected 200 directory listing showing .gitkeep")
+  }
+}
+
+///|
+async test "adversarial: Root directory listing suppresses parent link while subfolder includes it" {
+  let config : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    auto_index: false,
+    show_dir: true,
+    dir_overrides_404: true,
+  }
+  let engine = StaticEngine::new(config)
+
+  // Root "/" directory listing must NOT have ".."
+  let r_root = engine.handle({
+    meth: @core.Method::Get,
+    target: "/",
+    headers: Map([]),
+  })
+  match r_root {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      let html = adv_bytes_to_string(res.to_bytes())
+      assert_true(!html.contains("href=\"../\""))
+    }
+    _ => fail("expected 200 on root without parent link")
+  }
+
+  // Subfolder "/subfolder/" directory listing MUST have ".."
+  let r_sub = engine.handle({
+    meth: @core.Method::Get,
+    target: "/subfolder/",
+    headers: Map([]),
+  })
+  match r_sub {
+    Handled(res) => {
+      assert_eq(res.status, 200)
+      let html = adv_bytes_to_string(res.to_bytes())
+      assert_true(html.contains("href=\"../\""))
+    }
+    _ => fail("expected 200 on subfolder with parent link")
   }
 }

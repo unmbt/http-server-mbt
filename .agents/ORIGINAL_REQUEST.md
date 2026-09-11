@@ -53,50 +53,53 @@ Integrity mode: benchmark
 - [ ] 编译生成 Release CLI 可执行文件，命令行启动、参数解析、非法端口阻断与平滑退出功能通过冒烟验证。
 - [ ] Windows TransmitFile 传输正常工作，并在客户端异常中断或大量传输后无文件/Socket 句柄泄漏。
 
-## 2026-09-11T08:00:59Z
+## Follow-up — 2026-09-11T12:27:00Z
 
-【续接执行指示】
-上一次执行在 Milestone 2 完成后因模型配额中断。请接续当前已完成进度，继续推进剩余任务！
+接续 `docs/progress.md` 进度，全面完成 Milestone 3 的代码审查、对抗测试与门禁修复，并实现 Milestone 4 的 Windows Native TransmitFile 与 IOCP 零拷贝静态传输与 Range 支持。
 
-### 当前已完成成果（经实测核验）
-- Milestone 1: Warning Elimination & Clean Baseline 已通过验收（`moon check --target native` 实测 0 警告、0 错误）。
-- Milestone 2: Core Protocols, MIME, Security & Config 已通过验收（`moon test --target native` 实测 30/30 测试全部通过，涵盖 cache、range、mime、security、routing、config）。
-- 完整状态和交接文档位于：
-  - `D:\project\moonbit\http-server-mbt\.agents\orchestrator_1\PROJECT.md`
-  - `D:\project\moonbit\http-server-mbt\.agents\orchestrator_1\handoff.md`
-  - `D:\project\moonbit\http-server-mbt\.agents\orchestrator_1\progress.md`
-  - `D:\project\moonbit\http-server-mbt\.agents\orchestrator_gen2\DISPATCH.md`
-
-### 待完成的核心里程碑与任务
-1. **Milestone 3: Engine 业务与路由特性接入**
-   - HTTP/1.1 完整请求分发（GET/HEAD）
-   - 预压缩内容协商（.br / .gz 候选检测与 Accept-Encoding 优先级选择，forceContentEncoding）
-   - 目录索引探测（index.html）与美观的 HTML 目录列表视图渲染（排序、文件大小格式化、转义）
-   - SPA / try-files 运行时未命中兜底回退逻辑（不掩盖鉴权与路径越界错误）
-2. **Milestone 4: Windows Native TransmitFile 与 IOCP 零拷贝传输**
-   - 实现 Windows 内核级 TransmitFile 传输静态明文大文件与 Range 区间
-   - 具备有界缓冲降级与断连取消保护，确保无文件句柄与 Socket 句柄泄漏
-3. **Milestone 5: CLI、生命周期与架构整洁度**
-   - 完整命令行参数解析（--port, root, --base-url, --base-dir, --spa, --try-files, --autoIndex, --showDir, --cache, --cors, --auth, --help, --version 等）
-   - 非法参数在监听前拦截报错，优雅响应信号退出并排空资源
-   - 始终保持 0 错误、0 编译器警告，规范更新 `.mbti` 与格式化
-4. **Milestone 6: 原版全量测试套件迁移（C001~C042 及 CC/CE）与对抗加固**
-   - 对照 `docs/tasks.md` 逐例迁移矩阵，编写 Windows Native 单元与集成测试
-   - 验证边界条件、并发请求、断开连接及故障注入安全不变量
-   - 外部代码与依赖严格限定为 MIT、Apache-2.0、BSD-3-Clause 等宽松商业友好许可
-
-Working directory: D:\project\moonbit\http-server-mbt
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
 Integrity mode: benchmark
-Requested team: Full multi-agent team (全功能多 Agent 团队协同推进)
+Requested team: Full multi-agent team
 
-## 2026-09-11T08:18:32Z
+## References
+- 规格设计与实施契约: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md`
+- 阶段进度说明: `docs/progress.md`
+- 当前 Windows 基线: `docs/windows-baseline.md`
+- 架构规则: `AGENTS.md` (遵守 SDD 流程、0 Warning 原则、资源安全与所有权规范)
 
-【用户明确指令】
-用户要求：“m3实现后先停下来”。
-请通知 Orchestrator：在 Milestone 3（Engine 特性层）实现完毕且完成 Gate 门禁验证后，立即暂停后续里程碑（暂不启动 Milestone 4），整理并汇总 M3 的交付成果、测试结果及当前状态向用户汇报，等待用户的下一步指示。
+## Requirements
 
-## 2026-09-11T08:33:45Z
+### R1. Milestone 3 审查、检测与对抗加固 (Review & Hardening)
+- 对 Milestone 3 已完成的 Engine 业务特性（HTTP/1.1 GET/HEAD 分发、.br/.gz 预压缩协商、HTML 目录列表渲染、SPA/try-files 优雅回退、D-17 文件变更检测）进行全面代码审查与对抗测试。
+- 修复当前测试套件中暴露的问题（包括但不限于 `engine_test.mbt` 中 `directory listing vs custom 404 precedence (C016)`，以及 `engine_security_directory_adversarial_test.mbt` 中 `Terminal 404 when fallback file does not exist`）。
+- 确保静态目录探测、索引回退、404/403/401 优先级逻辑完全符合 RFC 与 `docs/design.md` 契约，杜绝任何硬编码或伪造实现。
 
-【用户最终暂停指令】
-用户明确要求：“让现有的agent干完手头上的工作后停下来，不用干后续了，然后在docs下记录下进度，方便下次继续任务”。
-请注意：当前 Gate 评审员和审计员完成手头审查裁决后，Milestone 3 正式闭环即彻底停止所有后续任务（不启动 M4、M5、M6），在 docs 下完成进度交接与记录，进入完全停止状态。
+### R2. Milestone 4 Windows Native TransmitFile 与 IOCP 零拷贝传输 (T-031)
+- 在 Windows Native 下实现基于 Win32 `TransmitFile` / Overlapped 异步 I/O 的静态文件与 Range 分段内核级零拷贝发送。
+- 对接 `engine.mbt` 与 `core/` 中的 `FileRegion(path, offset, length)`，避免用户态大文件缓冲与多次内存拷贝。
+- 具备健全的有界缓冲降级机制（对于非文件响应、小数据块或特定平台回退路径）。
+- 实现慢客户端与断连取消处理，确保在连接异常中断、客户端主动关闭或高并发传输下绝不泄漏文件句柄与 Socket 句柄。
+
+### R3. 编译整洁度、接口生成与规范审计
+- 严格遵循 MoonBit 习惯用法与架构规范，保持全模块 `moon check --target native` 持续 0 错误、0 警告。
+- 保证 `moon info --target native` 正确生成/更新各包 `.mbti` 接口描述文件，并通过 `moon fmt` 保持代码风格规范。
+- 引用依赖与实现代码严格遵循 MIT、Apache-2.0、BSD-3-Clause 等宽松商业友好开源协议。
+
+## Acceptance Criteria
+
+### 编译与类型检查
+- [ ] `moon check --target native` 输出结果为 0 错误（0 errors）、0 警告（0 warnings）。
+- [ ] `moon info --target native` 成功更新 `.mbti` 接口，`moon fmt` 格式化无异常差异。
+
+### 行为与测试验证
+- [ ] `moon test --target native` 全量单元与对抗测试 100% 通过（无任何失败用例）。
+- [ ] 修复 C016 目录列表与自定义 404 优先级逻辑，修复 SPA/try-files 在回退文件不存在时的终端 404 判定。
+- [ ] 针对 Windows Native TransmitFile / IOCP 零拷贝与 Range 区间发送，编写并执行端到端或集成测试，验证普通文件、大文件及 Range 切片正确传输。
+- [ ] 验证异常断连与慢速传输场景下无文件句柄泄漏（handle leak）和 Socket 泄漏。
+
+## Follow-up — 2026-09-11T12:39:43Z
+
+Milestone 3 的审查、测试修复与门禁验证通过后，在开始执行 Milestone 4 之前：
+必须先执行全部 `git add -A` 并创建本地 commit（例如 `git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证"`），但【绝对不要 push】！
+确认本地 commit 完成后，再启动 Milestone 4 的实施。请立即同步通知 Orchestrator 并在流程规划中执行此约束。
+

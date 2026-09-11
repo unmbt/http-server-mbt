@@ -480,6 +480,26 @@ fn render_directory_html(
 }
 
 ///|
+fn StaticEngine::make_terminal_404_response(
+  self : StaticEngine,
+  request : @core.Request,
+) -> Response {
+  let text = "File not found. :("
+  let body_bytes = @utf8.encode(text)
+  let headers : Map[String, String] = Map([
+    ("Content-Type", "text/plain; charset=UTF-8"),
+    ("Content-Length", body_bytes.length().to_string()),
+  ])
+  @core.apply_security_headers(headers, self.config, request.meth)
+  let body = if request.meth is Head {
+    @core.ResponseBody::Empty
+  } else {
+    @core.ResponseBody::Bytes(body_bytes)
+  }
+  { status: 404, headers, body, }
+}
+
+///|
 async fn StaticEngine::make_404_response(
   self : StaticEngine,
   request : @core.Request,
@@ -504,19 +524,7 @@ async fn StaticEngine::make_404_response(
     }
     { status: 404, headers, body, }
   } else {
-    let text = "File not found. :("
-    let body_bytes = @utf8.encode(text)
-    let headers : Map[String, String] = Map([
-      ("Content-Type", "text/plain; charset=UTF-8"),
-      ("Content-Length", body_bytes.length().to_string()),
-    ])
-    @core.apply_security_headers(headers, self.config, request.meth)
-    let body = if request.meth is Head {
-      @core.ResponseBody::Empty
-    } else {
-      @core.ResponseBody::Bytes(body_bytes)
-    }
-    { status: 404, headers, body, }
+    self.make_terminal_404_response(request)
   }
 }
 
@@ -693,7 +701,7 @@ pub async fn StaticEngine::handle(
 
     // No index file found
     if self.config.show_dir {
-      if !self.config.dir_overrides_404 {
+      if !self.config.dir_overrides_404 && !self.config.has_fallback() {
         let root_404 = normalize_root_join(self.config.root, "404.html")
         let has_404 = try
           @fs.exists(root_404) && @fs.kind(root_404) is @fs.FileKind::Regular
@@ -937,7 +945,7 @@ pub async fn StaticEngine::handle(
       return self.serve_file(request, fallback_path, fallback_target, None)
     } else {
       // Terminal 404: fallback file missing on disk (D-04 line 136)
-      return Handled(self.make_404_response(request))
+      return Handled(self.make_terminal_404_response(request))
     }
   }
 

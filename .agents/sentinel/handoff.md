@@ -1,30 +1,27 @@
-# Sentinel Handoff Report — Generation 2 Continuation
+# Sentinel Initial Handoff
 
 ## Observation
-- The user provided continuation instructions to resume execution following Milestone 2 completion.
-- Baseline verification confirmed: Milestone 1 (Warning elimination) and Milestone 2 (Core protocols, MIME, security, routing config) are complete with 30/30 tests passing and 0 compiler warnings/errors.
-- Predecessor orchestrator (`orchestrator_1`) context and handoff documented in `.agents/orchestrator_1/handoff.md` and `.agents/orchestrator_1/PROJECT.md`.
-- No subagents were actively running prior to this invocation.
+Received user request to continue from `docs/progress.md`, complete Milestone 3 code review, adversarial testing, and gate fixes, and implement Milestone 4 Windows Native TransmitFile and IOCP zero-copy static file/Range transmission (T-031). The user explicitly requested a full multi-agent team.
 
 ## Logic Chain
-1. Updated `.agents/ORIGINAL_REQUEST.md` verbatim with the new user continuation request under UTC timestamp `## 2026-09-11T08:00:59Z`.
-2. Evaluated routing per Routing Decision Table: Multi-component SWE project with explicit request for full multi-agent team -> General path (`teamwork_preview_orchestrator`).
-3. Updated `.agents/orchestrator_gen2/DISPATCH.md` with current parent Sentinel conversation ID (`027d26f2-2219-433a-9e81-19707b1a405e`).
-4. Spawned Generation 2 Project Orchestrator (`teamwork_preview_orchestrator`, conversation ID `9732d646-2bae-4a07-a355-bcd4158f8351`) in working directory `D:\project\moonbit\http-server-mbt\.agents\orchestrator_gen2`.
-5. Established Sentinel monitoring per specification:
-   - Cron 1 (Progress Reporting, `*/8 * * * *`): Task `027d26f2-2219-433a-9e81-19707b1a405e/task-30`.
-   - Cron 2 (Liveness Check, `*/10 * * * *`): Task `027d26f2-2219-433a-9e81-19707b1a405e/task-32`.
-6. Preserved 🔒 append-only sections in `.agents/sentinel/BRIEFING.md` and registered active orchestrator ID and crons.
+1. Per the Task Routing Decision Table:
+   - Not a document review (no paper supplied).
+   - Not a pure math/proof task.
+   - Not SWE Light (multi-milestone project, user explicitly requested "Full multi-agent team").
+   - Decision: General path -> `teamwork_preview_orchestrator`.
+2. Initialized `ORIGINAL_REQUEST.md` in workspace root and `.agents/ORIGINAL_REQUEST.md` verbatim with timestamp header `## Follow-up — 2026-09-11T12:27:00Z`.
+3. Created working directory `.agents/orchestrator_1` and spawned `teamwork_preview_orchestrator` (ID: `96573c49-1ac6-4444-a189-e6e723f7c41a`).
+4. Scheduled Cron 1 (*/8 * * * *) for periodic progress reporting to user and Cron 2 (*/10 * * * *) for orchestrator liveness monitoring.
+5. Standing by for progress updates and victory claim.
 
 ## Caveats
-- Orchestrator Gen 2 is executing asynchronously.
-- Mandatory Sentinel constraint: Independent Victory Auditor (`teamwork_preview_victory_auditor`) MUST be dispatched when the orchestrator claims victory before reporting completion to the user.
-- Any VICTORY REJECTED audit findings must be routed back to the orchestrator for remediation.
+- Technical implementation is delegated to the orchestrator swarm; sentinel must not write code or make technical decisions.
+- Mandatory Victory Audit must be completed by `teamwork_preview_victory_auditor` upon victory claim before reporting completion to the user.
+- Crons and subagents must be killed before final summary delivery.
 
 ## Conclusion
-Generation 2 execution has commenced. Sentinel progress reporting and liveness monitoring crons are running.
+Orchestrator dispatched and crons established. Project execution is underway.
 
 ## Verification Method
-- `manage_subagents(action="list")` verifies `9732d646-2bae-4a07-a355-bcd4158f8351` is active.
-- `manage_task(action="list")` verifies periodic crons task-30 and task-32 are active.
-- Monitor incoming notifications from Cron 1, Cron 2, and Orchestrator.
+- Active tasks checked: Cron 1 (`task-22`), Cron 2 (`task-24`).
+- Active subagents checked: Orchestrator `96573c49-1ac6-4444-a189-e6e723f7c41a`.

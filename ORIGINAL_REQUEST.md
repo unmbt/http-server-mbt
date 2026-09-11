@@ -52,3 +52,55 @@ Integrity mode: benchmark
 - [ ] BaseURL 前缀匹配与 SPA / try-files 回退机制经自动化测试验证，边界与异常情况处理准确。
 - [ ] 编译生成 Release CLI 可执行文件，命令行启动、参数解析、非法端口阻断与平滑退出功能通过冒烟验证。
 - [ ] Windows TransmitFile 传输正常工作，并在客户端异常中断或大量传输后无文件/Socket 句柄泄漏。
+
+## Follow-up — 2026-09-11T12:27:00Z
+
+接续 `docs/progress.md` 进度，全面完成 Milestone 3 的代码审查、对抗测试与门禁修复，并实现 Milestone 4 的 Windows Native TransmitFile 与 IOCP 零拷贝静态传输与 Range 支持。
+
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
+Integrity mode: benchmark
+Requested team: Full multi-agent team
+
+## References
+- 规格设计与实施契约: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md`
+- 阶段进度说明: `docs/progress.md`
+- 当前 Windows 基线: `docs/windows-baseline.md`
+- 架构规则: `AGENTS.md` (遵守 SDD 流程、0 Warning 原则、资源安全与所有权规范)
+
+## Requirements
+
+### R1. Milestone 3 审查、检测与对抗加固 (Review & Hardening)
+- 对 Milestone 3 已完成的 Engine 业务特性（HTTP/1.1 GET/HEAD 分发、.br/.gz 预压缩协商、HTML 目录列表渲染、SPA/try-files 优雅回退、D-17 文件变更检测）进行全面代码审查与对抗测试。
+- 修复当前测试套件中暴露的问题（包括但不限于 `engine_test.mbt` 中 `directory listing vs custom 404 precedence (C016)`，以及 `engine_security_directory_adversarial_test.mbt` 中 `Terminal 404 when fallback file does not exist`）。
+- 确保静态目录探测、索引回退、404/403/401 优先级逻辑完全符合 RFC 与 `docs/design.md` 契约，杜绝任何硬编码或伪造实现。
+
+### R2. Milestone 4 Windows Native TransmitFile 与 IOCP 零拷贝传输 (T-031)
+- 在 Windows Native 下实现基于 Win32 `TransmitFile` / Overlapped 异步 I/O 的静态文件与 Range 分段内核级零拷贝发送。
+- 对接 `engine.mbt` 与 `core/` 中的 `FileRegion(path, offset, length)`，避免用户态大文件缓冲与多次内存拷贝。
+- 具备健全的有界缓冲降级机制（对于非文件响应、小数据块或特定平台回退路径）。
+- 实现慢客户端与断连取消处理，确保在连接异常中断、客户端主动关闭或高并发传输下绝不泄漏文件句柄与 Socket 句柄。
+
+### R3. 编译整洁度、接口生成与规范审计
+- 严格遵循 MoonBit 习惯用法与架构规范，保持全模块 `moon check --target native` 持续 0 错误、0 警告。
+- 保证 `moon info --target native` 正确生成/更新各包 `.mbti` 接口描述文件，并通过 `moon fmt` 保持代码风格规范。
+- 引用依赖与实现代码严格遵循 MIT、Apache-2.0、BSD-3-Clause 等宽松商业友好开源协议。
+
+## Acceptance Criteria
+
+### 编译与类型检查
+- [ ] `moon check --target native` 输出结果为 0 错误（0 errors）、0 警告（0 warnings）。
+- [ ] `moon info --target native` 成功更新 `.mbti` 接口，`moon fmt` 格式化无异常差异。
+
+### 行为与测试验证
+- [ ] `moon test --target native` 全量单元与对抗测试 100% 通过（无任何失败用例）。
+- [ ] 修复 C016 目录列表与自定义 404 优先级逻辑，修复 SPA/try-files 在回退文件不存在时的终端 404 判定。
+- [ ] 针对 Windows Native TransmitFile / IOCP 零拷贝与 Range 区间发送，编写并执行端到端或集成测试，验证普通文件、大文件及 Range 切片正确传输。
+- [ ] 验证异常断连与慢速传输场景下无文件句柄泄漏（handle leak）和 Socket 泄漏。
+
+## Follow-up — 2026-09-11T12:39:43Z
+
+Milestone 3 的审查、测试修复与门禁验证通过后，在开始执行 Milestone 4 之前：
+必须先执行全部 `git add -A` 并创建本地 commit（例如 `git commit -m "feat: 完成 Milestone 3 审查修复与门禁验证"`），但【绝对不要 push】！
+确认本地 commit 完成后，再启动 Milestone 4 的实施。请立即同步通知 Orchestrator 并在流程规划中执行此约束。
+
+

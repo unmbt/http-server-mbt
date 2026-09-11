@@ -39,3 +39,12 @@ Key Requirements & Acceptance Criteria:
 
 Please maintain `plan.md`, `progress.md`, and `BRIEFING.md` in your directory. Dispatch workers, reviewers, and challengers as needed. Report back when ready for victory audit.
 </USER_REQUEST>
+
+## 2026-09-11T17:49:21Z
+
+【网络恢复与继续推进指令】
+请继续推进 Milestone 5 的审查与门禁流程：
+1. 推动各审查员 (reviewer_m5_1_gen2, reviewer_m5_2_gen2)、挑战者 (challenger_m5_1_gen2, challenger_m5_2_gen2) 及审计员 (auditor_m5_1_gen2) 完成判定并收集 handoff 报告；
+2. 若发现任何缺陷及时安排 worker 修复；
+3. 门禁全票通过后更新 .mbti / moon fmt，执行最终本地 commit（严禁 push），并向 Sentinel 报告 ready_for_victory_audit！
+

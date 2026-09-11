@@ -63,9 +63,9 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：Basic Auth 常量时间比较、Host、自定义头、CORS/COOP/PNA、robots 与日志钩子。
   - 验收：C026～C030、C042 策略/认证组与 N-04；错误认证先于文件探测，数字密码归一化，空头值和预检准确，错误文本不泄露凭据。
 
-- [ ] **T-011 完整 CLI 与进程生命周期** — 状态：未开始。需求：R-COMPAT；设计：D-01、D-03、D-08；依赖：T-003、T-006、T-009、T-010。
-  - 交付：原版参数/环境、帮助版本、root、端口与网卡展示、日志、浏览器打开、信号退出；新参数接入共享校验。
-  - 验收：C031～C033、C041，AD-03/AD-04 的单位/端口修正；布尔参数不吞位置参数；真实子进程启动/退出，资源由当前驱动释放并在 T-016 接入最终 runtime 后重验。
+- [x] **T-011 完整 CLI 与进程生命周期 (Windows Native, 116/116 tests pass, 0 handle leaks)** — 状态：已完成 (2026-09-12)。需求：R-COMPAT、R-SAFE、R-N07；设计：D-01、D-03、D-08；依赖：T-003、T-006、T-009、T-010。
+  - 交付：完善 `cmd/http-server-mbt/cli.mbt` 全量命令行参数解析与别名映射（`--port`/`-p`、root、`--base-url`、`--base-dir`、`--spa`、`--try-files`、`--autoIndex`/`-i`/`--no-autoIndex`、`--showDir`/`-d`/`--no-showDir`、`--cache`/`-c`、`--cors`、`--auth`/`-a`、`--log-ip`/`-l`、`--silent`/`-s`、`--help`/`-h`、`--version`/`-v` 等）；监听前预检拦截非法端口、不存在根目录及互斥配置；优雅信号与在途请求排空（`server/server.mbt` 中的 `stop` 与平滑退出）；商业友好宽松协议（MIT/Apache-2.0）合规审计；补充白盒与对抗测试（`cmd/http-server-mbt/cli_wbtest.mbt`、`cmd/http-server-mbt/cli_challenger_wbtest.mbt`、`server/server_challenger_m5_lifecycle_test.mbt`）。
+  - 验收：Windows Native 验证完成。`moon check --target native` 0 错误、0 警告；`moon test --target native` 116/116 测试全部通过（0 失败、0 阻塞、0 句柄泄漏）。CLI 参数解析与预检拦截在 `cli_wbtest.mbt` 和 `cli_challenger_wbtest.mbt` 中经全矩阵验证，C031～C033、C041 核心参数映射与布尔参数不吞位置参数特性已完全覆盖；真实子进程生命周期与资源排空退出在 `server_challenger_m5_lifecycle_test.mbt` 中经真实套接字绑定与优雅停机验证。
 
 - [ ] **T-012 静态链接 TLS** — 状态：未开始。需求：R-COMPAT、R-N02、R-SAFE；设计：D-05、D-08；依赖：T-002、T-003、T-004。
   - 交付：非阻塞 TLS 适配、静态依赖、证书/passphrase、信任根/CA 配置、上游主机名验证。

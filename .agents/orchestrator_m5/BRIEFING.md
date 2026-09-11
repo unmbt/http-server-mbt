@@ -62,12 +62,18 @@
 | explorer_m5_1 | teamwork_preview_explorer | CLI Parser & Config Investigation | completed | f182dba1-80a6-469a-b05e-b4a4ee2916a0 |
 | explorer_m5_2 | teamwork_preview_explorer | Pre-flight Validation Investigation | completed | bb99f582-ba4e-4855-bb63-c5c615feaaa5 |
 | explorer_m5_3 | teamwork_preview_explorer | Lifecycle & Testing Investigation | completed | afb0ce32-5797-44e6-9cff-f479d50f3073 |
-| worker_m5 | teamwork_preview_worker | Milestone 5 Implementation & Local Commit | in-progress | dbd686bf-c2fa-4677-816b-096dfd9d6656 |
+| worker_m5 | teamwork_preview_worker | Milestone 5 Implementation & Local Commit | completed | dbd686bf-c2fa-4677-816b-096dfd9d6656 |
+| reviewer_m5_1_gen2 | teamwork_preview_reviewer | CLI Feature & Architecture Review | completed | 834558a2-c4cc-4b14-987d-87f4c12ba548 |
+| reviewer_m5_2_gen2 | teamwork_preview_reviewer | Pre-flight & Lifecycle Review | completed | 2fac728a-517f-40a1-89b7-3c417536110c |
+| challenger_m5_1_gen2 | teamwork_preview_challenger | CLI Adversarial Challenge | completed | 4c4382c3-f94d-4b4e-8250-03da41c2e49b |
+| challenger_m5_2_gen2 | teamwork_preview_challenger | Lifecycle & Executable Challenge | completed | af8e7ace-ccb1-48d8-ad20-7fed0b4c9e63 |
+| auditor_m5_1_gen2 | teamwork_preview_auditor | Forensic Integrity & License Audit | completed | 7d9ac85b-735a-40c6-aaec-ea84c89bb6ee |
+| worker_m5_closure | teamwork_preview_worker | Milestone 5 Closure & Final Commit | in-progress | a1f5dac7-0d86-46be-a727-70355abc4069 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 4 / 16
-- Pending subagents: dbd686bf-c2fa-4677-816b-096dfd9d6656
+- Spawn count: 15 / 16
+- Pending subagents: a1f5dac7-0d86-46be-a727-70355abc4069
 - Predecessor: none
 - Successor: not yet spawned
 

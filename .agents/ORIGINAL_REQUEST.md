@@ -178,3 +178,18 @@ Requested team: Full multi-agent team
 - [ ] 命令行优雅响应 Ctrl+C 中断信号，退出时释放所有资源与套接字。
 - [ ] 现有 83 项单元与集成测试持续 100% 通过，并为 CLI 增加单元与集成测试。
 </USER_REQUEST>
+
+## Follow-up — 2026-09-11T17:48:31Z
+
+【网络恢复与继续推进指令】
+由于底层 API 连接中断后恢复，请继续推进 Milestone 5 的审查与门禁流程：
+
+1. 当前状态：
+   - Worker 已完成核心参数解析与生命周期实现，全量测试 99/99 全部通过，0 错误、0 警告；
+   - 本地 Git commit 已就绪：`178bb57 feat: 实现 Milestone 5 完整 CLI 参数与生命周期`（严格未 push）；
+   - 审查群组已派发（reviewer_m5_1, reviewer_m5_2, challenger_m5_1, challenger_m5_2, auditor_m5_1）。
+
+2. 后续任务：
+   - 推动各审查员、挑战者及审计员完成审查判定，收集 handoff 报告；
+   - 若发现任何缺陷及时修复；
+   - 门禁全票通过后更新 `.mbti`/`moon fmt`，执行最终本地 commit（严禁 push），并交由 Victory Auditor 进行终审闭环！

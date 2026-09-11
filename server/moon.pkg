@@ -6,7 +6,6 @@ import {
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
   "moonbitlang/async/types",
-  "moonbitlang/core/debug",
 }
 
 import {

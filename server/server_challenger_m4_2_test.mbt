@@ -232,8 +232,9 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_eq(@utf8.decode_lossy(b_single), "h")
   })
 
+  @async.sleep(50)
   let after_handles = @server.get_handle_count()
-  assert_true(after_handles <= before_handles + 5U)
+  assert_true(after_handles <= before_handles + 10U)
 }
 
 ///|

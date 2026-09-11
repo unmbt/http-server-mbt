@@ -121,7 +121,13 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
     let meth = match request.meth {
       @http.RequestMethod::Get => @core.Method::Get
       @http.RequestMethod::Head => @core.Method::Head
-      _ => @core.Method::Other(@debug.to_string(request.meth))
+      @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
+      @http.RequestMethod::Post => @core.Method::Other("POST")
+      @http.RequestMethod::Put => @core.Method::Other("PUT")
+      @http.RequestMethod::Delete => @core.Method::Other("DELETE")
+      @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
+      @http.RequestMethod::Trace => @core.Method::Other("TRACE")
+      @http.RequestMethod::Patch => @core.Method::Other("PATCH")
     }
     let headers : Map[String, String] = Map([])
     for key, value in request.headers {
@@ -131,7 +137,11 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
     let ok = match result {
       @root.HandleResult::Handled(response) => send_response(tcp_conn, response)
       @root.HandleResult::Next =>
-        send_fallback_status(tcp_conn, 404, "Not Found")
+        if meth is Other(_) {
+          send_fallback_status(tcp_conn, 405, "Method Not Allowed")
+        } else {
+          send_fallback_status(tcp_conn, 404, "Not Found")
+        }
       @root.HandleResult::Error(_) =>
         send_fallback_status(tcp_conn, 500, "Internal Server Error")
     }
@@ -161,6 +171,7 @@ fn status_reason(status : Int) -> String {
     401 => "Unauthorized"
     403 => "Forbidden"
     404 => "Not Found"
+    405 => "Method Not Allowed"
     416 => "Range Not Satisfiable"
     500 => "Internal Server Error"
     _ => "OK"

@@ -193,3 +193,68 @@ Requested team: Full multi-agent team
    - 推动各审查员、挑战者及审计员完成审查判定，收集 handoff 报告；
    - 若发现任何缺陷及时修复；
    - 门禁全票通过后更新 `.mbti`/`moon fmt`，执行最终本地 commit（严禁 push），并交由 Victory Auditor 进行终审闭环！
+
+## Follow-up — 2026-09-11T18:09:08Z
+
+<USER_REQUEST>
+推进 Milestone 6（原版全量测试套件迁移与对抗加固）：对照 docs/tasks.md 逐例迁移矩阵（C001～C042 及 CC-01～CC-28、CE-01～CE-02），补充真实 HTTP 客户端端到端测试与状态机故障注入（T-034）；实现阶段完成后先执行 git add 与本地 commit（严禁 push），再进入审查员（Reviewer）、挑战者（Challenger）与审计员（Auditor）的多阶段对抗审查与终审闭环。
+
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
+Integrity mode: benchmark
+
+## References
+- 规格契约与实施任务: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md`
+- 阶段进度与接续指南: `docs/progress.md`
+- 历史基线与执行证据: `docs/windows-baseline.md`
+- 团队架构规则: `AGENTS.md` (SDD 流程、0 警告门禁、所有权安全)
+
+## Requirements
+
+### R1. 原版全量测试套件迁移 (C001～C042, CC-01～CC-28, CE-01～CE-02)
+- 对照 `docs/tasks.md` 逐例迁移矩阵，将 `http-server/test/` 核心测试逻辑移植到 MoonBit Native 测试集；
+- 覆盖条件缓存（304/ETag/IMS）、字节区间 Range（206/416）、预压缩协商（.br/.gz 候选探测）、MIME 类型识别与覆盖、目录索引与列表 HTML 渲染转义、安全策略（路径穿越防御、Basic Auth）、以及命令行配置映射；
+- 兼容 Windows 平台特性与限制（如 AD-05 Windows 特殊路径约束处理）。
+
+### R2. 真实 HTTP 客户端端到端集成测试
+- 通过真实 TCP Socket 客户端对运行中的服务发起请求与解析响应；
+- 验证 GET、HEAD、OPTIONS、keep-alive 及错误状态码交互，确保协议解析与响应调度端到端正确。
+
+### R3. 状态机故障注入与异常并发对抗 (T-034)
+- 引入可重现的状态机故障注入场景：包含网络短写（Short Write）、慢速客户端读取（分段延时）、请求中途异常断连与在途取消；
+- 验证高并发请求及连接异常终止下服务器不挂起、不崩溃，且无 Socket/文件句柄泄漏（0 handle leaks）。
+
+### R4. 流程与提交约束 (Git Workflow)
+- **【核心流程约束】Milestone 6 代码实现部分完成后，必须先执行全部 `git add -A` 并创建本地 commit（例如 `feat: 实现 Milestone 6 原版测试迁移与故障注入测试`），严禁 push！**
+- 确认本地 commit 成功后，再交由 Reviewer、Challenger 及 Auditor 开展独立的对抗性代码审查与门禁审计；
+- 全量门禁全票无条件通过后，更新 `.mbti`、运行 `moon fmt`、同步文档，完成最终本地 commit（严禁 push），并交由 Victory Auditor 进行归档终审。
+
+### R5. 架构整洁度与 0 Warnings 门禁
+- 保持全模块 `moon check --target native` 持续 **0 错误、0 警告**；
+- 生成规范的 `.mbti` 接口描述文件并通过 `moon fmt` 保持代码风格一致；
+- 开源依赖及代码引用严格限定为 MIT、Apache-2.0、BSD-3-Clause 等宽松商业友好协议。
+
+## Acceptance Criteria
+
+### 编译与接口门禁
+- [ ] `moon check --target native` 检查结果为 0 错误（0 errors）、0 警告（0 warnings）。
+- [ ] `moon info --target native` 与 `moon fmt` 规范执行，接口描述与格式无异常差异。
+
+### 行为与测试门禁
+- [ ] 原版测试迁移（C001～C042 及 CC/CE 矩阵）在 Native 下建立完整断言并 100% 通过。
+- [ ] 状态机故障注入测试（短写、慢速读取、断连取消）100% 通过且无句柄泄漏。
+- [ ] `moon test --target native` 全量测试套件通过率保持 100%（全 PASS、0 FAIL）。
+
+### 提交流程与审查门禁
+- [ ] 实现完成后第一阶段先且必须执行本地 commit（`git add -A` && `git commit`），严禁 push。
+- [ ] Reviewer、Challenger、Auditor 独立门禁全票通过并出具 handoff 报告。
+- [ ] 门禁全通后完成文档更新并记录最终本地 commit（严禁 push）。
+</USER_REQUEST>
+
+## Follow-up — 2026-09-11T18:32:31Z
+
+<USER_REQUEST>
+实现部分完成后commit后先停下来
+</USER_REQUEST>
+
+【执行约束】：
+Worker 完成实现与自测（`moon check` 0 警告、`moon test` 100% 通过）并执行完 `git add -A` 和本地 commit（严禁 push）之后，必须立即暂停流程并向用户汇报停下来，暂不启动后续审查阶段，静候用户下一步确认。

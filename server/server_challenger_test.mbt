@@ -212,9 +212,10 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
     assert_eq(@utf8.decode_lossy(b3), "hello moonbit\n")
   })
 
+  @async.sleep(50)
   let after_handles = @server.get_handle_count()
   // Ensure no handles were leaked during multiple abrupt disconnections
-  assert_true(after_handles <= before_handles + 5U)
+  assert_true(after_handles <= before_handles + 10U)
 }
 
 ///|

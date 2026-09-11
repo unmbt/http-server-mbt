@@ -569,6 +569,25 @@ pub async fn StaticEngine::handle(
     return Next
   }
 
+  // 2.1 Robots.txt interception per D-03 / C042.04
+  if self.config.robots {
+    let raw_target_parts = request.target.split("?").to_array()
+    if raw_target_parts[0] == "/robots.txt" {
+      let body_bytes = @utf8.encode("User-agent: *\nDisallow: /\n")
+      let headers : Map[String, String] = Map([
+        ("Content-Type", "text/plain"),
+        ("Content-Length", body_bytes.length().to_string()),
+      ])
+      @core.apply_security_headers(headers, self.config, request.meth)
+      let body = if request.meth is Head {
+        @core.ResponseBody::Empty
+      } else {
+        @core.ResponseBody::Bytes(body_bytes)
+      }
+      return Handled({ status: 200, headers, body, })
+    }
+  }
+
   // 3. Path resolution & root anchoring
   let resolved = @core.resolve_path(
     self.config.root,

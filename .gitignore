@@ -4,5 +4,5 @@ target/
 target
 .mooncakes/
 .moonagent/
-http-server
+/http-server/
 embedded_mod.mbt

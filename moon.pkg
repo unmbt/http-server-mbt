@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
+  "unmbt/http-server-mbt/core",
+}
+
+options(
+  targets: { "*.mbt": [ "native" ] },
+)

@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/env",
+}
+
+/// Windows baseline probe for T-001/T-031. The reference checkout is intentionally read-only.
+fn main {
+  println("http-server-mbt Windows baseline")
+  println("moonbit toolchain: native")
+  println("reference dependencies: inspect http-server/node_modules before Node comparison")
+  let args = @env.args()
+  println("arguments: \{args.length() - 1}")
+}

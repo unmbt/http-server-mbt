@@ -30,7 +30,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ### 阶段二：配置、协议和静态核心
 
-- [ ] **T-003 配置与别名归一化** — 状态：未开始。需求：R-COMPAT、R-SAFE、R-N07；设计：D-01、D-04；依赖：T-001、T-002。
+- [ ] **T-003 配置与别名归一化** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-SAFE、R-N07；设计：D-01、D-04；依赖：T-001、T-002。已交付：`core.Config` 默认构造、BaseURL 归一化和路径校验；证据见 [windows-baseline](windows-baseline.md)。
   - 交付：CLI/Server/中间件/C ABI 共享配置模型、别名、默认构造策略和 ConfigError；记录新路由参数但不伪造已实现能力。
   - 验收：对象/字符串/数字/布尔来源、gzip 构造默认差异、CRLF/MIME 文件错误、参数互斥/缺失验证，覆盖 C013、C026 及 N-03；所有预检失败均无监听。
 
@@ -42,15 +42,15 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：根目录锚定、组件解码与边界验证、含身份/变更观察信息的文件 lease、元数据与错误分类、三平台特殊路径；下载不主动持有拒绝写入的锁。
   - 验收：C017～C021 及 N-04 路径案例；symlink/reparse 竞态不得越界，ENOENT/ENOTDIR 与权限失败区分，取消释放句柄。
 
-- [ ] **T-006 静态文件、MIME 与索引解析** — 状态：未开始。需求：R-COMPAT、R-SAFE；设计：D-03；依赖：T-003、T-004、T-005。
+- [ ] **T-006 静态文件、MIME 与索引解析** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-SAFE；设计：D-03；依赖：T-003、T-004、T-005。已交付：GET/HEAD、默认扩展名、MIME、404 和 index 文件的基础实现；证据见 [windows-baseline](windows-baseline.md)。
   - 交付：FileRegion 响应、默认扩展名、索引/重定向/404、MIME 注册/.types、有界 charset 嗅探。
   - 验收：C008、C010～C015、C025、CC 非压缩案例通过；UTF-8/ISO-8859-6/Shift_JIS、二进制无 charset、大文本不整文件读入。
 
-- [ ] **T-007 缓存与条件请求** — 状态：未开始。需求：R-COMPAT、R-N15；设计：D-03、D-17；依赖：T-006。
+- [ ] **T-007 缓存与条件请求** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-N15；设计：D-03、D-17；依赖：T-006。已交付：ETag/If-None-Match 304 基础路径和 Cache-Control；文件变更一致性仍待 T-033。
   - 交付：同一文件句柄元数据 ETag/Last-Modified、CachePolicy、强弱比较及非法日期处理。
   - 验收：C001～C003；动态 cache 每请求求值，数值/字符串结果准确，304 无正文，文件替换不混用旧元数据与新内容。
 
-- [ ] **T-008 Range 与预压缩表示** — 状态：未开始。需求：R-COMPAT、R-N01、R-N15；设计：D-03、D-05、D-17；依赖：T-006、T-007。
+- [ ] **T-008 Range 与预压缩表示** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-N01、R-N15；设计：D-03、D-05、D-17；依赖：T-006、T-007。已交付：206/416、gzip/Brotli 表示选择及 HEAD 空正文；零拷贝与 lease 仍待 T-031。
   - 交付：64 位区间、206/416、Brotli/gzip 选择、gzip 魔数、forceContentEncoding 与压缩索引/404。
   - 验收：C004～C007 和 CC 压缩案例，错误正文及头完整；HEAD+Range 不输出 body，字节区间与选定表示一致。
 
@@ -80,7 +80,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：条件启用 upgrade、握手后 tunnel、背压、半关闭与错误路径。
   - 验收：C040 和 N-12；AD-07 的非法配置启动失败与有效但不可达目标运行失败分别验证，客户端关闭后两侧句柄回收。
 
-- [ ] **T-015 MoonBit 库与中间件 API** — 状态：未开始。需求：R-COMPAT、R-N06、R-N11、R-N14；设计：D-02、D-07、D-14；依赖：T-006、T-007、T-008、T-009、T-010。
+- [ ] **T-015 MoonBit 库与中间件 API** — 状态：进行中（Windows 分项）。需求：R-COMPAT、R-N06、R-N11、R-N14；设计：D-02、D-07、D-14；依赖：T-006、T-007、T-008、T-009、T-010。已交付：根包 `StaticEngine`/`Response`/`with_engine`、server `with_server`/`stop` 和 `Handled`/`Next`/`Error`；完整生命周期和外部消费仍待后续任务。
   - 交付：根包 StaticEngine 的异步 handle/read/close、server 包的配置 start/stop、公共 core 类型、Handled/Next/Error；默认托管任务和内部循环，不公开 pump/run/poll 或裸文件句柄；文档示例与生成 `.mbti`。
   - 验收：C009/C035/C036、CC/CE 与 N-19；宿主只启动/停止或提交请求接入框架，关闭自动排空，Next 前无输出，cache=no-cache 保留。直接 MoonBit 消费不绕行 C ABI，类型及异步上下文合法；根包不拉入完整 TLS/代理，T-016/T-030 重验生产运行时和外部消费。
 

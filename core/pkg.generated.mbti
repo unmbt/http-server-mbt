@@ -1,0 +1,54 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/core"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn normalize_base_url(String) -> String raise
+
+pub fn parse_range(String, Int64) -> ByteRange?
+
+pub fn validate_relative_path(String) -> Bool
+
+// Errors
+pub suberror ConfigError {
+  InvalidBaseUrl(String)
+  InvalidRoot(String)
+} derive(@debug.Debug)
+
+// Types and methods
+pub(all) struct ByteRange {
+  start : Int64
+  end : Int64
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Config {
+  root : String
+  base_url : String
+  default_ext : String?
+  gzip : Bool
+  brotli : Bool
+  auto_index : Bool
+  show_dir : Bool
+  show_dotfiles : Bool
+  cache_control : String
+}
+pub fn Config::default(String) -> Self
+
+pub(all) enum Method {
+  Get
+  Head
+  Other(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Request {
+  method : Method
+  target : String
+  headers : Map[String, String]
+}
+
+// Type aliases
+
+// Traits

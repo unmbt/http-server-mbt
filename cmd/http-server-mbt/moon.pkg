@@ -1,0 +1,9 @@
+import {
+  "unmbt/http-server-mbt/server",
+  "unmbt/http-server-mbt/core",
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "moonbitlang/core/argparse",
+}
+
+pkgtype(kind: "executable")

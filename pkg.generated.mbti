@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt"
+
+import {
+  "moonbitlang/core/debug",
+  "unmbt/http-server-mbt/core",
+}
+
+// Values
+pub async fn[T] with_engine(@core.Config, async (StaticEngine) -> T) -> T
+
+// Errors
+pub suberror ServerError {
+  InvalidRequest(String)
+  Forbidden(String)
+  NotFound
+  Io(String)
+  Closed
+} derive(@debug.Debug)
+
+// Types and methods
+pub(all) enum HandleResult {
+  Handled(Response)
+  Next
+  Error(ServerError)
+}
+
+pub struct Response {
+  status : Int
+  headers : Map[String, String]
+  body : Bytes
+} derive(@debug.Debug)
+pub fn Response::close(Self) -> Unit
+pub fn Response::read(Self, offset? : Int, max_len? : Int) -> Bytes
+
+pub struct StaticEngine {
+  config : @core.Config
+}
+pub async fn StaticEngine::handle(Self, @core.Request) -> HandleResult
+pub fn StaticEngine::new(@core.Config) -> Self
+
+// Type aliases
+
+// Traits

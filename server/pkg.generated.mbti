@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/server"
+
+import {
+  "moonbitlang/async/http",
+  "unmbt/http-server-mbt",
+  "unmbt/http-server-mbt/core",
+}
+
+// Values
+pub async fn with_server(@core.Config, async (Server) -> Unit) -> Unit
+
+pub async fn with_server_at(@core.Config, Int, async (Server) -> Unit) -> Unit
+
+// Errors
+
+// Types and methods
+pub struct Server {
+  inner : @http.Server
+  engine : @http-server-mbt.StaticEngine
+}
+pub fn Server::engine(Self) -> @http-server-mbt.StaticEngine
+pub fn Server::stop(Self) -> Unit
+
+// Type aliases
+
+// Traits

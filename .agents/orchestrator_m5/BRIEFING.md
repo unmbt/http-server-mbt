@@ -68,12 +68,12 @@
 | challenger_m5_1_gen2 | teamwork_preview_challenger | CLI Adversarial Challenge | completed | 4c4382c3-f94d-4b4e-8250-03da41c2e49b |
 | challenger_m5_2_gen2 | teamwork_preview_challenger | Lifecycle & Executable Challenge | completed | af8e7ace-ccb1-48d8-ad20-7fed0b4c9e63 |
 | auditor_m5_1_gen2 | teamwork_preview_auditor | Forensic Integrity & License Audit | completed | 7d9ac85b-735a-40c6-aaec-ea84c89bb6ee |
-| worker_m5_closure | teamwork_preview_worker | Milestone 5 Closure & Final Commit | in-progress | a1f5dac7-0d86-46be-a727-70355abc4069 |
+| worker_m5_closure | teamwork_preview_worker | Milestone 5 Closure & Final Commit | completed | a1f5dac7-0d86-46be-a727-70355abc4069 |
 
 ## Succession Status
 - Succession required: no
 - Spawn count: 15 / 16
-- Pending subagents: a1f5dac7-0d86-46be-a727-70355abc4069
+- Pending subagents: none
 - Predecessor: none
 - Successor: not yet spawned
 

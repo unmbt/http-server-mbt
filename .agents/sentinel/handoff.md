@@ -1,31 +1,43 @@
-# Sentinel Handoff Report — Milestone 5 Dispatch
+# Sentinel Final Handoff Report — Milestone 5 (CLI 完整性、生命周期与架构规范)
 
 ## Observation
-User requested implementation of Milestone 5 (CLI 完整性、生命周期与架构规范):
-- R1: Complete CLI argument parsing and config mapping in `cmd/http-server-mbt` aligned with upstream `http-server` (`--port`, `root`, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--log-ip`, `--silent`, `--help`, `--version`).
-- R2: Pre-flight validation blocking invalid configs (invalid port, nonexistent root, invalid base-url/dir, mutex route combinations like spa + mutex) before listening with clear stderr message and non-zero exit.
-- R3: Graceful lifecycle: cross-platform/Windows Native Ctrl+C/SIGINT signal capture, safe socket closure and in-flight request draining.
-- R4: Git workflow: MUST run `git add -A` and local commit after M5 implementation finishes (STRICTLY NO PUSH) before Reviewer/Auditor inspection, then final commit after verification.
-- R5: 0 warnings, 0 errors, `.mbti` up-to-date, `moon fmt`, permissive open-source license audit (MIT, Apache-2.0, BSD-3-Clause).
-- All existing 83 tests continue to pass 100%, plus new CLI unit and integration tests.
+User requested full implementation of Milestone 5 (CLI 完整性、生命周期与架构规范，T-011):
+1. R1: Comprehensive CLI argument parsing in `cmd/http-server-mbt` aligned with upstream `http-server` (15 options/flags: `--port`/`-p`, `root`, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `--autoIndex`/`-i`/`--no-autoIndex`, `--showDir`/`-d`/`--no-showDir`, `--cache`/`-c`, `--cors`, `--auth`/`-a`, `--log-ip`/`-l`, `--silent`/`-s`, `--help`/`-h`, `--version`/`-v`), mapped to `@core.Config`, with float port truncation support.
+2. R2: Pre-flight validation strictly intercepting invalid ports, nonexistent root directories, and mutex conflicts before socket listen, outputting clear error to stderr and exiting with code 1.
+3. R3: Cross-platform / Windows Native graceful lifecycle: signal handling, active request tracking, and clean in-flight drain under `@async.protect_from_cancel` with zero handle/socket leaks.
+4. R4: Mandatory git workflow constraint: intermediate local commit (`178bb57`) after code implementation before review/audit, and final closure local commit (`44c038b`), strictly unpushed.
+5. R5: Zero warnings, zero errors (`moon check --target native`), `.mbti` up-to-date, `moon fmt`, 100% permissive open-source licenses (MIT & Apache-2.0, zero copyleft).
+6. 100% test pass rate: 116/116 tests passing (including 16 worker CLI unit tests, 12 challenger CLI edge-case tests, and 5 lifecycle stress tests).
+
+The full multi-agent orchestration team under `teamwork_preview_orchestrator` completed all phases:
+- Dual reviewers (`reviewer_m5_1_gen2`, `reviewer_m5_2_gen2`): `APPROVE`
+- Dual challengers (`challenger_m5_1_gen2`, `challenger_m5_2_gen2`): `APPROVE`
+- Forensic auditor (`auditor_m5_1_gen2`): `CLEAN`
+- Post-victory independent audit (`teamwork_preview_victory_auditor`): `VERDICT: VICTORY CONFIRMED` (all 3 phases passed).
 
 ## Logic Chain
-1. Recorded verbatim request with UTC timestamp into `ORIGINAL_REQUEST.md` and `.agents/ORIGINAL_REQUEST.md`.
-2. Applied Task Routing Decision Table: Routed to `teamwork_preview_orchestrator` (General path) as requested team is "Full multi-agent team" with comprehensive requirements.
-3. Created working directory `.agents/orchestrator_m5` and initialized `context.md`.
-4. Spawned Project Orchestrator (`1d1f0f44-178d-4d9d-aec3-2a13ccae568f`).
-5. Scheduled Cron 1 (*/8 * * * *) for progress reporting and Cron 2 (*/10 * * * *) for liveness check.
-6. Updated `BRIEFING.md` preserving all append-only sections.
+1. Recorded user request and follow-up directive verbatim with UTC timestamps into `ORIGINAL_REQUEST.md` and `.agents/ORIGINAL_REQUEST.md`.
+2. Applied Task Routing Decision Table: Routed to `teamwork_preview_orchestrator` (General path).
+3. Monitored orchestration lifecycle through progress reporting cron (task-32) and liveness check cron (task-34).
+4. Enforced hard gate constraints: intermediate local commit `178bb57` verified before reviewer handoff; final closure commit `44c038b` created locally without remote push.
+5. On victory claim, blocked completion report and spawned independent `teamwork_preview_victory_auditor` (`a11a614b-d102-4eaa-92a5-c7d86c226332`).
+6. Upon receiving `VERDICT: VICTORY CONFIRMED`:
+   - Cancelled background monitoring crons (`task-32` and `task-34`).
+   - Terminated all active subagents via `manage_subagents(action="kill_all")`.
+   - Formulated structured report for user and parent delivery.
 
 ## Caveats
-- Mandatory git workflow gate: local commit only after M5 implementation before reviewer handoff, strictly NO PUSH.
-- Zero warnings and 0 errors (`moon check --target native`) is a strict blocking criterion.
-- Victory audit is mandatory before project completion report.
+- All Milestone 5 deliverables are committed to the local repository (`44c038b`, ahead of origin/master). Remote push was strictly prevented per user instructions.
+- Pre-flight directory check validates target directory existence via native `@fs.exists` & `@fs.kind == Directory` before socket binding.
 
 ## Conclusion
-Project Orchestrator has been spawned and active monitoring is running. Awaiting milestone implementation, review, adversarial testing, gate verification, and victory audit.
+Milestone 5 (CLI 完整性、生命周期与架构规范，T-011) has been 100% fulfilled, independently audited, and verified with zero errors, zero warnings, 116/116 test pass rate, 0 handle leaks, and full permissive licensing compliance.
 
 ## Verification Method
-- Active subagents: `teamwork_preview_orchestrator` (`1d1f0f44-178d-4d9d-aec3-2a13ccae568f`).
-- Background cron tasks: Task-32 (Progress reporting), Task-34 (Liveness check).
+- Independent Victory Auditor verdict: `VICTORY CONFIRMED` (`.agents/victory_auditor_m5/handoff.md`).
+- `moon check --target native`: 0 errors, 0 warnings.
+- `moon test --target native`: 116/116 passed (100%).
+- Empirical release executable smoke tests: `-h`, `-v`, out-of-bounds port, non-existent directory, mutex conflict, and live HTTP request serving.
+- Git status: Clean working tree, commits unpushed (`ahead of 'origin/master' by 1 commit`).
+
 

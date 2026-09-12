@@ -49,3 +49,8 @@ moon fmt
 - **Milestone 5**（已完成）：CLI 完整参数解析（`--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--spa`, `--try-files` 等）与前置拦截报错，优雅退出与商业宽松协议合规审计（116/116 测试通过）。
 - **Milestone 6**（已完成）：原版 C001~C042 及 CC/CE 测试套件 Windows 全量迁移、真实 TCP Socket E2E 测试集、T-034 状态机故障注入与边缘对抗加固（169/169 测试全通过，0 挂起，0 句柄泄漏，多角色独立审查全票无条件 APPROVED / PASSED (CLEAN)）。
 
+## 平台支持与后续接续说明
+
+当前基线聚焦于 **Windows x86_64 Native** 的全量功能与测试闭环验证（M1~M6 全部达成并通过独立第三方 Victory Audit 终审）。**Linux 与 macOS 版本为待完成状态（Pending / In Progress）**，后续将按规划（D-16 与 T-032）在 Milestone 7 接入 GitHub Actions 三平台持续集成矩阵与平台原生零拷贝调用（Linux `io_uring`/`sendfile` + `epoll`，macOS `kqueue` + `sendfile`）。
+
+

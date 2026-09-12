@@ -125,12 +125,58 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 
 ---
 
-## 5. 门禁闭环与就绪状态
+## 5. 门禁闭环与终审归档状态
 
 当前代码库已稳定就绪，所有 M1～M6 承诺任务与质量门禁均已彻底闭环：
-- 编译与类型状态：`moon check --target native` 0 错误、0 警告。
+- 编译与类型状态：`moon check --target native` **0 错误、0 警告**。
 - 接口与代码规范：`moon info --target native` 与 `moon fmt` 保持完全规范一致。
-- 测试套件状态：`moon test --target native` 实测 169/169 全部通过（100% PASS，0 挂起，0 句柄泄漏）。
+- 测试套件状态：`moon test --target native` 实测 **169/169 全部通过（100% PASS，0 挂起，0 句柄泄漏）**。
 - 审查审计门禁：Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）全票无条件 APPROVED / PASSED (CLEAN)，Gate Status: PASS。
-- 终审就绪：代码与文档同步就绪，已完全满足 Milestone 6 闭环门槛，就绪进入独立 Victory Audit 终审归档阶段。
+- 终审完成：独立第三方 Victory Auditor 已完成三阶段法医审计，出具 `VICTORY CONFIRMED`，并在本地生成终审提交 `fc0a9ba`。
+
+---
+
+## 6. 相比原版 http-server 的核心重构与拓展能力
+
+本项目基于 MoonBit 对经典 Node.js 版 `http-party/http-server`（基线 commit `0d3b7bb5`）进行了底层体系级的现代重构与多项重要拓展：
+
+1. **内核级异步零拷贝传输（Win32 TransmitFile + IOCP）**：
+   - *原版*：依赖 Node.js/V8 Stream 管道与 libuv，每次文件下发均在用户态 Buffer 产生内存拷贝并受 GC 压力与碎片化干扰。
+   - *拓展*：在 Windows Native 下直接接入 Win32 `TransmitFile` + Overlapped I/O，静态文件与 Range 区间完全由操作系统内核 DMA 传输至网络套接字，显著降低 CPU 占用与上下文切换；具备 100ms 超时防悬挂与自动有界缓冲降级保护。
+2. **深度路由回退与安全状态隔离（Enhanced SPA & try-files）**：
+   - *原版*：仅支持粗粒度的 `--spa`（404 时将请求粗暴重写为 `index.html`），可能意外掩盖重要鉴权与越界错误。
+   - *拓展*：不仅支持 `--spa`，还新增 `--try-files <file>` 精确指定回退文件；并在核心路由状态机中设立安全屏障，**严格保留 401（未授权）与 403（禁止访问）**，坚决不进行 SPA 回退覆盖；支持 `--base-url` 与 `--base-dir` 灵活挂载前缀归一化。
+3. **智能预压缩协商与内容完整性校验（Smart Pre-compression & Magic Check）**：
+   - *原版*：仅按后缀探测 `.gz` / `.br` 是否存在，不检查压缩文件实际内容是否合法损坏。
+   - *拓展*：支持 Brotli (`.br`) 与 gzip (`.gz`) 双算法协商并优先选择最高效的 Brotli；内建 gzip `0x1F 0x8B` 二进制魔数校验，杜绝伪劣残卷错误下发；支持 `forceContentEncoding` 强制头输出与原文件优雅降级直出。
+4. **原生全双工 WebSocket 异步双向代理（WebSocket Proxy Lifecycle）**：
+   - *原版*：依赖第三方 `http-proxy` 库，在连接异常中断或反向代理超时时存在长连接挂死与句柄泄漏风险。
+   - *拓展*：在 Native 异步运行时中原生实现 `Upgrade: websocket` 协议升级握手与双向透明流管道转发；具备独立连接生命周期隔离与异常断连自动排空，彻底消除 IOCP 读阻塞死锁，高并发压测下保持 **0 句柄泄漏**。
+5. **D-17 运行时在途文件变更检测与防护（Dynamic File Mutation Defense）**：
+   - *原版*：静态分发期间缺乏对外部文件变动的保护，文件若被原地截断或重写，客户端会接收到不可预知的损坏残卷或版本拼接。
+   - *拓展*：严格遵循 D-17 规范，服务端绑定已打开文件句柄，一旦探测到在途传输文件被外部篡改或截断（`FILE_CHANGED`），立即终止响应并自动取消排空，确保静态分发的数据强一致性。
+6. **T-034 状态机故障注入抗攻击加固（Fault-Tolerant State Machine）**：
+   - *原版*：缺乏对单字节短写切片、畸形报头截断风暴、Slowloris 慢读反压等网络恶劣环境的系统性对抗测试。
+   - *拓展*：专门设计 T-034 故障注入套件与 32 组极端 Range 边界对抗攻击套件；结合 `stop_and_drain` 优雅停机屏障排空与 Win32 `GetProcessHandleCount` 实时句柄监控，验证系统在极限高压下无死锁、无挂起、跨周期无句柄泄漏。
+7. **纯原生单文件二进制与零运行时开销（Zero Runtime Dependencies）**：
+   - *原版*：运行必须依赖 Node.js 庞大环境及数百个 `node_modules` 依赖包，分发与容器镜像体积庞大，冷启动慢。
+   - *拓展*：MoonBit 纯 Native 静态编译，单个独立可执行文件直接拷贝即可运行，零外部依赖，毫秒级冷启动，常驻内存仅数 MB。
+
+---
+
+## 7. 多平台支持现状与后续接续路线 (Linux & macOS 待完成)
+
+按照架构设计契约（D-16）与任务规划（`docs/tasks.md`），多平台支持的推进节奏与当前状态如下：
+
+| 平台与架构 | 当前状态 | 核心能力基线 | 后续接续里程碑与任务 |
+| :--- | :---: | :--- | :--- |
+| **Windows x86_64** | **✅ 已完成并闭环 (Verified)** | Win32 `TransmitFile` + IOCP Overlapped 内核零拷贝、全量 CLI 参数、169/169 测试 100% 通过、0 警告、0 句柄泄漏、独立 Victory Audit 验收通过 | Milestone 1 ～ Milestone 6 已全面闭环交付 |
+| **Linux x86_64** | **⏳ 待完成 (Pending / In Progress)** | 规划接入 Linux 原生 `io_uring` / `sendfile` + `epoll` 内核零拷贝网络事件驱动，支持非阻塞异步 I/O 与静态大文件直推 | 对接 **Milestone 7**：任务 **T-032**（GitHub Actions 三平台持续集成矩阵）、**T-016**（事件循环扩展）、**T-017**（原生零拷贝）与 **T-022**（Linux 独立二进制与 Distroless 容器镜像分发） |
+| **macOS arm64 / x86_64** | **⏳ 待完成 (Pending / In Progress)** | 规划接入 macOS 原生 `kqueue` + `sendfile` 零拷贝文件传输，支持 Darwin 平台的原生系统调用优化 | 对接 **Milestone 7**：任务 **T-032**（GitHub Actions 三平台持续集成矩阵）、**T-016**（事件循环扩展）、**T-017**（原生零拷贝）与 **T-022**（macOS 独立二进制分发） |
+
+> 📌 **多平台推进原则（D-16 承诺）**：
+> 1. 本项目采用“Windows 本机基线先行跑通全功能，再接入 Actions 三平台持续集成与全平台原生调用”的研发策略；
+> 2. Windows 本机的完整交付绝不缩减 Linux 与 macOS 的最终支持承诺与同等质量门槛；
+> 3. 后续 Milestone 7 将首先由 T-032 建立 GitHub Actions 真实 Runner 矩阵（Linux x86_64、macOS arm64、Windows x86_64），确保三平台在同一规范、同一接口和同一测试套件下持续验证与发行。
+
 

@@ -9,7 +9,7 @@
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20(Verified)%20%7C%20Linux%20%26%20macOS%20(Pending)-orange)](#-platform-support-matrix)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-platform-support-matrix)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
 </div>
@@ -19,10 +19,10 @@
 | Platform | Arch | Status | Core I/O & Transfer Mechanism | Verification & Quality Gates |
 | :--- | :--- | :---: | :--- | :--- |
 | **Windows** | x86_64 | **✅ Verified (Stable)** | Win32 `TransmitFile` + IOCP Overlapped asynchronous kernel zero-copy, 100ms anti-hang protection | 169/169 tests 100% PASS, 0 warnings, zero handle leaks under adversarial stress testing, verified by independent Victory Audit (Milestones 1–6 complete) |
-| **Linux** | x86_64 | **⏳ Pending** | Planned `io_uring` / `sendfile` + `epoll` kernel zero-copy | Milestone 7 CI matrix (T-032) & native zero-copy integration pending |
-| **macOS** | arm64 / x86_64 | **⏳ Pending** | Planned `kqueue` + `sendfile` kernel zero-copy | Milestone 7 CI matrix (T-032) & native zero-copy integration pending |
+| **Linux** | x86_64 | **✅ Verified** | `sendfile(2)` explicit-offset kernel zero-copy + `epoll` event loop (via `moonbitlang/async`), per-chunk fstat `FILE_CHANGED` detection, `posix_fadvise` prefetch | 169/169 tests pass locally (3 stable rounds), zero-copy gate test green; CI matrix enabled (T-032); evidence in `docs/linux-baseline.md` |
+| **macOS** | arm64 / x86_64 | **✅ Verified** | Darwin `sendfile` kernel zero-copy (value-result `len`: error & bytes-sent checked together, short-write offset advance) + `kqueue` event loop (via `moonbitlang/async`), per-chunk fstat `FILE_CHANGED` detection, `F_RDADVISE` prefetch | 169/169 tests pass on GitHub Actions `macos-latest` (arm64) first run; CI matrix enabled (T-032); evidence in `docs/macos-baseline.md` |
 
-> 📌 **Cross-Platform Roadmap**: The Windows Native version is fully functional with 169/169 gate tests passing. Per project specification (D-16), Linux and macOS native zero-copy support and single-binary packaging will be delivered in Milestone 7 via GitHub Actions three-platform CI matrix.
+> 📌 **Cross-Platform Roadmap**: All three platforms now ship native kernel zero-copy file transfer with the full 169-test gate suite green on each platform — Windows (`TransmitFile` + IOCP), Linux (`sendfile` + `epoll`), macOS (Darwin `sendfile` + `kqueue`). Per project specification (D-16), the GitHub Actions three-platform CI matrix (T-032) provides continuous verification; single-binary packaging & release (T-022) and remaining runtime tasks continue in Milestone 7.
 
 ---
 
@@ -32,7 +32,7 @@
 
 | Dimension | Original Node.js http-server | http-server-mbt (MoonBit) | Value & Advantage |
 | :--- | :--- | :--- | :--- |
-| **Underlying I/O & Transfer** | Relies on Node.js/V8 streams and libuv with userland buffer copying; prone to GC pauses | **Win32 `TransmitFile` kernel zero-copy**; static files and Range byte slices pushed directly from kernel DMA to network socket | Maximum throughput, minimal CPU & context switching overhead; 100ms timeout protection & bounded buffer fallback |
+| **Underlying I/O & Transfer** | Relies on Node.js/V8 streams and libuv with userland buffer copying; prone to GC pauses | **Per-platform kernel zero-copy**: Win32 `TransmitFile` (Windows) / `sendfile` + `epoll` (Linux) / Darwin `sendfile` + `kqueue` (macOS); static files and Range byte slices pushed directly from kernel DMA to network socket | Maximum throughput, minimal CPU & context switching overhead; 100ms timeout protection & bounded buffer fallback |
 | **SPA & Custom Fallback** | Basic `--spa` only (blindly rewrites 404 to `index.html`), potentially masking authentication and permission errors | **Both `--spa` and `--try-files <file>`**; core state machine **strictly preserves 401 Unauthorized and 403 Forbidden** | Production-ready SPA routing; eliminates security bypass vulnerabilities; flexible `--base-url` / `--base-dir` path mounting |
 | **Pre-compressed Assets** | Basic check for `.gz` / `.br` filename presence without content validation | **Brotli (`.br`) prioritized negotiation**, built-in **gzip magic number validation (`0x1F 0x8B`)**, `forceContentEncoding` mode | Prevents serving corrupted or fake compressed files; validates and gracefully falls back to raw asset transfer |
 | **WebSocket Proxy** | Relies on third-party `http-proxy` module; unhandled socket dropouts cause connection and handle leaks | **Native full-duplex WebSocket proxy** with built-in `Upgrade` handshake, transparent bi-directional pipes & cancellation draining | Completely eliminates IOCP read-blocking deadlocks; verified **0 handle leaks** across long-running connections |
@@ -44,7 +44,7 @@
 
 ## ✨ Features
 
-- **Blazing Fast**: Native machine code generated by MoonBit, with Windows kernel zero-copy DMA file transfer.
+- **Blazing Fast**: Native machine code generated by MoonBit, with kernel zero-copy file transfer on all three platforms — Windows (`TransmitFile`), Linux (`sendfile`), macOS (Darwin `sendfile`).
 - **Zero Dependencies**: Standalone single binary. No Node.js, V8, Python, or external dynamic libraries required!
 - **Modern Routing**: BaseURL path mounting prefix, SPA fallback, and custom `--try-files` fallback strategy.
 - **Smart Pre-compression**: Dual Brotli / gzip content negotiation with gzip magic number validation.
@@ -128,11 +128,11 @@ Hit CTRL-C to stop the server
 
 ---
 
-## 🛠️ Build from Source (Windows Native)
+## 🛠️ Build from Source
 
 Ensure you have the [MoonBit toolchain](https://docs.moonbitlang.com/en/latest/commands/installation.html) installed.
 
-```powershell
+```bash
 # Clone repository
 git clone https://github.com/unmbt/http-server-mbt.git
 cd http-server-mbt
@@ -148,7 +148,7 @@ moon test --target native
 moon build --target native --release
 ```
 
-The compiled binary will be located at `target/native/release/build/cmd/http-server-mbt/http-server-mbt.exe`.
+The compiled binary will be located at `_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe` (same commands and artifact name on Windows, Linux, and macOS).
 
 ---
 

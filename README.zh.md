@@ -9,7 +9,7 @@
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20(Verified)%20%7C%20Linux%20%26%20macOS%20(Pending)-orange)](#-平台支持矩阵)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-平台支持矩阵)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
 </div>
@@ -19,10 +19,10 @@
 | 平台 | 架构 | 状态 | 核心传输机制 | 质量门禁与测试 |
 | :--- | :--- | :---: | :--- | :--- |
 | **Windows** | x86_64 | **✅ 稳定支持 (Verified)** | Win32 `TransmitFile` + IOCP Overlapped 异步内核级零拷贝，100ms 超时防内核悬挂 | 169/169 项全量测试 100% 通过，0 警告，高压循环测试 0 句柄泄漏，通过独立 Victory Audit 终审 (M1~M6 已完成) |
-| **Linux** | x86_64 | **⏳ 待完成 (Pending)** | 规划接入 `io_uring` / `sendfile` + `epoll` 内核零拷贝 | M7 持续集成矩阵 (T-032) 与跨平台原生零拷贝任务待完成 |
-| **macOS** | arm64 / x86_64 | **⏳ 待完成 (Pending)** | 规划接入 `kqueue` + `sendfile` 内核零拷贝 | M7 持续集成矩阵 (T-032) 与跨平台原生零拷贝任务待完成 |
+| **Linux** | x86_64 | **✅ 支持 (Verified)** | `sendfile(2)` 显式偏移内核零拷贝 + `epoll` 事件循环（moonbitlang/async 后端），每块 fstat `FILE_CHANGED` 检测、`posix_fadvise` 预取 | 169/169 测试本机通过（连续三轮稳定），零拷贝门禁转绿；CI 矩阵已启用 (T-032)；证据见 `docs/linux-baseline.md` |
+| **macOS** | arm64 / x86_64 | **✅ 支持 (Verified)** | Darwin `sendfile` 内核零拷贝（value-result `len`：错误与实际发送字节同时检查、短写推进偏移）+ `kqueue` 事件循环（moonbitlang/async 后端），每块 fstat `FILE_CHANGED` 检测、`F_RDADVISE` 预取 | 169/169 测试经 GitHub Actions `macos-latest`（arm64）首跑通过；CI 矩阵已启用 (T-032)；证据见 `docs/macos-baseline.md` |
 
-> 📌 **跨平台说明**：当前 Windows Native 版本已实现全部功能与 169 项全量测试闭环。依据项目规划规范（D-16），后续将在 Milestone 7 通过 GitHub Actions 三平台持续集成矩阵与跨平台系统调用接入，补齐 Linux 与 macOS 两个平台的原生零拷贝与独立二进制发布。
+> 📌 **跨平台说明**：三平台现已全部具备原生内核零拷贝文件传输，且各自通过全量 169 项测试门禁 —— Windows（`TransmitFile` + IOCP）、Linux（`sendfile` + `epoll`）、macOS（Darwin `sendfile` + `kqueue`）。依据项目规划规范（D-16），GitHub Actions 三平台持续集成矩阵（T-032）提供持续验证；独立二进制打包发布（T-022）与剩余运行时任务在 Milestone 7 继续推进。
 
 ---
 
@@ -32,7 +32,7 @@
 
 | 维度 | 原版 Node.js http-server | 本项目 http-server-mbt | 拓展与提升价值 |
 | :--- | :--- | :--- | :--- |
-| **底层 I/O 传输** | 依赖 Node.js/V8 流管道与 libuv，用户态 Buffer 内存拷贝，受垃圾回收 (GC) 开销影响 | **Win32 `TransmitFile` 内核级零拷贝**，静态大文件与 Range 切片由内核直接 DMA 推送至网络套接字 | 极致吞吐，大幅削减 CPU 占用与上下文切换开销，内建 100ms 超时防悬挂与有界缓冲降级保护 |
+| **底层 I/O 传输** | 依赖 Node.js/V8 流管道与 libuv，用户态 Buffer 内存拷贝，受垃圾回收 (GC) 开销影响 | **分平台内核级零拷贝**：Win32 `TransmitFile`（Windows）/ `sendfile` + `epoll`（Linux）/ Darwin `sendfile` + `kqueue`（macOS），静态大文件与 Range 切片由内核直接 DMA 推送至网络套接字 | 极致吞吐，大幅削减 CPU 占用与上下文切换开销，内建 100ms 超时防悬挂与有界缓冲降级保护 |
 | **路由兜底与 SPA** | 仅提供基础 `--spa`（404 简单重定向/回退到 `index.html`），可能意外掩盖权限与认证错误 | **同时支持 `--spa` 与 `--try-files <file>`**，且核心状态机**严格保留 401（未授权）与 403（禁止访问）** | 生产级 SPA 支持，彻底消除安全信息泄露与认证穿透隐患；支持 `--base-url` / `--base-dir` 灵活挂载 |
 | **预压缩协商** | 仅按文件名后缀简单匹配 `.gz` / `.br` 是否存在，无内容合法性校验 | **Brotli (`.br`) 优先协商**，内置 **gzip 魔数校验（`0x1F 0x8B`）**，支持 `forceContentEncoding` | 杜绝伪劣残缺压缩文件错误下发，自动校验并优雅降级至原文件直接输出 |
 | **WebSocket 代理** | 依赖第三方 `http-proxy` 模块，长连接异常断连容易发生句柄与连接挂死 | **原生全双工 WebSocket 代理**，内建 `Upgrade` 协议升级、透明双向管道与断连取消排空 | 彻底消除 IOCP 读阻塞死锁，高并发长连接跨周期实测 **0 句柄泄漏** |
@@ -44,7 +44,7 @@
 
 ## ✨ 核心特性
 
-- **极速性能**：使用 MoonBit 最前沿的 Native 后端直接编译为原生机器码，Windows 下开启内核零拷贝。
+- **极速性能**：使用 MoonBit 最前沿的 Native 后端直接编译为原生机器码，Windows（`TransmitFile`）/ Linux（`sendfile`）/ macOS（Darwin `sendfile`）三平台均开启内核零拷贝。
 - **零外部依赖**：单文件分发，无需安装 Node.js、V8、Python 或动态库解释器。
 - **现代路由支持**：支持 BaseURL 路径挂载前缀、SPA 路由兜底及 `--try-files` 自定义降级策略。
 - **智能预压缩协商**：优先支持 Brotli 与 gzip 双重内容协商，内建 gzip 魔数校验防损坏。
@@ -128,11 +128,11 @@ Hit CTRL-C to stop the server
 
 ---
 
-## 🛠️ 从源码构建 (Windows Native)
+## 🛠️ 从源码构建
 
 确保已安装 [MoonBit 工具链](https://docs.moonbitlang.com/zh/latest/commands/installation.html)。
 
-```powershell
+```bash
 # 克隆仓库
 git clone https://github.com/unmbt/http-server-mbt.git
 cd http-server-mbt
@@ -148,7 +148,7 @@ moon test --target native
 moon build --target native --release
 ```
 
-编译生成的原生二进制位于 `target/native/release/build/cmd/http-server-mbt/http-server-mbt.exe`。
+编译生成的原生二进制位于 `_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe`（Windows、Linux、macOS 三平台命令与产物名一致）。
 
 ---
 

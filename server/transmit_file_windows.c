@@ -104,13 +104,18 @@ MOONBIT_FFI_EXPORT int32_t http_server_tf_step(int64_t state_ptr) {
             }
             return 1;
         } else {
-            DWORD err = WSAGetLastError();
-            if (err == ERROR_IO_INCOMPLETE) {
+            DWORD err = GetLastError();
+            DWORD wsa_err = WSAGetLastError();
+            if (err == ERROR_IO_INCOMPLETE || wsa_err == ERROR_IO_INCOMPLETE ||
+                err == ERROR_IO_PENDING || wsa_err == WSA_IO_PENDING) {
                 return 2; // Still pending, yield to event loop
             }
             if (err == WSAECONNRESET || err == WSAECONNABORTED ||
                 err == WSAESHUTDOWN || err == ERROR_NETNAME_DELETED ||
-                err == ERROR_OPERATION_ABORTED) {
+                err == ERROR_OPERATION_ABORTED ||
+                wsa_err == WSAECONNRESET || wsa_err == WSAECONNABORTED ||
+                wsa_err == WSAESHUTDOWN || wsa_err == ERROR_NETNAME_DELETED ||
+                wsa_err == ERROR_OPERATION_ABORTED) {
                 return -2; // Client disconnected
             }
             return -4; // Other I/O error
@@ -160,7 +165,9 @@ MOONBIT_FFI_EXPORT int32_t http_server_tf_step(int64_t state_ptr) {
     }
 
     DWORD err = WSAGetLastError();
-    if (err == ERROR_IO_PENDING || err == WSA_IO_PENDING) {
+    DWORD win_err = GetLastError();
+    if (err == ERROR_IO_PENDING || err == WSA_IO_PENDING ||
+        win_err == ERROR_IO_PENDING) {
         s->in_flight = 1;
         DWORD transferred = 0;
         if (GetOverlappedResult((HANDLE)s->sock, &s->ov, &transferred, FALSE)) {
@@ -177,7 +184,10 @@ MOONBIT_FFI_EXPORT int32_t http_server_tf_step(int64_t state_ptr) {
 
     if (err == WSAECONNRESET || err == WSAECONNABORTED ||
         err == WSAESHUTDOWN || err == ERROR_NETNAME_DELETED ||
-        err == ERROR_OPERATION_ABORTED) {
+        err == ERROR_OPERATION_ABORTED ||
+        win_err == WSAECONNRESET || win_err == WSAECONNABORTED ||
+        win_err == WSAESHUTDOWN || win_err == ERROR_NETNAME_DELETED ||
+        win_err == ERROR_OPERATION_ABORTED) {
         return -2;
     }
     return -4;
@@ -188,8 +198,10 @@ MOONBIT_FFI_EXPORT void http_server_tf_close(int64_t state_ptr) {
     TfState* s = (TfState*)(intptr_t)state_ptr;
     if (s->in_flight) {
         CancelIoEx((HANDLE)s->sock, &s->ov);
+        WaitForSingleObject(s->hEvent, 100);
         DWORD transferred = 0;
-        GetOverlappedResult((HANDLE)s->sock, &s->ov, &transferred, TRUE);
+        GetOverlappedResult((HANDLE)s->sock, &s->ov, &transferred, FALSE);
+        s->in_flight = 0;
     }
     CloseHandle(s->hEvent);
     CloseHandle(s->hFile);

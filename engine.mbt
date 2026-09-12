@@ -186,7 +186,8 @@ fn normalize_root_join(root : String, relative : String) -> String {
 }
 
 ///|
-fn escape_html(s : String) -> String {
+/// Escape characters for safe HTML rendering.
+pub fn escape_html(s : String) -> String {
   let buf = StringBuilder()
   for c in s {
     match c {
@@ -477,6 +478,34 @@ fn render_directory_html(
   )
   buf.write_string("</body></html>")
   buf.to_string()
+}
+
+///|
+/// Pure HTML directory listing renderer for testing and embedding (AD-05).
+pub fn render_directory_listing_html(
+  title_path : String,
+  entry_names : Array[(String, Bool)],
+  raw_query? : String?,
+  host? : String = "localhost",
+) -> String {
+  let entries : Array[ListingEntry] = []
+  for item in entry_names {
+    let (name, is_dir) = item
+    entries.push({
+      name,
+      is_dir,
+      size: 0L,
+      mtime_sec: 0L,
+      is_companion: false,
+      has_br: false,
+      has_gz: false,
+    })
+  }
+  let q = match raw_query {
+    Some(opt) => opt
+    None => None
+  }
+  render_directory_html(title_path, entries, q, host)
 }
 
 ///|

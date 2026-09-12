@@ -24,12 +24,15 @@ pub async fn with_server_at(@core.Config, Int, async (Server) -> Unit) -> Unit
 pub struct Server {
   inner : @socket.TcpServer
   engine : @http-server-mbt.StaticEngine
+  config : @core.Config
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int]
 }
 pub fn Server::active_request_count(Self) -> Int
+pub fn Server::config(Self) -> @core.Config
 pub fn Server::engine(Self) -> @http-server-mbt.StaticEngine
+pub fn Server::has_upgrade_capability(Self) -> Bool
 pub fn Server::port(Self) -> Int
 pub fn Server::stop(Self) -> Unit
 pub async fn Server::stop_and_drain(Self, timeout_ms? : Int) -> Unit

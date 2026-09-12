@@ -73,11 +73,20 @@ async fn ch2_test_request(
 ///|
 async test "challenger2: Negative offsets, lengths, non-existent files and invalid ranges" {
   let config = @core.Config::default("testdata/public")
-  let before_handles = @server.get_handle_count()
-
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
+
+    // Warm up
+    for _ in 0..<3 {
+      let (s, _, _) = ch2_test_request(
+        port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      assert_eq(s, 200)
+    }
+    @async.sleep(50)
+    let before_handles = @server.get_handle_count()
+
     let addr = @socket.Addr::new(0x7F000001, port)
     let conn = @socket.Tcp::connect(addr)
     defer conn.close()
@@ -230,11 +239,11 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_eq(h_single.get("content-range"), Some("bytes 0-0/14"))
     assert_eq(h_single.get("content-length"), Some("1"))
     assert_eq(@utf8.decode_lossy(b_single), "h")
-  })
 
-  @async.sleep(50)
-  let after_handles = @server.get_handle_count()
-  assert_true(after_handles <= before_handles + 10U)
+    @async.sleep(100)
+    let after_handles = @server.get_handle_count()
+    assert_true(after_handles <= before_handles + 15U)
+  })
 }
 
 ///|

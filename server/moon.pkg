@@ -6,10 +6,12 @@ import {
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
   "moonbitlang/async/types",
+  "moonbitlang/async/websocket",
 }
 
 import {
   "moonbitlang/async/fs",
+  "moonbitlang/async/websocket",
   "moonbitlang/core/encoding/utf8",
 } for "test"
 

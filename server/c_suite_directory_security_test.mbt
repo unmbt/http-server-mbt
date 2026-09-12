@@ -81,7 +81,7 @@ async fn dirsec_get(
 async test "C016: dir_overrides_404 true vs false precedence" {
   // .01 dir_overrides_404 = true: Directory listing takes precedence (200)
   let config_override : @core.Config = {
-    ..@core.Config::default("testdata/public"),
+    ..@core.Config::default("testdata/public/dir-overrides-404"),
     show_dir: true,
     auto_index: false,
     dir_overrides_404: true,
@@ -89,15 +89,15 @@ async test "C016: dir_overrides_404 true vs false precedence" {
   @server.with_server_at(config_override, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
-    let (s, _, b) = dirsec_get(port, "/empty_dir/")
+    let (s, _, b) = dirsec_get(port, "/directory/")
     assert_eq(s, 200)
     let body_str = @utf8.decode_lossy(b)
-    assert_true(body_str.contains("Index of /empty_dir/"))
+    assert_true(body_str.contains("Index of /directory/"))
   })
 
   // .02 dir_overrides_404 = false: Root custom 404.html takes precedence (404)
   let config_no_override : @core.Config = {
-    ..@core.Config::default("testdata/public"),
+    ..@core.Config::default("testdata/public/dir-overrides-404"),
     show_dir: true,
     auto_index: false,
     dir_overrides_404: false,
@@ -105,10 +105,10 @@ async test "C016: dir_overrides_404 true vs false precedence" {
   @server.with_server_at(config_no_override, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
-    let (s, _, b) = dirsec_get(port, "/empty_dir/")
+    let (s, _, b) = dirsec_get(port, "/directory/")
     assert_eq(s, 404)
     let body_str = @utf8.decode_lossy(b)
-    assert_true(body_str.contains("Custom 404"))
+    assert_true(body_str.contains("404file"))
   })
 }
 
@@ -128,16 +128,40 @@ async test "C017 ~ C021: Path handling, ENOTDIR, escaping, and malformed encodin
     assert_eq(s_enotdir, 404)
 
     // C018: Escaping -> URI encoded path with @, space, and percent
+    // .01 Request without trailing slash redirects to directory
+    let (s_redir, h_redir, _) = dirsec_get(
+      port, "/curimit%40gmail.com%20(40%25)",
+    )
+    assert_eq(s_redir, 302)
+    assert_eq(h_redir.get("location"), Some("/curimit%40gmail.com%20(40%25)/"))
+
+    // .02 Request with trailing slash resolves index.html -> 200
     let (s_esc, _, b_esc) = dirsec_get(port, "/curimit%40gmail.com%20(40%25)/")
     assert_eq(s_esc, 200)
     let esc_str = @utf8.decode_lossy(b_esc)
     assert_true(
-      esc_str.contains("curimit@gmail.com (40%)") || esc_str.contains("index"),
+      esc_str.contains("index!!!") ||
+      esc_str.contains("curimit@gmail.com (40%)"),
     )
 
     // C019: Pathname encoding safety with NUL byte (%00)
     let (s_nul, _, _) = dirsec_get(port, "/%00hello.txt")
     assert_true(s_nul == 403 || s_nul == 400 || s_nul == 404)
+
+    // C019: Pure HTML directory listing escaping for `<dir>` per AD-05
+    // On Windows NTFS, creating `<dir>` folder fails at filesystem level.
+    // Per AD-05, pure HTML escaping is verified on all three platforms:
+    let html = @root.render_directory_listing_html(
+      "/base/<dir>/",
+      [("<dir>", true), ("<script>.txt", false)],
+      raw_query=None,
+    )
+    assert_true(!html.contains("<dir>"))
+    assert_true(!html.contains("<script>"))
+    assert_true(html.contains("&#x3C;dir&#x3E;"))
+    assert_true(html.contains("&#x3C;script&#x3E;"))
+    assert_true(html.contains("Index of /base/&#x3C;dir&#x3E;/"))
+    assert_true(html.contains("href=\"./%3Cdir%3E/\""))
 
     // C020: Malformed URI `/%` -> 400 Bad Request
     let (s_mal1, _, _) = dirsec_get(port, "/%")
@@ -146,6 +170,15 @@ async test "C017 ~ C021: Path handling, ENOTDIR, escaping, and malformed encodin
     // C021: Malformed Directory URI `/?%` -> 400 Bad Request
     let (s_mal2, _, _) = dirsec_get(port, "/?%")
     assert_eq(s_mal2, 400)
+  })
+
+  // C017: Dedicated ENOTDIR check with directory lacking custom 404.html
+  let config_subdir = @core.Config::default("testdata/public/subdir")
+  @server.with_server_at(config_subdir, 0, async fn(server) {
+    defer server.stop()
+    let (s, _, b) = dirsec_get(server.port(), "/index.html/hello")
+    assert_eq(s, 404)
+    assert_true(@utf8.decode_lossy(b).contains("File not found"))
   })
 }
 
@@ -165,11 +198,20 @@ async test "C022 ~ C025: ShowDir href/search encoding and trailing slash suppres
     defer server.stop()
     let port = server.port()
 
-    // C022: ShowDir href with plus sign -> href="./aname%2Baplus.txt"
-    let (s_plus, _, b_plus) = dirsec_get(port, "/subfolder/")
-    assert_eq(s_plus, 200)
-    let plus_str = @utf8.decode_lossy(b_plus)
-    assert_true(plus_str.contains("href=\"./aname%2Baplus.txt\""))
+    // C022: ShowDir href with plus sign and dollar signs -> href="./aname%2Baplus.txt"
+    let (s_plus1, _, b_plus1) = dirsec_get(
+      port, "/show-dir%24%24href_encoding%24%24/",
+    )
+    assert_eq(s_plus1, 200)
+    assert_true(
+      @utf8.decode_lossy(b_plus1).contains("href=\"./aname%2Baplus.txt\""),
+    )
+
+    let (s_plus2, _, b_plus2) = dirsec_get(port, "/subfolder/")
+    assert_eq(s_plus2, 200)
+    assert_true(
+      @utf8.decode_lossy(b_plus2).contains("href=\"./aname%2Baplus.txt\""),
+    )
 
     // C023: ShowDir query preservation with XML/HTML entity encoding
     let (s_query, _, b_query) = dirsec_get(port, "/?a=1&b=2")
@@ -186,6 +228,10 @@ async test "C022 ~ C025: ShowDir href/search encoding and trailing slash suppres
     assert_eq(s_space, 200)
     let sp_str = @utf8.decode_lossy(b_space)
     assert_true(sp_str.contains("href=\"./index.html\""))
+
+    let (s_sp_redir, h_sp_redir, _) = dirsec_get(port, "/subdir_with%20space")
+    assert_eq(s_sp_redir, 302)
+    assert_eq(h_sp_redir.get("location"), Some("/subdir_with%20space/"))
   })
 
   // C025: Trailing slash suppression when show_dir=false and auto_index=false

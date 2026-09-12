@@ -153,10 +153,11 @@ async test "C001: ETag matching and 304 Not Modified responses" {
 
 ///|
 async test "C002: Cache-Control numeric, string, and max-age headers" {
-  // Numeric 3600 -> max-age=3600
+  // .01 Numeric 3600 default -> max-age=3600
   let config_num : @core.Config = {
     ..@core.Config::default("testdata/public"),
-    cache_control: Some("max-age=3600"),
+    cache_seconds: 3600,
+    cache_control: None,
   }
   @server.with_server_at(config_num, 0, async fn(server) {
     defer server.stop()
@@ -165,7 +166,36 @@ async test "C002: Cache-Control numeric, string, and max-age headers" {
     assert_eq(h.get("cache-control"), Some("max-age=3600"))
   })
 
-  // Custom string -> max-whatever=3600
+  // .02 Numeric 7200 -> max-age=7200
+  let config_7200 : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    cache_seconds: 7200,
+    cache_control: None,
+  }
+  @server.with_server_at(config_7200, 0, async fn(server) {
+    defer server.stop()
+    let (s, h, _) = proto_get(server.port(), "/hello.txt")
+    assert_eq(s, 200)
+    assert_eq(h.get("cache-control"), Some("max-age=7200"))
+  })
+
+  // .03 Negative cache duration -1 -> no-cache, no-store, must-revalidate
+  let config_nocache : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    cache_seconds: -1,
+    cache_control: None,
+  }
+  @server.with_server_at(config_nocache, 0, async fn(server) {
+    defer server.stop()
+    let (s, h, _) = proto_get(server.port(), "/hello.txt")
+    assert_eq(s, 200)
+    assert_eq(
+      h.get("cache-control"),
+      Some("no-cache, no-store, must-revalidate"),
+    )
+  })
+
+  // .04 Custom string -> max-whatever=3600 verbatim
   let config_str : @core.Config = {
     ..@core.Config::default("testdata/public"),
     cache_control: Some("max-whatever=3600"),
@@ -276,7 +306,14 @@ async test "C005 & C006: Precompression hierarchy (.br vs .gz) and Accept-Encodi
     assert_eq(s1, 200)
     assert_eq(h1.get("content-encoding"), Some("br"))
 
-    // .02 br unaccepted -> gzip selected
+    // .02 br not available on resource (only .gz exists in /gzip/) -> gzip selected
+    let (s_gz_only, h_gz_only, _) = proto_request(port, "/gzip/", [
+      ("Accept-Encoding", "gzip, br"),
+    ])
+    assert_eq(s_gz_only, 200)
+    assert_eq(h_gz_only.get("content-encoding"), Some("gzip"))
+
+    // .03 br unaccepted (only gzip accepted) -> gzip selected
     let (s2, h2, _) = proto_request(port, "/bundle.js", [
       ("Accept-Encoding", "gzip"),
     ])
@@ -289,6 +326,13 @@ async test "C005 & C006: Precompression hierarchy (.br vs .gz) and Accept-Encodi
     ])
     assert_eq(s3, 200)
     assert_eq(h3.get("content-encoding"), Some("gzip"))
+
+    // C006.02 Single Accept-Encoding entry `gzip` -> gzip selected
+    let (s3b, h3b, _) = proto_request(port, "/bundle.js", [
+      ("Accept-Encoding", "gzip"),
+    ])
+    assert_eq(s3b, 200)
+    assert_eq(h3b.get("content-encoding"), Some("gzip"))
 
     // .05 Neither accepted -> uncompressed regular file
     let (s5, h5, _) = proto_request(port, "/bundle.js", [
@@ -312,6 +356,21 @@ async test "C005 & C006: Precompression hierarchy (.br vs .gz) and Accept-Encodi
     assert_eq(s, 200)
     assert_eq(h.get("content-encoding"), Some("gzip"))
   })
+
+  // .06 Compression disabled (both brotli and gzip false) -> uncompressed
+  let config_none : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    brotli: false,
+    gzip: false,
+  }
+  @server.with_server_at(config_none, 0, async fn(server) {
+    defer server.stop()
+    let (s, h, _) = proto_request(server.port(), "/bundle.js", [
+      ("Accept-Encoding", "gzip, br"),
+    ])
+    assert_eq(s, 200)
+    assert_eq(h.get("content-encoding"), None)
+  })
 }
 
 // ----------------------------------------------------------------------------
@@ -320,7 +379,7 @@ async test "C005 & C006: Precompression hierarchy (.br vs .gz) and Accept-Encodi
 
 ///|
 async test "C007: Force Content Encoding option behavior" {
-  // With force_content_encoding: false
+  // .01 With force_content_encoding: false on explicit .br -> no Content-Encoding header
   let config_false : @core.Config = {
     ..@core.Config::default("testdata/public"),
     brotli: true,
@@ -334,7 +393,7 @@ async test "C007: Force Content Encoding option behavior" {
     assert_eq(h.get("content-encoding"), None)
   })
 
-  // With force_content_encoding: true
+  // .02 With force_content_encoding: true on explicit .br -> Content-Encoding: br
   let config_true : @core.Config = {
     ..@core.Config::default("testdata/public"),
     brotli: true,
@@ -346,6 +405,13 @@ async test "C007: Force Content Encoding option behavior" {
     let (s, h, _) = proto_get(server.port(), "/bundle.js.br")
     assert_eq(s, 200)
     assert_eq(h.get("content-encoding"), Some("br"))
+
+    // .03 Regular file served with Content-Encoding when flag is set
+    let (s2, h2, _) = proto_request(server.port(), "/bundle.js", [
+      ("Accept-Encoding", "gzip, br"),
+    ])
+    assert_eq(s2, 200)
+    assert_eq(h2.get("content-encoding"), Some("br"))
   })
 }
 
@@ -354,23 +420,18 @@ async test "C007: Force Content Encoding option behavior" {
 // ----------------------------------------------------------------------------
 
 ///|
-async test "C010 ~ C015: MIME resolution, Charset sniffing, and Default Extension" {
-  // C012: Custom MIME map opml -> application/jon
-  let custom_map : Map[String, String] = Map([
-    ("opml", "application/jon"),
-    ("f_f", "text/plain"),
-  ])
+async test "C010: Content-Type resolution, binary types, and Charset sniffing" {
   let config : @core.Config = {
     ..@core.Config::default("testdata/public"),
-    mime_types: custom_map,
     default_ext: Some("html"),
+    mime_types: Map([("f_f", "text/plain")]),
   }
 
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
 
-    // C010.01: Default Content-Type text/plain for extensionless file `f_f`
+    // .01 Default Content-Type text/plain for extensionless file `f_f`
     let (s1, h1, _) = proto_get(port, "/f_f")
     assert_eq(s1, 200)
     guard h1.get("content-type") is Some(ct1) else {
@@ -378,12 +439,17 @@ async test "C010 ~ C015: MIME resolution, Charset sniffing, and Default Extensio
     }
     assert_true(ct1.has_prefix("text/plain"))
 
-    // C010.02: HTML UTF-8
+    // .02 HTML UTF-8
     let (s2, h2, _) = proto_get(port, "/index.html")
     assert_eq(s2, 200)
     assert_eq(h2.get("content-type"), Some("text/html; charset=UTF-8"))
 
-    // C010.04 & .05: Charset sniffing for Arabic and Shift_JIS HTML
+    // .03 Binary wasm without charset parameter
+    let (s_wasm, h_wasm, _) = proto_get(port, "/subdir/app.wasm")
+    assert_eq(s_wasm, 200)
+    assert_eq(h_wasm.get("content-type"), Some("application/wasm"))
+
+    // .04 & .05 Charset sniffing for Arabic and Shift_JIS HTML
     let (s_ar, h_ar, _) = proto_get(port, "/charset/arabic.html")
     assert_eq(s_ar, 200)
     guard h_ar.get("content-type") is Some(ct_ar) else {
@@ -397,6 +463,40 @@ async test "C010 ~ C015: MIME resolution, Charset sniffing, and Default Extensio
       abort("missing shift_jis content-type")
     }
     assert_true(ct_sjis.contains("Shift_JIS") || ct_sjis.contains("text/html"))
+  })
+}
+
+///|
+test "C011: MimeRegistry standard lookups and custom extensions" {
+  let reg = @core.MimeRegistry::new()
+
+  // .01 7 standard lookups from mime.test.js
+  assert_eq(reg.lookup("/path/to/file.css"), "text/css")
+  assert_eq(reg.lookup("/path/to/file.js"), "application/javascript")
+  assert_eq(reg.lookup("/path/to/file.mjs"), "application/javascript")
+  assert_eq(reg.lookup("/path/to/file.txt"), "text/plain")
+  assert_eq(reg.lookup("file.txt"), "text/plain")
+  assert_eq(reg.lookup(".TXT"), "text/plain")
+  assert_eq(reg.lookup("htm"), "text/html")
+
+  // .02 Custom definition with register method
+  reg.register("opml", "application/xml")
+  assert_eq(reg.lookup(".opml"), "application/xml")
+}
+
+///|
+async test "C012 ~ C015: Custom MIME, .types parsing, and default extension completion" {
+  // C012: In-line custom MIME map opml -> application/jon
+  let custom_map : Map[String, String] = Map([("opml", "application/jon")])
+  let config : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    mime_types: custom_map,
+    default_ext: Some("html"),
+  }
+
+  @server.with_server_at(config, 0, async fn(server) {
+    defer server.stop()
+    let port = server.port()
 
     // C012.01: Custom MIME override `custom_mime_type.opml` -> application/jon
     let (s_opml, h_opml, _) = proto_get(port, "/custom_mime_type.opml")
@@ -409,8 +509,34 @@ async test "C010 ~ C015: MIME resolution, Charset sniffing, and Default Extensio
     assert_eq(@utf8.decode_lossy(b_ext), "index!!!\n")
   })
 
-  // C011 & C013: Load .types file via @core.parse_types
+  // C013: Load .types file via @core.parse_types and check nonexistent failure
   let types_content = @fs.read_file("testdata/public/custom_mime_type.types").text()
   let types_map = @core.parse_types(types_content)
   assert_eq(types_map.get("opml"), Some("application/foo"))
+
+  let nonexistent_failed = try {
+    let _ = @fs.read_file("testdata/public/nonexistent_file.types")
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(nonexistent_failed)
+
+  // C014: Dedicated secret .types file mapping opml to application/secret
+  let secret_types_content = @fs.read_file(
+    "testdata/fixtures/custom_mime_type.types",
+  ).text()
+  let secret_types_map = @core.parse_types(secret_types_content)
+  assert_eq(secret_types_map.get("opml"), Some("application/secret"))
+
+  let secret_config : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    mime_types: secret_types_map,
+  }
+  @server.with_server_at(secret_config, 0, async fn(server) {
+    defer server.stop()
+    let (s, h, _) = proto_get(server.port(), "/custom_mime_type.opml")
+    assert_eq(s, 200)
+    assert_eq(h.get("content-type"), Some("application/secret"))
+  })
 }

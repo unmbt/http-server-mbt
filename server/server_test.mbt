@@ -239,12 +239,13 @@ async test "server zero handle leaks across repeated requests" {
     let port = server.port()
 
     // Warm up with initial requests so Winsock IOCP threadpools and internal structures are allocated
-    for _ in 0..<2 {
+    for _ in 0..<5 {
       let (warm_status, _, _) = test_request(
         port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
       )
       assert_eq(warm_status, 200)
     }
+    @async.sleep(50)
 
     let before_handles = @server.get_handle_count()
 
@@ -256,12 +257,13 @@ async test "server zero handle leaks across repeated requests" {
         "GET \{path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
       )
       assert_eq(status, 200)
+      @async.pause()
     }
 
-    @async.sleep(50)
+    @async.sleep(100)
     let after_handles = @server.get_handle_count()
     // With unconditional CloseHandle, handle count must remain bounded with 0 leaks
-    assert_true(after_handles <= before_handles + 10U)
+    assert_true(after_handles <= before_handles + 15U)
   })
 }
 

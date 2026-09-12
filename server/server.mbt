@@ -3,9 +3,22 @@
 pub struct Server {
   inner : @socket.TcpServer
   engine : @root.StaticEngine
+  config : @core.Config
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : Ref[Int]
+}
+
+///|
+/// Return the server configuration.
+pub fn Server::config(self : Server) -> @core.Config {
+  self.config
+}
+
+///|
+/// Return whether this server has WebSocket proxy upgrade capability (AD-06 / AD-07).
+pub fn Server::has_upgrade_capability(self : Server) -> Bool {
+  self.config.has_websocket_proxy()
 }
 
 ///|
@@ -31,6 +44,7 @@ pub async fn with_server_at(
   let server : Server = {
     inner: listener,
     engine,
+    config,
     stopped: false,
     task: None,
     active_requests: { val: 0, },
@@ -109,51 +123,197 @@ pub fn Server::port(self : Server) -> Int {
 }
 
 ///|
+async fn handle_single_request(
+  server : Server,
+  tcp_conn : @socket.Tcp,
+  http_conn : @http.ServerConnection,
+) -> Bool {
+  let req_opt = if server.config.idle_timeout_ms > 0 {
+    @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
+      http_conn.read_request()
+    }) catch {
+      _ => None
+    }
+  } else {
+    Some(http_conn.read_request()) catch {
+      _ => None
+    }
+  }
+  let request = match req_opt {
+    Some(r) => r
+    None => return false
+  }
+  server.active_requests.val += 1
+  defer {
+    server.active_requests.val = server.active_requests.val - 1
+  }
+  let mut is_ws_upgrade = false
+  for k, v in request.headers {
+    if k.to_string().to_lower() == "upgrade" && v.to_lower() == "websocket" {
+      is_ws_upgrade = true
+      break
+    }
+  }
+  if server.has_upgrade_capability() && is_ws_upgrade {
+    let proxy_target = match server.config.proxy {
+      Some(p) => p
+      None => ""
+    }
+    let ws_upstream_url = if proxy_target.has_prefix("https://") {
+      "wss://" + proxy_target[8:].to_owned() + request.path
+    } else if proxy_target.has_prefix("http://") {
+      "ws://" + proxy_target[7:].to_owned() + request.path
+    } else {
+      "ws://" + proxy_target + request.path
+    }
+    let upstream_opt = Some(@websocket.connect(ws_upstream_url)) catch {
+      _ => None
+    }
+    match upstream_opt {
+      None => {
+        let _ = http_conn
+          ..send_response(502, "Bad Gateway")
+          ..write("Upstream WebSocket unreachable")
+          .end_response() catch {
+            _ => ()
+          }
+        return false
+      }
+      Some(upstream_ws) => {
+        let client_ws_res = Ok(@websocket.from_http_server(request, http_conn)) catch {
+          err => Err(err)
+        }
+        match client_ws_res {
+          Err(_) => {
+            upstream_ws.close()
+            return false
+          }
+          Ok(client_ws) => {
+            let _ = try {
+              @async.with_task_group() <| group => {
+                let _ = group.spawn(allow_failure=true, () => {
+                  defer {
+                    client_ws.close()
+                    upstream_ws.close()
+                  }
+                  for ;; {
+                    let msg = client_ws.recv() catch { _ => break }
+                    match msg.kind {
+                      Text => {
+                        let data = msg.read_all() catch { _ => break }
+                        let txt = data.text() catch { _ => break }
+                        upstream_ws.send_text(txt) catch {
+                          _ => break
+                        }
+                      }
+                      Binary => {
+                        let data = msg.read_all() catch { _ => break }
+                        let bin = data.binary()
+                        upstream_ws.send_binary(bin) catch {
+                          _ => break
+                        }
+                      }
+                    }
+                  }
+                  client_ws.close()
+                  upstream_ws.close()
+                  group.return_immediately(())
+                })
+                let _ = group.spawn(allow_failure=true, () => {
+                  defer {
+                    client_ws.close()
+                    upstream_ws.close()
+                  }
+                  for ;; {
+                    let msg = upstream_ws.recv() catch { _ => break }
+                    match msg.kind {
+                      Text => {
+                        let data = msg.read_all() catch { _ => break }
+                        let txt = data.text() catch { _ => break }
+                        client_ws.send_text(txt) catch {
+                          _ => break
+                        }
+                      }
+                      Binary => {
+                        let data = msg.read_all() catch { _ => break }
+                        let bin = data.binary()
+                        client_ws.send_binary(bin) catch {
+                          _ => break
+                        }
+                      }
+                    }
+                  }
+                  client_ws.close()
+                  upstream_ws.close()
+                  group.return_immediately(())
+                })
+              }
+            } catch {
+              _ => ()
+            }
+            return false
+          }
+        }
+      }
+    }
+  }
+  let meth = match request.meth {
+    @http.RequestMethod::Get => @core.Method::Get
+    @http.RequestMethod::Head => @core.Method::Head
+    @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
+    @http.RequestMethod::Post => @core.Method::Other("POST")
+    @http.RequestMethod::Put => @core.Method::Other("PUT")
+    @http.RequestMethod::Delete => @core.Method::Other("DELETE")
+    @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
+    @http.RequestMethod::Trace => @core.Method::Other("TRACE")
+    @http.RequestMethod::Patch => @core.Method::Other("PATCH")
+  }
+  let headers : Map[String, String] = Map([])
+  for key, value in request.headers {
+    headers[key.to_string().to_lower()] = value
+  }
+  let result = server.engine.handle({ meth, target: request.path, headers, })
+  let ok = match result {
+    @root.HandleResult::Handled(response) => send_response(tcp_conn, response)
+    @root.HandleResult::Next => {
+      let _ = if meth is Other(_) {
+        send_fallback_status(tcp_conn, 405, "Method Not Allowed")
+      } else {
+        send_fallback_status(tcp_conn, 404, "Not Found")
+      }
+      return false
+    }
+    @root.HandleResult::Error(_) => {
+      let _ = send_fallback_status(tcp_conn, 500, "Internal Server Error")
+      return false
+    }
+  }
+  if !ok {
+    return false
+  }
+  let conn_val = match headers.get("connection") {
+    Some(v) => v.to_lower()
+    None => ""
+  }
+  if conn_val == "close" || server.stopped {
+    return false
+  }
+  true
+}
+
+///|
 async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
   let http_conn = @http.ServerConnection::new(tcp_conn)
-  defer tcp_conn.close()
   for ;; {
     if server.stopped {
       break
     }
-    let request = http_conn.read_request() catch { _ => break }
-    server.active_requests.val += 1
-    let meth = match request.meth {
-      @http.RequestMethod::Get => @core.Method::Get
-      @http.RequestMethod::Head => @core.Method::Head
-      @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
-      @http.RequestMethod::Post => @core.Method::Other("POST")
-      @http.RequestMethod::Put => @core.Method::Other("PUT")
-      @http.RequestMethod::Delete => @core.Method::Other("DELETE")
-      @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
-      @http.RequestMethod::Trace => @core.Method::Other("TRACE")
-      @http.RequestMethod::Patch => @core.Method::Other("PATCH")
+    let keep_going = try {
+      handle_single_request(server, tcp_conn, http_conn)
+    } catch {
+      _ => false
     }
-    let headers : Map[String, String] = Map([])
-    for key, value in request.headers {
-      headers[key.to_string().to_lower()] = value
-    }
-    let result = server.engine.handle({ meth, target: request.path, headers, })
-    let ok = match result {
-      @root.HandleResult::Handled(response) => send_response(tcp_conn, response)
-      @root.HandleResult::Next =>
-        if meth is Other(_) {
-          send_fallback_status(tcp_conn, 405, "Method Not Allowed")
-        } else {
-          send_fallback_status(tcp_conn, 404, "Not Found")
-        }
-      @root.HandleResult::Error(_) =>
-        send_fallback_status(tcp_conn, 500, "Internal Server Error")
-    }
-    server.active_requests.val -= 1
-    if !ok {
-      break
-    }
-    let conn_val = match headers.get("connection") {
-      Some(v) => v.to_lower()
-      None => ""
-    }
-    if conn_val == "close" || server.stopped {
+    if !keep_going {
       break
     }
   }

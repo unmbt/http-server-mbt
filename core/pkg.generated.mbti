@@ -154,6 +154,7 @@ pub(all) struct Config {
   proxy : String?
   proxy_all : String?
   proxy_options : Map[String, String]
+  websocket : Bool
   handle_error : Bool
   idle_timeout_ms : Int
   mime_types : Map[String, String]
@@ -166,6 +167,7 @@ pub fn Config::fallback_mode(Self) -> FallbackMode
 pub fn Config::fallback_target_file(Self) -> String?
 pub fn Config::has_fallback(Self) -> Bool
 pub fn Config::has_proxy(Self) -> Bool
+pub fn Config::has_websocket_proxy(Self) -> Bool
 pub fn Config::middleware_default(String) -> Self
 pub fn Config::validate(Self) -> Unit raise ConfigError
 

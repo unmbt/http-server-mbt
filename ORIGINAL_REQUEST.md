@@ -258,3 +258,70 @@ Integrity mode: benchmark
 
 【执行约束】：
 Worker 完成实现与自测（`moon check` 0 警告、`moon test` 100% 通过）并执行完 `git add -A` 和本地 commit（严禁 push）之后，必须立即暂停流程并向用户汇报停下来，暂不启动后续审查阶段，静候用户下一步确认。
+
+## Follow-up — 2026-09-12T01:58:20Z
+
+<USER_REQUEST>
+全面复核 Milestone 6（原版全量测试套件迁移与状态机故障注入）的实现与测试覆盖情况，确认无遗漏后依序推进代码审查（Reviewer）、对抗测试挑战（Challenger）、合规与资源审计（Auditor），并完成门禁全通闭环与独立 Victory Audit 终审归档。
+
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
+Integrity mode: benchmark
+Requested team: Full multi-agent team
+
+## References
+- 规格契约与实施任务: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md`
+- 阶段进度与接续指南: `docs/progress.md`
+- 原版参考仓库: `http-server/` (commit `0d3b7bb5b6e8a59fd450ae2dca65870009cfcd8b`)
+- 团队架构规则: `AGENTS.md` (遵守 SDD 流程、0 警告门禁、所有权安全、禁止 push)
+
+## Requirements
+
+### R1. M6 实现与测试用例迁移完整性复核
+- 审查并核对原版 42 个测试文件（C001～C042）、28 项公共用例（CC-01～CC-28）、2 项错误用例（CE-01～CE-02）在 MoonBit Native 中的落地；
+- 核验 `server/c_suite_*.mbt`、`server/server_e2e_client_test.mbt`、`server/server_fault_injection_test.mbt` 的断言语义与原版行为的一致性；
+- 若发现任何尚未迁移或存在语义偏差的用例，立即补齐并确保 100% 通过。
+
+### R2. 审查员（Reviewer）质量与契约审查
+- 对照 `docs/design.md`（D-01～D-18）与 `docs/tasks.md` 逐项核对行为契约；
+- 特别验证 AD-01～AD-10 差异记录与平台约束（如 AD-05 Windows 特殊路径约束、AD-03 超时单位、AD-07 WebSocket 启动校验等）；
+- 出具详细审查报告（Handoff Report），指出需改进之处或给出通过判定。
+
+### R3. 挑战者（Challenger）对抗测试与压力加固
+- 编写专项对抗性测试集（如 `server/server_challenger_m6_test.mbt`）；
+- 针对极端场景展开攻击性测试：单字节流式短写、报头截断断连、慢速客户端反压（Slowloris 式读取延时）、并发突发连接、在途请求取消排空；
+- 结合 Win32 `GetProcessHandleCount` 强断言验证多次往返与并发异常断连下 0 句柄泄漏（0 handle leaks）。
+
+### R4. 审计员（Auditor）合规与资源审计
+- 审计编译状态：全包 `moon check --target native` 保持绝对 **0 错误、0 警告**；
+- 审计开源许可证合规：全量源码、测试用例与 testdata 静态资产均遵循 MIT / Apache-2.0 / BSD-3-Clause 等商业友好宽松协议，无 GPL/AGPL 污染；
+- 审查资源安全性与内存/句柄所有权生命周期。
+
+### R5. 门禁闭环、文档同步与独立 Victory Audit 终审归档
+- 在各门禁全票无条件通过后，更新并校验公开接口文件（`moon info --target native`）与代码格式化（`moon fmt`）；
+- 同步更新 `docs/progress.md` 与 `docs/tasks.md` 中 Milestone 6 任务状态与实测证据；
+- 执行本地提交（`feat: 完成 Milestone 6 审查门禁闭环与文档同步`，严禁 push）；
+- 派发独立 Victory Auditor 开展最终完整性核验，生成归档报告并执行最终本地归档提交（`docs: 归档 Milestone 6 独立 Victory Audit 终审记录`，严禁 push）。
+
+## Acceptance Criteria
+
+### 编译与质量门禁
+- [ ] `moon check --target native` 输出结果保持 0 errors, 0 warnings。
+- [ ] `moon info --target native` 与 `moon fmt` 执行无接口破坏与格式差异。
+
+### 测试与行为门禁
+- [ ] 原版迁移用例矩阵（C001～C042, CC-01～CC-28, CE-01～CE-02）100% 覆盖并断言无误。
+- [ ] 真实 TCP Socket E2E 与状态机故障注入测试 100% 通过。
+- [ ] 对抗测试（Challenger）覆盖慢速反压与并发异常中断，且实测句柄差值为 0（0 handle leaks）。
+- [ ] `moon test --target native` 全量测试通过率保持 100%（全 PASS、0 FAIL）。
+
+### 审查与审计门禁
+- [ ] Reviewer、Challenger、Auditor 各自独立出具 Handoff 报告并通过门禁判定。
+- [ ] 严格遵守 Git 本地提交规范，全过程严禁执行 `git push`。
+</USER_REQUEST>
+
+## Follow-up — 2026-09-12T02:48:51Z
+
+<USER_REQUEST>
+继续完成m6的门禁、审查、挑战、审计等
+</USER_REQUEST>
+

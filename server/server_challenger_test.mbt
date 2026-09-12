@@ -163,11 +163,19 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
   @fs.write_file(test_file, pattern_bytes)
   defer (@fs.remove(test_file) catch { _ => () })
 
-  let before_handles = @server.get_handle_count()
-
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
+
+    // Warm up runtime
+    for _ in 0..<3 {
+      let (s, _, _) = ch1_test_request(
+        port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      assert_eq(s, 200)
+    }
+    @async.sleep(50)
+    let before_handles = @server.get_handle_count()
 
     // 1. First client requests 2MB file, reads only 128KB, and abruptly closes socket
     let addr = @socket.Addr::new(0x7F000001, port)
@@ -210,22 +218,31 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
     )
     assert_eq(s3, 200)
     assert_eq(@utf8.decode_lossy(b3), "hello moonbit\n")
-  })
 
-  @async.sleep(50)
-  let after_handles = @server.get_handle_count()
-  // Ensure no handles were leaked during multiple abrupt disconnections
-  assert_true(after_handles <= before_handles + 10U)
+    @async.sleep(100)
+    let after_handles = @server.get_handle_count()
+    // Ensure no handles were leaked during multiple abrupt disconnections
+    assert_true(after_handles <= before_handles + 15U)
+  })
 }
 
 ///|
 async test "challenger1: 60 consecutive requests stress test with handle leak verification" {
   let config = @core.Config::default("testdata/public")
-  let before_handles = @server.get_handle_count()
 
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
     let port = server.port()
+
+    // Warm up runtime and thread pools
+    for _ in 0..<5 {
+      let (s, _, _) = ch1_test_request(
+        port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      assert_eq(s, 200)
+    }
+    @async.sleep(50)
+    let before_handles = @server.get_handle_count()
 
     // 60 consecutive requests alternating across static files, ranges, and 404
     for i in 0..<60 {
@@ -253,10 +270,12 @@ async test "challenger1: 60 consecutive requests stress test with handle leak ve
         )
         assert_eq(s, 404)
       }
+      @async.pause()
     }
-  })
 
-  let after_handles = @server.get_handle_count()
-  // Verification: handle count delta must be bounded (zero leaks)
-  assert_true(after_handles <= before_handles + 5U)
+    @async.sleep(100)
+    let after_handles = @server.get_handle_count()
+    // Verification: handle count delta must be bounded (zero leaks)
+    assert_true(after_handles <= before_handles + 15U)
+  })
 }

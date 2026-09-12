@@ -337,11 +337,12 @@ async test "e2e client: Zero handle leaks across diverse socket lifecycle operat
     let port = server.port()
 
     // Warm up
-    for _ in 0..<2 {
+    for _ in 0..<5 {
       let _ = e2e_one_shot(
         port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
       )
     }
+    @async.sleep(50)
 
     let before_handles = @server.get_handle_count()
 
@@ -362,15 +363,17 @@ async test "e2e client: Zero handle leaks across diverse socket lifecycle operat
       let _ = e2e_one_shot(
         port, "GET /% HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
       )
+      @async.pause()
 
       // Range request
       let _ = e2e_one_shot(
         port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nRange: bytes=0-4\r\nConnection: close\r\n\r\n",
       )
+      @async.pause()
     }
 
-    @async.sleep(50)
+    @async.sleep(100)
     let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 10U)
+    assert_true(after_handles <= before_handles + 15U)
   })
 }

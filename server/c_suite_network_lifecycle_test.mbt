@@ -6,7 +6,10 @@
 /// - C033 (process-env-port.test.js: PORT integer/float parsing & boundary validation)
 /// - C034 (timeout.test.js: idle_timeout_ms configuration matrix & active request lifecycle)
 /// - C037 (proxy-all.test.js: proxy without target preflight validation)
+/// - C038 (proxy-config.test.js: local hit serving & proxy routing contracts)
+/// - C039 (proxy-options.test.js: proxy options & upstream scheme validation)
 /// - C040 (websocket-proxy.test.js: proxy protocol scheme & illegal URL preflight validation)
+/// - C041 (cli.test.js: CLI configuration parity, custom headers, and port mapping)
 
 ///|
 fn net_parse_port(port_str : String) -> Int? {
@@ -232,45 +235,54 @@ test "C033: PORT integer/float parsing and port validation" {
 // ----------------------------------------------------------------------------
 
 ///|
-async test "C034: Idle timeout configuration and request lifecycle" {
+async test "C034: Idle timeout configuration and request lifecycle (.01 - .06)" {
   let base_cfg = @core.Config::default("testdata/public")
 
-  // .01 & .06: Timeout values 0, 30000, 60000, 120000, 300000 are valid
-  let t0 = try {
-    @core.validate_config({ ..base_cfg, idle_timeout_ms: 0, })
-    true
-  } catch {
-    _ => false
+  // .01: No timeout configuration (uses default 120000 ms)
+  @server.with_server_at(base_cfg, 0, server => {
+    assert_eq(server.config().idle_timeout_ms, 120000)
+  })
+
+  // .02: Explicit 60s creation succeeds
+  let cfg_60 = { ..base_cfg, idle_timeout_ms: 60000, }
+  @server.with_server_at(cfg_60, 0, server => {
+    assert_eq(server.config().idle_timeout_ms, 60000)
+  })
+
+  // .03: 0 creates successfully and disables timeout
+  let cfg_0 = { ..base_cfg, idle_timeout_ms: 0, }
+  @server.with_server_at(cfg_0, 0, server => {
+    assert_eq(server.config().idle_timeout_ms, 0)
+  })
+
+  // .04: 1000 ms idle triggers timeout and actual disconnection
+  let cfg_1s = { ..base_cfg, idle_timeout_ms: 1000, }
+  @server.with_server_at(cfg_1s, 0, async fn(server) {
+    let port = server.port()
+    let conn = @socket.Tcp::connect(@socket.Addr::new(0x7F000001, port))
+    defer conn.close()
+    // At 200ms, connection is still alive
+    @async.sleep(200)
+    // Now wait for server-initiated idle disconnect
+    let read_res = @async.with_timeout_opt(3500, () => conn.read_some())
+    assert_true(read_res is Some(None))
+  })
+
+  // .05: Normal request with 60s timeout succeeds with 200 and non-empty body
+  @server.with_server_at(cfg_60, 0, async fn(server) {
+    let (status, _, body) = net_test_get(server.port(), "localhost")
+    assert_eq(status, 200)
+    assert_true(body.length() > 0)
+    assert_eq(@utf8.decode_lossy(body), "hello moonbit\n")
+  })
+
+  // .06: Four values (30s, 120s, 300s, 0) validate and create servers
+  for ms in [30000, 120000, 300000, 0] {
+    let cfg = { ..base_cfg, idle_timeout_ms: ms, }
+    @server.with_server_at(cfg, 0, server => {
+      assert_eq(server.config().idle_timeout_ms, ms)
+    })
   }
-  let t30 = try {
-    @core.validate_config({ ..base_cfg, idle_timeout_ms: 30000, })
-    true
-  } catch {
-    _ => false
-  }
-  let t60 = try {
-    @core.validate_config({ ..base_cfg, idle_timeout_ms: 60000, })
-    true
-  } catch {
-    _ => false
-  }
-  let t120 = try {
-    @core.validate_config({ ..base_cfg, idle_timeout_ms: 120000, })
-    true
-  } catch {
-    _ => false
-  }
-  let t300 = try {
-    @core.validate_config({ ..base_cfg, idle_timeout_ms: 300000, })
-    true
-  } catch {
-    _ => false
-  }
-  assert_true(t0)
-  assert_true(t30)
-  assert_true(t60)
-  assert_true(t120)
-  assert_true(t300)
 
   // Negative timeout fails validation
   let t_neg = try {
@@ -280,16 +292,6 @@ async test "C034: Idle timeout configuration and request lifecycle" {
     _ => true
   }
   assert_true(t_neg)
-
-  // .05 Normal request with explicit timeout succeeds
-  let cfg_timeout : @core.Config = { ..base_cfg, idle_timeout_ms: 60000, }
-  @server.with_server_at(cfg_timeout, 0, async fn(server) {
-    defer server.stop()
-    let port = server.port()
-    let (status, _, body) = net_test_get(port, "localhost")
-    assert_eq(status, 200)
-    assert_eq(@utf8.decode_lossy(body), "hello moonbit\n")
-  })
 }
 
 // ----------------------------------------------------------------------------
@@ -352,4 +354,299 @@ test "C037 & C040: Proxy configuration and protocol scheme preflight checks" {
   }
   assert_true(ok_http)
   assert_true(ok_https)
+}
+
+// ----------------------------------------------------------------------------
+// C038 & C039: Proxy Config & Proxy Options Contracts
+// ----------------------------------------------------------------------------
+
+///|
+async test "C038: Proxy Config — non-matching static local serving and fallback exclusivity" {
+  let cfg_local : @core.Config = {
+    ..@core.Config::default("testdata/fixtures/root"),
+    proxy: Some("http://127.0.0.1:8082"),
+  }
+
+  // .01 Non-proxied local file served with 200 and exact content match
+  @server.with_server_at(cfg_local, 0, async fn(server) {
+    defer server.stop()
+    let port = server.port()
+    let addr = @socket.Addr::new(0x7F000001, port)
+    let conn = @socket.Tcp::connect(addr)
+    defer conn.close()
+    conn.write(
+      "GET /file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    )
+    let status_line = match conn.read_until("\r\n") {
+      Some(s) => s
+      None => abort("missing status line")
+    }
+    assert_eq(fi_parse_status(status_line), 200)
+    let hdrs = fi_read_headers(conn)
+    let content_len = match hdrs.get("content-length") {
+      Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+      None => 0
+    }
+    let body = conn.read_exactly(content_len)
+    let expected = @fs.read_file("testdata/fixtures/root/file")
+      .text()
+      .trim()
+      .to_owned()
+    assert_eq(@utf8.decode_lossy(body).trim().to_owned(), expected)
+  })
+
+  // .02 Exclusivity: Combining proxy with --spa or --try-files must fail preflight validation
+  let cfg_conflict_spa : @core.Config = { ..cfg_local, spa: true, }
+  let conflict_spa_failed = try {
+    @core.validate_config(cfg_conflict_spa)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(conflict_spa_failed)
+
+  let cfg_conflict_try : @core.Config = {
+    ..cfg_local,
+    try_files: Some("index.html"),
+  }
+  let conflict_try_failed = try {
+    @core.validate_config(cfg_conflict_try)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(conflict_try_failed)
+}
+
+///|
+test "C039: Proxy Options — options configuration and upstream scheme validation" {
+  let base_cfg = @core.Config::default("testdata/fixtures/root")
+
+  // .01 ProxyOptions map passed correctly with proxy target
+  let proxy_opts : Map[String, String] = Map([("secure", "false")])
+  let cfg_options : @core.Config = {
+    ..base_cfg,
+    proxy: Some("http://127.0.0.1:8080"),
+    proxy_options: proxy_opts,
+  }
+  let ok = try {
+    @core.validate_config(cfg_options)
+    true
+  } catch {
+    _ => false
+  }
+  assert_true(ok)
+  assert_eq(cfg_options.proxy_options.get("secure"), Some("false"))
+
+  // .02 ProxyOptions with conflicting fallback fails validation
+  let bad_options : @core.Config = { ..cfg_options, spa: true, }
+  let bad_failed = try {
+    @core.validate_config(bad_options)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(bad_failed)
+}
+
+// ----------------------------------------------------------------------------
+// C040: WebSocket Proxy Upgrade and Error Handling (AD-07)
+// ----------------------------------------------------------------------------
+
+///|
+async test "C040: WebSocket proxy upgrade, echo, and error handling (.01 - .04)" {
+  let base_cfg = @core.Config::default("testdata/public")
+  // .01: Proxy + WebSocket enabled registers upgrade capability and echoes messages
+  @async.with_task_group() <| group => {
+    let target_server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let target_port = target_server.addr.port()
+    group.spawn_bg() <| () => {
+      defer target_server.close()
+      let (conn, _) = target_server.accept()
+      defer conn.close()
+      let req = conn.read_request()
+      let ws = @websocket.from_http_server(req, conn)
+      defer ws.close()
+      let msg = ws.recv()
+      let content = msg.read_all().text()
+      ws..start_message(msg.kind)..write("Echo: " + content).end_message()
+      try {
+        let _ = ws.recv()
+      } catch {
+        _ => ()
+      }
+    }
+
+    let proxy_cfg : @core.Config = {
+      ..base_cfg,
+      proxy: Some("http://127.0.0.1:\{target_port}"),
+      websocket: true,
+    }
+    @server.with_server_at(proxy_cfg, 0, async fn(server) {
+      assert_true(server.has_upgrade_capability())
+      let proxy_port = server.port()
+
+      let client_ws = @websocket.connect("ws://127.0.0.1:\{proxy_port}/ws")
+      defer client_ws.close()
+
+      client_ws.send_text("Hello WebSocket!")
+      let resp = client_ws.recv()
+      assert_eq(resp.read_all().text(), "Echo: Hello WebSocket!")
+      try client_ws.send_close() catch {
+        _ => ()
+      }
+      client_ws.close()
+    })
+  }
+
+  // .02: No proxy configured -> no upgrade capability (.listeners('upgrade').length == 0)
+  let cfg_no_proxy : @core.Config = {
+    ..base_cfg,
+    proxy: None,
+    websocket: true,
+  }
+  @server.with_server_at(cfg_no_proxy, 0, async fn(server) {
+    assert_false(server.has_upgrade_capability())
+    let ws_attempt = Some(
+      @websocket.connect("ws://127.0.0.1:\{server.port()}/ws"),
+    ) catch {
+      _ => None
+    }
+    assert_true(ws_attempt is None)
+  })
+
+  // .03: WebSocket option not set -> no upgrade capability
+  let cfg_no_ws : @core.Config = {
+    ..base_cfg,
+    proxy: Some("http://127.0.0.1:3000"),
+    websocket: false,
+  }
+  @server.with_server_at(cfg_no_ws, 0, async fn(server) {
+    assert_false(server.has_upgrade_capability())
+    let ws_attempt = Some(
+      @websocket.connect("ws://127.0.0.1:\{server.port()}/ws"),
+    ) catch {
+      _ => None
+    }
+    assert_true(ws_attempt is None)
+  })
+
+  // .04 Part A: Illegal port (99999) fails in preflight
+  let bad_port_cfg : @core.Config = {
+    ..base_cfg,
+    proxy: Some("http://localhost:99999"),
+    websocket: true,
+  }
+  let preflight_failed = try {
+    @core.validate_config(bad_port_cfg)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(preflight_failed)
+
+  // .04 Part B: Legal but unreachable port runs, client gets error/close, main server survives
+  let unreachable_port = 59876
+  let unreachable_cfg : @core.Config = {
+    ..base_cfg,
+    proxy: Some("http://127.0.0.1:\{unreachable_port}"),
+    websocket: true,
+  }
+  @server.with_server_at(unreachable_cfg, 0, async fn(server) {
+    assert_true(server.has_upgrade_capability())
+    let port = server.port()
+    let ws_attempt = Some(@websocket.connect("ws://127.0.0.1:\{port}/ws")) catch {
+      _ => None
+    }
+    assert_true(ws_attempt is None)
+
+    let (status, _, body) = net_test_get(port, "localhost")
+    assert_eq(status, 200)
+    assert_eq(@utf8.decode_lossy(body), "hello moonbit\n")
+  })
+}
+
+// ----------------------------------------------------------------------------
+// C041: CLI Configuration Parity Matrix
+// ----------------------------------------------------------------------------
+
+///|
+async test "C041: CLI configuration mapping, headers, port, and MIME parity" {
+  // .01 Custom port mapping
+  let cfg_port : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    port: 8090,
+  }
+  assert_eq(cfg_port.port, 8090)
+
+  // .02 .types file loading into mime_types map
+  let types_text = @fs.read_file("testdata/fixtures/custom_mime_type.types").text()
+  let types_map = @core.parse_types(types_text)
+  assert_eq(types_map.get("opml"), Some("application/secret"))
+
+  // .03 Inline MIME definition
+  let inline_mime : Map[String, String] = Map([
+    ("opml", "application/x-my-type"),
+  ])
+  let cfg_inline : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    mime_types: inline_mime,
+  }
+  @server.with_server_at(cfg_inline, 0, async fn(server) {
+    defer server.stop()
+    let port = server.port()
+    let addr = @socket.Addr::new(0x7F000001, port)
+    let conn = @socket.Tcp::connect(addr)
+    defer conn.close()
+    conn.write(
+      "GET /custom_mime_type.opml HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    )
+    let _ = conn.read_until("\r\n")
+    let hdrs = fi_read_headers(conn)
+    assert_eq(hdrs.get("content-type"), Some("application/x-my-type"))
+  })
+
+  // .04 & .05 Proxy configuration validation error checks
+  let cfg_bad_proxy : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    proxy: Some("invalid_scheme://127.0.0.1"),
+  }
+  let bad_proxy_failed = try {
+    @core.validate_config(cfg_bad_proxy)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(bad_proxy_failed)
+
+  let cfg_orphan_proxy_all : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    proxy: None,
+    proxy_all: Some("http://127.0.0.1:3000"),
+  }
+  let orphan_failed = try {
+    @core.validate_config(cfg_orphan_proxy_all)
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(orphan_failed)
+
+  // .07 - .10 Headers mapping: custom headers, merged headers, and empty values
+  let headers_map : Map[String, String] = Map([
+    ("X-Long-Header", "value1"),
+    ("X-Empty-Header", ""),
+  ])
+  let cfg_headers : @core.Config = {
+    ..@core.Config::default("testdata/public"),
+    custom_headers: headers_map,
+  }
+  @server.with_server_at(cfg_headers, 0, async fn(server) {
+    defer server.stop()
+    let port = server.port()
+    let (s, h, _) = net_test_get(port, "localhost")
+    assert_eq(s, 200)
+    assert_eq(h.get("x-long-header"), Some("value1"))
+    assert_eq(h.get("x-empty-header"), Some(""))
+  })
 }

@@ -83,6 +83,7 @@ pub(all) struct Config {
   proxy : String? // Upstream proxy target (e.g. "http://127.0.0.1:3000")
   proxy_all : String? // Proxy all requests upstream (requires proxy to be set)
   proxy_options : Map[String, String] // Upstream proxy options (must be empty if fallback active)
+  websocket : Bool // Enable WebSocket proxy upgrade capability (default false)
 
   // --- Lifecycle & Error Handling ---
   handle_error : Bool // If false, delegates 404/errors to host (middleware Next)
@@ -128,6 +129,7 @@ pub fn Config::default(root : String) -> Config {
     proxy: None,
     proxy_all: None,
     proxy_options: Map([]),
+    websocket: false,
     handle_error: true,
     idle_timeout_ms: 120000, // 120 seconds per AD-03
     mime_types: Map([]),
@@ -170,6 +172,12 @@ pub fn Config::has_proxy(self : Config) -> Bool {
   self.proxy is Some(_) ||
   self.proxy_all is Some(_) ||
   !self.proxy_options.is_empty()
+}
+
+///|
+/// Returns whether WebSocket proxy capability is enabled.
+pub fn Config::has_websocket_proxy(self : Config) -> Bool {
+  self.has_proxy() && self.websocket
 }
 
 ///|
@@ -255,6 +263,42 @@ pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
     raise ConfigError::InvalidProxy(
       "proxy URL must start with http:// or https://",
     )
+  }
+  let prefix_len = if url.has_prefix("https://") { 8 } else { 7 }
+  let rest = url[prefix_len:].to_owned()
+  let auth_end = match rest.find("/") {
+    Some(idx) => idx
+    None =>
+      match rest.find("?") {
+        Some(idx) => idx
+        None => rest.length()
+      }
+  }
+  let authority = rest[:auth_end].to_owned()
+  match authority.find(":") {
+    Some(colon_idx) => {
+      let port_str = authority[colon_idx + 1:].to_owned()
+      if port_str.length() == 0 {
+        raise ConfigError::InvalidProxy(
+          "proxy URL missing port number after ':'",
+        )
+      }
+      let mut p = 0
+      for c in port_str {
+        if c < '0' || c > '9' {
+          raise ConfigError::InvalidProxy(
+            "proxy URL has invalid non-numeric port: " + port_str,
+          )
+        }
+        p = p * 10 + (c.to_int() - '0'.to_int())
+        if p > 65535 {
+          raise ConfigError::InvalidProxy(
+            "proxy URL port exceeds 65535: " + port_str,
+          )
+        }
+      }
+    }
+    None => ()
   }
 }
 

@@ -74,12 +74,7 @@ pub async fn with_server_at(
 ///|
 /// Stop accepting new connections.
 pub fn Server::stop(self : Server) -> Unit {
-  if !self.stopped {
-    self.stopped = true
-    if self.task is Some(t) {
-      t.cancel()
-    }
-  }
+  self.stopped = true
 }
 
 ///|
@@ -88,19 +83,17 @@ pub async fn Server::stop_and_drain(
   self : Server,
   timeout_ms? : Int = 5000,
 ) -> Unit {
-  if !self.stopped {
-    self.stopped = true
-    @async.protect_from_cancel(() => {
-      let mut waited = 0
-      let step = 10
-      while self.active_requests.val > 0 && waited < timeout_ms {
-        @async.sleep(step)
-        waited += step
-      }
-    })
-    if self.task is Some(t) {
-      t.cancel()
+  self.stop()
+  @async.protect_from_cancel(() => {
+    let mut waited = 0
+    let step = 10
+    while self.active_requests.val > 0 && waited < timeout_ms {
+      @async.sleep(step)
+      waited += step
     }
+  })
+  if self.task is Some(t) {
+    t.cancel()
   }
 }
 
@@ -189,13 +182,9 @@ async fn handle_single_request(
             return false
           }
           Ok(client_ws) => {
-            let _ = try {
+            let _ = try
               @async.with_task_group() <| group => {
                 let _ = group.spawn(allow_failure=true, () => {
-                  defer {
-                    client_ws.close()
-                    upstream_ws.close()
-                  }
                   for ;; {
                     let msg = client_ws.recv() catch { _ => break }
                     match msg.kind {
@@ -215,15 +204,11 @@ async fn handle_single_request(
                       }
                     }
                   }
-                  client_ws.close()
-                  upstream_ws.close()
-                  group.return_immediately(())
+                  upstream_ws.send_close() catch {
+                    _ => ()
+                  }
                 })
                 let _ = group.spawn(allow_failure=true, () => {
-                  defer {
-                    client_ws.close()
-                    upstream_ws.close()
-                  }
                   for ;; {
                     let msg = upstream_ws.recv() catch { _ => break }
                     match msg.kind {
@@ -243,14 +228,16 @@ async fn handle_single_request(
                       }
                     }
                   }
-                  client_ws.close()
-                  upstream_ws.close()
-                  group.return_immediately(())
+                  client_ws.send_close() catch {
+                    _ => ()
+                  }
                 })
               }
-            } catch {
+            catch {
               _ => ()
             }
+            client_ws.close()
+            upstream_ws.close()
             return false
           }
         }
@@ -303,14 +290,13 @@ async fn handle_single_request(
 
 ///|
 async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
+  defer tcp_conn.close()
   let http_conn = @http.ServerConnection::new(tcp_conn)
   for ;; {
     if server.stopped {
       break
     }
-    let keep_going = try {
-      handle_single_request(server, tcp_conn, http_conn)
-    } catch {
+    let keep_going = handle_single_request(server, tcp_conn, http_conn) catch {
       _ => false
     }
     if !keep_going {

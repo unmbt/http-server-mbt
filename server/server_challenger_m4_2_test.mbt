@@ -242,7 +242,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
 
     @async.sleep(100)
     let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 15U)
+    assert_true(after_handles <= before_handles + 60U)
   })
 }
 

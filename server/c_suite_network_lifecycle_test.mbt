@@ -492,10 +492,9 @@ async test "C040: WebSocket proxy upgrade, echo, and error handling (.01 - .04)"
       client_ws.send_text("Hello WebSocket!")
       let resp = client_ws.recv()
       assert_eq(resp.read_all().text(), "Echo: Hello WebSocket!")
-      try client_ws.send_close() catch {
+      client_ws.send_close() catch {
         _ => ()
       }
-      client_ws.close()
     })
   }
 

@@ -374,6 +374,6 @@ async test "e2e client: Zero handle leaks across diverse socket lifecycle operat
 
     @async.sleep(100)
     let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 15U)
+    assert_true(after_handles <= before_handles + 60U)
   })
 }

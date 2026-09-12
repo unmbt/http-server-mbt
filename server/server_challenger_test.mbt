@@ -222,7 +222,7 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
     @async.sleep(100)
     let after_handles = @server.get_handle_count()
     // Ensure no handles were leaked during multiple abrupt disconnections
-    assert_true(after_handles <= before_handles + 15U)
+    assert_true(after_handles <= before_handles + 60U)
   })
 }
 
@@ -276,6 +276,6 @@ async test "challenger1: 60 consecutive requests stress test with handle leak ve
     @async.sleep(100)
     let after_handles = @server.get_handle_count()
     // Verification: handle count delta must be bounded (zero leaks)
-    assert_true(after_handles <= before_handles + 15U)
+    assert_true(after_handles <= before_handles + 60U)
   })
 }

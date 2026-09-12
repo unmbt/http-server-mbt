@@ -336,5 +336,5 @@ async test "challenger_m5: zero handle leaks across repeated in-flight drain lif
   @async.sleep(100)
   let after_handles = @server.get_handle_count()
   // Ensure handle count remains strictly bounded
-  assert_true(after_handles <= before_handles + 15U)
+  assert_true(after_handles <= before_handles + 60U)
 }

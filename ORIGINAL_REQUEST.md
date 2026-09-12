@@ -325,3 +325,69 @@ Requested team: Full multi-agent team
 继续完成m6的门禁、审查、挑战、审计等
 </USER_REQUEST>
 
+## Follow-up — 2026-09-12T10:37:00Z
+
+<USER_REQUEST>
+由独立的多 Agent 团队对当前仓库中 Milestone 6（原版全量测试套件迁移、真实 TCP Socket E2E、T-034 状态机故障注入、C040 WebSocket 异步双向代理与生命周期管理）的全部实现代码与测试套件进行严格的多角色独立审查（Reviewers）、对抗测试挑战（Challengers）与合规取证审计（Auditors），杜绝单 Agent 自审自鉴，出具独立客观的门禁裁决与终审归档。
+
+Working directory: E:\project\moonbit\unmbt\http-server-mbt
+Integrity mode: benchmark
+
+## References
+- 规格契约与实施任务: `docs/proposal.md`, `docs/design.md`, `docs/tasks.md`
+- 阶段进度与接续指南: `docs/progress.md`
+- 原版参考仓库: `http-server/` (commit `0d3b7bb5b6e8a59fd450ae2dca65870009cfcd8b`)
+- 团队规则与规范: `AGENTS.md` (严格遵守 SDD 规范、0 警告门禁、Native FFI 所有权安全、严格本地 Git 提交、严禁执行 git push)
+
+## Requirements
+
+### R1. 多角色独立代码与契约审查（Reviewers）
+- 审查员必须独立审查 `core/`、`server/`（含 `server.mbt`、`transmit_file.mbt`、`transmit_file_windows.c`）以及原版 42 组测试用例的落地情况（`server/c_suite_*.mbt`）；
+- 严格对照 `docs/design.md`（D-01～D-18）与 `docs/tasks.md` 逐条核实契约实现，重点审查：
+  - C034 空闲超时断连（`.04` 真实 1000ms 空闲断连与 AD-03 规范）；
+  - C040 WebSocket 双向代理生命周期（`.01～.04` 协议级关闭帧、握手升级与错误隔离，杜绝 IOCP 读阻塞死锁）；
+  - AD-05 纯 HTML `<dir>` 实体转义跨平台测试；
+- 独立出具审查报告（Handoff Report），附带详实代码行级证据与明确裁决（`APPROVE` / `REQUEST_CHANGES`）。
+
+### R2. 独立对抗性压力与边缘挑战（Challengers）
+- 挑战者独立设计并执行攻击性对抗测试套件（如 `server_challenger_m6_test.mbt` 与 `server_challenger_m6_edge_test.mbt`）；
+- 验证极端场景的系统韧性：
+  - 单字节分片短写与畸形报头截断风暴；
+  - Slowloris 慢读反压与 `TransmitFile` Overlapped I/O 缓冲区阻塞；
+  - 高并发突发并发连接与在途请求排空（`stop_and_drain` 屏障同步）；
+  - 极端 Range 边界攻击（32 组边界测试）；
+  - 基于 Win32 `GetProcessHandleCount` 验证跨周期多轮压测下 0 句柄单调泄漏；
+- 独立出具挑战者报告，若发现挂起、死锁或泄漏立即提出阻断。
+
+### R3. 独立法医式合规与资源审计（Forensic Auditor）
+- 审计编译与类型安全：执行 `moon check --target native`，全仓必须保持绝对 **0 错误、0 警告**；
+- 审计测试执行：独立运行全量测试套件（`moon test --target native`），确认 169 项测试通过率必须保持 **100%（全 PASS、0 FAIL）**；
+- 审计开源许可合规：审查全量代码、依赖（`moonbitlang/async` Apache-2.0）与静态资产，确认全量属于 MIT/Apache-2.0 商业宽松许可，严禁 GPL/AGPL 限制性代码污染；
+- 审计反作弊与实现真伪（Benchmark Mode）：核查全量实现是否真实，杜绝硬编码测试预期、桩函数或伪造通过；
+- 出具法医式审计报告与裁决。
+
+### R4. 独立 Victory Audit 终审与本地归档
+- 在审查员、挑战者、审计员全票无条件通过后，执行 `moon info --target native` 与 `moon fmt` 接口及格式校验；
+- 核验本地 Git 提交合规性，严格确认当前工作区干净且**绝无任何 `git push` 行为**；
+- 独立 Victory Auditor 出具终审报告并完成本地归档记录。
+
+## Acceptance Criteria
+
+### 编译与静态质量门禁
+- [ ] `moon check --target native` 输出结果保持 0 errors, 0 warnings。
+- [ ] `moon info --target native` 接口一致，`moon fmt` 格式化无差异。
+
+### 测试执行与行为门禁
+- [ ] 原版迁移用例矩阵（C001～C042、CC-01～CC-28、CE-01～CE-02）全部覆盖并断言无误。
+- [ ] `server/server_e2e_client_test.mbt` 真实 TCP 握手与 HTTP Wire-level 报文解析测试 100% 通过。
+- [ ] `server/server_fault_injection_test.mbt` 状态机故障注入测试 100% 通过，无挂起与死锁。
+- [ ] 两组 Challenger 对抗套件全部通过，Win32 `GetProcessHandleCount` 验证 0 句柄泄漏。
+- [ ] `moon test --target native` 全仓 169 项测试通过率保持 100%（全 PASS、0 FAIL）。
+
+### 审查与归档门禁
+- [ ] Reviewers、Challengers、Forensic Auditor 各自独立出具 Handoff 报告并全票给出通过判定。
+- [ ] 全过程严格本地 Git 提交，严禁执行 `git push`。
+- [ ] 独立 Victory Auditor 完成终审归档报告。
+</USER_REQUEST>
+
+

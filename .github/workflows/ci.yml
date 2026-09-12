@@ -17,10 +17,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            artifact_name: http-server-mbt-linux-amd64
-          - os: macos-latest
-            artifact_name: http-server-mbt-macos-arm64
+          # - os: ubuntu-latest
+          #   artifact_name: http-server-mbt-linux-amd64
+          # - os: macos-latest
+          #   artifact_name: http-server-mbt-macos-arm64
           - os: windows-latest
             artifact_name: http-server-mbt-windows-amd64.exe
 

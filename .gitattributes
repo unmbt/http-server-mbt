@@ -1,0 +1,12 @@
+# Normalize source/text to LF on every platform.
+* text=auto eol=lf
+
+# Compressed / opaque binaries: keep exact bytes, never EOL-convert.
+*.gz -text -diff -merge !eol
+*.br -text -diff -merge !eol
+*.wasm -text -diff -merge !eol
+*.dat -text -diff -merge !eol
+
+# HTTP fixtures are Content-Length / Range / ETag sensitive.
+# Treat the whole tree as raw bytes so Windows autocrlf cannot rewrite them.
+testdata/** -text -diff -merge !eol

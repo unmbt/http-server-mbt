@@ -25,8 +25,23 @@ jobs:
             artifact_name: http-server-mbt-windows-amd64.exe
 
     steps:
+      - name: Disable Git EOL conversion
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Verify fixture bytes (no CRLF rewrite)
+        shell: bash
+        run: |
+          set -euo pipefail
+          size=$(wc -c < testdata/public/hello.txt | tr -d ' ')
+          if [ "$size" != "14" ]; then
+            echo "testdata/public/hello.txt is $size bytes, expected 14 (LF). Git EOL conversion leaked into fixtures."
+            exit 1
+          fi
+          git ls-files --eol testdata/public/hello.txt
 
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1

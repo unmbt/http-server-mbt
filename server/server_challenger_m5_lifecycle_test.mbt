@@ -88,8 +88,11 @@ async fn m5_simple_request(
 ///|
 async test "challenger_m5: in-flight request drains cleanly on stop_and_drain" {
   let config = @core.Config::default("testdata/public")
-  let test_file = "testdata/public/m5_drain_512k.dat"
-  let file_size = 524288 // 512KB
+  // The response must exceed kernel socket buffer ceilings (Linux tcp_wmem
+  // max is 4MB by default) so the tail is genuinely backpressured by the
+  // slow reader and the in-flight window stays observable (D-05 pacing).
+  let test_file = "testdata/public/m5_drain_8m.dat"
+  let file_size = 8388608 // 8MB
   let test_bytes = Bytes::makei(file_size, fn(i) {
     ((i * 31 + 7) % 256).to_byte()
   })
@@ -112,7 +115,7 @@ async test "challenger_m5: in-flight request drains cleanly on stop_and_drain" {
           let conn = @socket.Tcp::connect(addr)
           defer conn.close()
           conn.write(
-            "GET /m5_drain_512k.dat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            "GET /m5_drain_8m.dat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
           )
           let status_line = match conn.read_until("\r\n") {
             Some(s) => s
@@ -126,7 +129,7 @@ async test "challenger_m5: in-flight request drains cleanly on stop_and_drain" {
           }
           client_len.val = content_len
 
-          // Read the 512KB response
+          // Read the 8MB response
           let mut total_read = 0
           while total_read < content_len {
             let to_read = if content_len - total_read < 32768 {

@@ -40,7 +40,10 @@ pub async fn with_server_at(
   action : async (Server) -> Unit,
 ) -> Unit {
   let engine = @root.StaticEngine::new(config)
-  let listener = @socket.TcpServer(@socket.Addr::new(0, port))
+  // SO_REUSEADDR on Linux/macOS so an immediate re-bind after stop succeeds
+  // through TIME_WAIT (Windows ignores this flag; libuv in the original
+  // http-server enables it by default). See D-05 platform parity.
+  let listener = @socket.TcpServer(@socket.Addr::new(0, port), reuse_addr=true)
   let server : Server = {
     inner: listener,
     engine,

@@ -28,6 +28,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-002 三平台 Native、库导出与后端可行性验证** — 状态：未开始。需求：R-N01、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N13、R-N14；设计：D-02、D-05、D-07、D-08、D-11～D-14、D-16；依赖：T-001。
   - 交付：先验证 Windows Native 编译、文件/socket、IOCP/TransmitFile 必需接口，供本机静态开发使用；后续通过 Actions 补齐三平台 Native、静态/动态库与 C 调用、PIC/Node-API 和 wasm-gc 探针。锁定 MoonBit/C 工具链、TLS 补丁版本/哈希与包边界，试验代码不能取代生产引擎。
   - 验收：依据 D-11 实测生成 C、桥接、归档/链接、符号及静态 TLS；N-19 探针验证 C ABI 的库内 owner/通知/自动排空，以及 MoonBit 直接消费的合法异步上下文，不能把宿主托管对象跨 runtime 传递或退回手动轮询。三平台程序/Node/wasm-gc 实际装载运行；只交叉编译或只有 Windows 结果不算整体完成，不支持能力记录阻塞证据。
+  - Linux 分项（2026-09-12，Fedora 44 x86_64，clang 22.1.8，Moon 0.1.20260904）：`moon check --target native` 0 错误 0 警告；`moon test --target native` 全量 169/169 通过；CLI 本机构建并真实运行（静态文件/Range/keep-alive/SIGTERM）。证据：[linux-baseline](linux-baseline.md)。macOS 探针、库导出与静态 TLS 链路仍未开始，总任务保持未勾选。
 
 ### 阶段二：配置、协议和静态核心
 
@@ -89,10 +90,12 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-016 三平台库托管无栈事件循环** — 状态：未开始。需求：R-N03、R-N04、R-SAFE、R-N13、R-N14、R-N16；设计：D-05、D-07、D-16、D-18；依赖：T-002、T-004、T-005、T-010、T-012、T-013、T-014、T-015、T-031、T-032。
   - 交付：复用 Windows 实现，补齐 epoll/kqueue/IOCP、有界队列/缓冲池、状态机/generation；库内自动运行、通知和停止排空，先保证单进程高效 I/O，多核仅作独立可选实验；为 T-034 提供注入边界。
   - 验收：C034、N-06/N-11/N-19；Actions 三平台 H/L/M 通过，无手动调度、关闭后回调或复用槽误触，冷文件不无界阻塞循环，资源最终回收；不设量化性能验收，Windows 本机结果仅为分项。
+  - Linux 分项（2026-09-12）：事件循环经 `moonbitlang/async@0.21.3` 的 Linux epoll 后端本机全量验证（169/169，含 52 处真实 TCP E2E、stop_and_drain 排空/超时、监听 socket 重绑、故障注入，连续三轮稳定）；`with_server_at` 补 `reuse_addr=true` 对齐原版 libuv 默认行为（Linux TIME_WAIT 立即重绑）。证据：[linux-baseline](linux-baseline.md)。D-05 L194 有界原生工作队列的冷文件隔离仅以 `posix_fadvise(WILLNEED)` 预取缓解，完整交付与 Actions 三平台证据未齐，总任务保持未勾选。
 
 - [ ] **T-017 三平台内核文件传输** — 状态：未开始。需求：R-N01、R-SAFE、R-N13、R-N15；设计：D-05、D-16、D-17；依赖：T-008、T-016、T-031。
   - 交付：复用本机已验证的 TransmitFile，补齐 Linux/Darwin sendfile、64 位分段、短写/取消与有界降级，并接入共同测试。
   - 验收：N-05 的路径及字节完整性；Actions 三平台跟踪实际内核传输，TLS 明确缓冲降级，检测变更后停止续传，取消安全性由 T-033 重验；ASan/可用替代检查无悬空引用/句柄泄漏。
+  - Linux 分项（2026-09-12）：新增 `server/transmit_file_linux.c`（sendfile(2) 显式偏移独立于共享文件位置、64 位区间溢出校验、每块 fstat FILE_CHANGED、EINTR/EAGAIN/断连语义与 Windows 契约一致、`posix_fadvise(WILLNEED)` 预取）；`get_handle_count` 以 `/proc/self/fd` 计数激活全部泄漏相对界限断言；零拷贝门禁测试（直接 `transmit_file` 返回 0 证明非降级路径）本机转绿，CLI 4MB 实测 2.6ms 且字节一致。ASan 未运行：moon 工具链未暴露 sanitizer 编译/链接开关，已记录于基线文档。证据：[linux-baseline](linux-baseline.md)。macOS Darwin sendfile 未实现，Actions 内核传输跟踪未跑，总任务保持未勾选。
 
 - [ ] **T-018 目录算法与分块优化** — 状态：未开始。需求：R-N05；设计：D-06；依赖：T-009、T-016。
   - 交付：容量提示/复用构建器、O(N) 伴生匹配、有界 stat 并发、UTF-8 分块输出和预算处理。
@@ -158,6 +161,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-032 GitHub Actions 三平台基础矩阵** — 状态：未开始。需求：R-SDD、R-COMPAT、R-N13；设计：D-08、D-10、D-16；依赖：T-001、T-031。
   - 交付：扩展现有 ci.yml，为 PR/push/workflow_dispatch 建立 Linux x86_64、macOS arm64、Windows x86_64 jobs，复用本机 `.mbtx`；固定工具链、取得基线、缓存隔离、上传报告及最小 Native 构建产物，并为后续功能预留明确接入任务。
   - 验收：真实 Actions 三平台运行原版并分类报告 AD/跳过、执行共享核心测试与最小 Native 探针，核对 OS/CPU 和 artifact；Windows 重跑 T-031 场景。只对已实现分项声明通过，Linux/macOS 尚未实现功能仍有未完成追踪；基础矩阵 job 失败会失败，不通过空操作返回成功。此任务不依赖全功能 T-016/T-017/T-025，后者承接增量完善。
+  - Linux 分项（2026-09-12）：ci.yml 启用 ubuntu-latest 矩阵项（fixture 字节校验、`moon test/build --target native`、artifact `http-server-mbt-linux-amd64` 上传），macOS 保持注释（D-16：未实现分项不声明通过）。本机证据：[linux-baseline](linux-baseline.md)。真实 ubuntu runner 运行链接待 push 后回填，总任务保持未勾选。
 
 ### 文件一致性与状态机验证
 
@@ -168,6 +172,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [x] **T-034 状态机故障注入与模糊测试** — 状态：已完成（Windows Native 交付，2026-09-12）。需求：R-N16、R-SAFE；设计：D-10、D-18；依赖：T-004、T-005、T-016、T-017、T-020、T-029、T-033。
   - 交付：落地 `server/server_fault_injection_test.mbt`（单字节短写、报头截断断连、慢读反压、在途取消屏障同步、混沌并发及 Win32 GetProcessHandleCount 0 泄漏多轮差分验证）与两组 Challenger 对抗套件（`server_challenger_m6_test.mbt`、`server_challenger_m6_edge_test.mbt`）；全部 16 项故障注入与边缘对抗测试 100% 通过。
   - 验收：N-21；短写/错误/取消/变更/关闭/句柄复用等不变量通过，实测 169/169 全部通过（100% PASS，0 errors, 0 warnings, 0 挂起、0 泄漏）。经 Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）独立对抗审查与全票无条件 APPROVED / PASSED (CLEAN)。
+  - Linux 分项备注（2026-09-12）：`fault_injection: In-flight cancellation via stop_and_drain during active streaming` 的流式文件由 1MB 调整为 8MB——Linux sndbuf 自动调优上限（tcp_wmem max ≈ 4MB）内的小文件会被内核缓冲整体吸收、在途状态不可观测；调整仅涉及测试文件大小，断言与不变量未改动。证据：[linux-baseline](linux-baseline.md)。
 
 <a id="compatibility"></a>
 

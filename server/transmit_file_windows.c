@@ -216,27 +216,8 @@ MOONBIT_FFI_EXPORT uint32_t http_server_get_handle_count(void) {
 
 #else
 
-#include <stdint.h>
-#ifndef MOONBIT_FFI_EXPORT
-#define MOONBIT_FFI_EXPORT
-#endif
-
-MOONBIT_FFI_EXPORT int64_t http_server_tf_open(intptr_t sock, const void* path, int64_t offset, int64_t length) {
-    (void)sock; (void)path; (void)offset; (void)length;
-    return 0;
-}
-
-MOONBIT_FFI_EXPORT int32_t http_server_tf_step(int64_t state_ptr) {
-    (void)state_ptr;
-    return -1;
-}
-
-MOONBIT_FFI_EXPORT void http_server_tf_close(int64_t state_ptr) {
-    (void)state_ptr;
-}
-
-MOONBIT_FFI_EXPORT uint32_t http_server_get_handle_count(void) {
-    return 0;
-}
+/* Non-Windows symbols (real sendfile backend on Linux, graceful stubs
+ * elsewhere) live in transmit_file_linux.c. This file defines nothing
+ * outside _WIN32 so each platform links exactly one http_server_tf_* set. */
 
 #endif

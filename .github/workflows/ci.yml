@@ -17,10 +17,14 @@ jobs:
     strategy:
       matrix:
         include:
-          # - os: ubuntu-latest
-          #   artifact_name: http-server-mbt-linux-amd64
+          # Linux x86_64 enabled by T-032 Linux sub-deliverable (D-16):
+          # native check/test + artifact. macOS stays disabled until its
+          # kqueue + Darwin sendfile work lands (per D-16, unimplemented
+          # platform sub-deliverables must not be declared passing).
           # - os: macos-latest
           #   artifact_name: http-server-mbt-macos-arm64
+          - os: ubuntu-latest
+            artifact_name: http-server-mbt-linux-amd64
           - os: windows-latest
             artifact_name: http-server-mbt-windows-amd64.exe
 

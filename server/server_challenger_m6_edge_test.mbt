@@ -93,8 +93,11 @@ async fn m6_edge_request(
 /// Tests active streaming draining across multiple concurrent clients and verifies bounded timeout enforcement.
 async test "challenger_m6_edge: in-flight request cancellation and drain under streaming load" {
   let config = @core.Config::default("testdata/public")
-  let test_file = "testdata/public/m6_edge_drain_256k.dat"
-  let file_size = 262144 // 256KB
+  // The response must exceed kernel socket buffer ceilings (Linux tcp_wmem
+  // max is 4MB by default) so the tail is genuinely backpressured by the
+  // readers and the in-flight window stays observable (D-05 pacing).
+  let test_file = "testdata/public/m6_edge_drain_8m.dat"
+  let file_size = 8388608 // 8MB
   let test_bytes = Bytes::makei(file_size, fn(i) {
     ((i * 37 + 13) % 256).to_byte()
   })
@@ -115,7 +118,7 @@ async test "challenger_m6_edge: in-flight request cancellation and drain under s
           let conn = @socket.Tcp::connect(addr)
           defer conn.close()
           conn.write(
-            "GET /m6_edge_drain_256k.dat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            "GET /m6_edge_drain_8m.dat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
           )
           let status_line = match conn.read_until("\r\n") {
             Some(s) => s

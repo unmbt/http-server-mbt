@@ -7,15 +7,15 @@ import {
   "moonbitlang/async/io",
   "moonbitlang/async/types",
   "moonbitlang/async/websocket",
+  "moonbitlang/core/encoding/utf8",
 }
 
 import {
   "moonbitlang/async/fs",
   "moonbitlang/async/websocket",
-  "moonbitlang/core/encoding/utf8",
 } for "test"
 
 options(
-  "native-stub": [ "transmit_file_windows.c" ],
+  "native-stub": [ "transmit_file_windows.c", "transmit_file_linux.c" ],
   targets: { "*.mbt": [ "native" ] },
 )

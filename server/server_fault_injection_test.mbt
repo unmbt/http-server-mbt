@@ -269,8 +269,11 @@ async test "fault_injection: Abrupt mid-stream disconnect during multi-chunk Tra
 ///|
 async test "fault_injection: In-flight cancellation via stop_and_drain during active streaming" {
   let config = @core.Config::default("testdata/public")
+  // The response must exceed kernel socket buffer ceilings (Linux sndbuf
+  // autotunes up to tcp_wmem max ~4MB) so stalled readers genuinely
+  // backpressure the server mid-sendfile and in-flight state is observable.
   let test_file = "testdata/public/fi_drain_cancel.dat"
-  let file_size = 1000000 // 1MB
+  let file_size = 8388608 // 8MB
   let test_bytes = Bytes::makei(file_size, fn(i) {
     ((i * 19 + 3) % 256).to_byte()
   })

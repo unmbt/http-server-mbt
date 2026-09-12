@@ -164,7 +164,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 
 ---
 
-## 7. 多平台支持现状与后续接续路线 (Linux & macOS 待完成)
+## 7. 多平台支持现状与后续接续路线 (Linux & macOS 进行中)
 
 按照架构设计契约（D-16）与任务规划（`docs/tasks.md`），多平台支持的推进节奏与当前状态如下：
 
@@ -172,7 +172,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 | :--- | :---: | :--- | :--- |
 | **Windows x86_64** | **✅ 已完成并闭环 (Verified)** | Win32 `TransmitFile` + IOCP Overlapped 内核零拷贝、全量 CLI 参数、169/169 测试 100% 通过、0 警告、0 句柄泄漏、独立 Victory Audit 验收通过 | Milestone 1 ～ Milestone 6 已全面闭环交付 |
 | **Linux x86_64** | **🔶 本机分项完成 (Local Verified)** | `sendfile(2)` 显式偏移内核零拷贝 + `epoll` 事件循环（moonbitlang/async 后端）、fstat `FILE_CHANGED` 检测、`/proc/self/fd` 句柄泄漏监控、`reuse_addr` 立即重绑、169/169 测试本机 100% 通过（连续三轮）、CLI 大文件 4MB/2.6ms 字节一致；证据见 [linux-baseline](linux-baseline.md) | 已对接 Milestone 7 的 **T-032** Linux 分项（ubuntu runner 运行待回填）、**T-002/T-016/T-017** Linux 分项（2026-09-12）；待 **T-022**（musl 静态 ELF 与 Distroless 镜像）、**T-023**（io_uring 实验后端）、**T-012**（静态 TLS）与三平台 Actions 汇总验收 |
-| **macOS arm64 / x86_64** | **⏳ 待完成 (Pending)** | C 层保留优雅占位：无原生实现时自动降级有界缓冲路径（功能正确、无零拷贝）；规划接入 macOS 原生 `kqueue` + Darwin `sendfile`（调用签名与 Linux 不同，需独立实现） | 对接 **Milestone 7**：任务 **T-032**（GitHub Actions 三平台持续集成矩阵）、**T-016**（事件循环扩展）、**T-017**（原生零拷贝）与 **T-022**（macOS 独立二进制分发） |
+| **macOS arm64 / x86_64** | **🔶 实现完成，Actions 首跑通过 (Actions Verified)** | 新增 `server/transmit_file_darwin.c`：Darwin sendfile 内核零拷贝（`<sys/socket.h>` value-result `len`、错误与实际发送字节同时检查、短写推进偏移、每块 fstat `FILE_CHANGED`）、`F_RDADVISE` 预取、`proc_pidinfo` 句柄计数；`kqueue` 事件循环由 moonbitlang/async 提供，MoonBit 侧零改动（`.mbti` 零差异）；`step` 契约与 Windows/Linux 完全一致；macos-latest（arm64）runner 首跑全量测试通过（2026-09-13，run 链接待补录）；证据见 [macos-baseline](macos-baseline.md) | 对接 **Milestone 7**：**T-002/T-017/T-032** macOS 分项（2026-09-13，Actions 首跑通过，run 链接待补录）；**T-032** ci.yml 已启用 macos-latest 矩阵项；待 **T-016**（事件循环 macOS 分项收口）、**T-022**（macOS 独立二进制分发）与三平台 Actions 汇总验收 |
 
 > 📌 **多平台推进原则（D-16 承诺）**：
 > 1. 本项目采用“Windows 本机基线先行跑通全功能，再接入 Actions 三平台持续集成与全平台原生调用”的研发策略；

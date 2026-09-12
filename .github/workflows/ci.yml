@@ -17,12 +17,13 @@ jobs:
     strategy:
       matrix:
         include:
+          # macOS arm64 enabled by the T-002/T-017 macOS sub-deliverables
+          # (D-16): kqueue event loop from moonbitlang/async + Darwin
+          # sendfile zero-copy backend (server/transmit_file_darwin.c).
+          - os: macos-latest
+            artifact_name: http-server-mbt-macos-arm64
           # Linux x86_64 enabled by T-032 Linux sub-deliverable (D-16):
-          # native check/test + artifact. macOS stays disabled until its
-          # kqueue + Darwin sendfile work lands (per D-16, unimplemented
-          # platform sub-deliverables must not be declared passing).
-          # - os: macos-latest
-          #   artifact_name: http-server-mbt-macos-arm64
+          # native check/test + artifact.
           - os: ubuntu-latest
             artifact_name: http-server-mbt-linux-amd64
           - os: windows-latest

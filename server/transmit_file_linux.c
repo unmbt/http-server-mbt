@@ -1,13 +1,15 @@
 /*
  * Linux sendfile zero-copy file transfer backend for the server package.
  *
- * Symbol ownership is complementary with transmit_file_windows.c: the
- * native-stub list compiles every stub file on every platform, so each
- * platform must define http_server_tf_* exactly once.
+ * Symbol ownership is complementary with transmit_file_windows.c and
+ * transmit_file_darwin.c: the native-stub list compiles every stub file on
+ * every platform, so each platform must define http_server_tf_* exactly once.
  *   - _WIN32: symbols come from transmit_file_windows.c; this file is empty.
+ *   - __APPLE__: symbols come from transmit_file_darwin.c (Darwin sendfile);
+ *     this file is empty.
  *   - __linux__: this file provides the real sendfile backend.
- *   - other Unix (macOS pending): this file provides graceful stubs so the
- *     caller degrades to the bounded-buffer path (transmit_file returns -1).
+ *   - other Unix: this file provides graceful stubs so the caller degrades
+ *     to the bounded-buffer path (transmit_file returns -1).
  *
  * step() return contract (identical to the Windows TransmitFile backend):
  *    0  transfer complete
@@ -21,6 +23,10 @@
 #if defined(_WIN32)
 
 /* Windows symbols live in transmit_file_windows.c. */
+
+#elif defined(__APPLE__)
+
+/* macOS symbols live in transmit_file_darwin.c (kqueue + Darwin sendfile). */
 
 #else
 
@@ -172,7 +178,7 @@ MOONBIT_FFI_EXPORT uint32_t http_server_get_handle_count(void) {
     return count;
 }
 
-#else /* other Unix: macOS pending (kqueue + Darwin sendfile), degrade gracefully */
+#else /* other Unix: no native backend yet, degrade gracefully */
 
 MOONBIT_FFI_EXPORT int64_t http_server_tf_open(int sock, const char* path, int64_t offset, int64_t length) {
     (void)sock; (void)path; (void)offset; (void)length;

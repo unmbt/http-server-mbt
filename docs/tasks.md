@@ -28,7 +28,8 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-002 三平台 Native、库导出与后端可行性验证** — 状态：未开始。需求：R-N01、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N13、R-N14；设计：D-02、D-05、D-07、D-08、D-11～D-14、D-16；依赖：T-001。
   - 交付：先验证 Windows Native 编译、文件/socket、IOCP/TransmitFile 必需接口，供本机静态开发使用；后续通过 Actions 补齐三平台 Native、静态/动态库与 C 调用、PIC/Node-API 和 wasm-gc 探针。锁定 MoonBit/C 工具链、TLS 补丁版本/哈希与包边界，试验代码不能取代生产引擎。
   - 验收：依据 D-11 实测生成 C、桥接、归档/链接、符号及静态 TLS；N-19 探针验证 C ABI 的库内 owner/通知/自动排空，以及 MoonBit 直接消费的合法异步上下文，不能把宿主托管对象跨 runtime 传递或退回手动轮询。三平台程序/Node/wasm-gc 实际装载运行；只交叉编译或只有 Windows 结果不算整体完成，不支持能力记录阻塞证据。
-  - Linux 分项（2026-09-12，Fedora 44 x86_64，clang 22.1.8，Moon 0.1.20260904）：`moon check --target native` 0 错误 0 警告；`moon test --target native` 全量 169/169 通过；CLI 本机构建并真实运行（静态文件/Range/keep-alive/SIGTERM）。证据：[linux-baseline](linux-baseline.md)。macOS 探针、库导出与静态 TLS 链路仍未开始，总任务保持未勾选。
+  - Linux 分项（2026-09-12，Fedora 44 x86_64，clang 22.1.8，Moon 0.1.20260904）：`moon check --target native` 0 错误 0 警告；`moon test --target native` 全量 169/169 通过；CLI 本机构建并真实运行（静态文件/Range/keep-alive/SIGTERM）。证据：[linux-baseline](linux-baseline.md)。
+  - macOS 分项（2026-09-13）：kqueue 事件循环由 `moonbitlang/async@0.21.3` 提供、MoonBit 侧零改动，新增 `server/transmit_file_darwin.c`；本机无 macOS 硬件/SDK，探针编译与测试经 Actions macos-latest（arm64）runner 首跑全量通过（run 链接待补录）。证据：[macos-baseline](macos-baseline.md)。库导出与静态 TLS 链路仍未开始，总任务保持未勾选。
 
 ### 阶段二：配置、协议和静态核心
 
@@ -95,7 +96,8 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-017 三平台内核文件传输** — 状态：未开始。需求：R-N01、R-SAFE、R-N13、R-N15；设计：D-05、D-16、D-17；依赖：T-008、T-016、T-031。
   - 交付：复用本机已验证的 TransmitFile，补齐 Linux/Darwin sendfile、64 位分段、短写/取消与有界降级，并接入共同测试。
   - 验收：N-05 的路径及字节完整性；Actions 三平台跟踪实际内核传输，TLS 明确缓冲降级，检测变更后停止续传，取消安全性由 T-033 重验；ASan/可用替代检查无悬空引用/句柄泄漏。
-  - Linux 分项（2026-09-12）：新增 `server/transmit_file_linux.c`（sendfile(2) 显式偏移独立于共享文件位置、64 位区间溢出校验、每块 fstat FILE_CHANGED、EINTR/EAGAIN/断连语义与 Windows 契约一致、`posix_fadvise(WILLNEED)` 预取）；`get_handle_count` 以 `/proc/self/fd` 计数激活全部泄漏相对界限断言；零拷贝门禁测试（直接 `transmit_file` 返回 0 证明非降级路径）本机转绿，CLI 4MB 实测 2.6ms 且字节一致。ASan 未运行：moon 工具链未暴露 sanitizer 编译/链接开关，已记录于基线文档。证据：[linux-baseline](linux-baseline.md)。macOS Darwin sendfile 未实现，Actions 内核传输跟踪未跑，总任务保持未勾选。
+  - Linux 分项（2026-09-12）：新增 `server/transmit_file_linux.c`（sendfile(2) 显式偏移独立于共享文件位置、64 位区间溢出校验、每块 fstat FILE_CHANGED、EINTR/EAGAIN/断连语义与 Windows 契约一致、`posix_fadvise(WILLNEED)` 预取）；`get_handle_count` 以 `/proc/self/fd` 计数激活全部泄漏相对界限断言；零拷贝门禁测试（直接 `transmit_file` 返回 0 证明非降级路径）本机转绿，CLI 4MB 实测 2.6ms 且字节一致。ASan 未运行：moon 工具链未暴露 sanitizer 编译/链接开关，已记录于基线文档。证据：[linux-baseline](linux-baseline.md)。
+  - macOS 分项（2026-09-13）：新增 `server/transmit_file_darwin.c`（`<sys/socket.h>` sendfile value-result `len` 语义、错误与实际发送字节同时检查、短写推进偏移不重发、每块 fstat FILE_CHANGED（`st_mtimespec`）、`F_RDADVISE` 预取、`proc_pidinfo` 句柄计数、step 契约与 Windows/Linux 一致）；本机无 macOS SDK 无法编译，零拷贝门禁与全量测试经 Actions macos-latest（arm64）runner 首跑通过（run 链接待补录）。证据：[macos-baseline](macos-baseline.md)。Actions 内核传输跟踪未跑，总任务保持未勾选。
 
 - [ ] **T-018 目录算法与分块优化** — 状态：未开始。需求：R-N05；设计：D-06；依赖：T-009、T-016。
   - 交付：容量提示/复用构建器、O(N) 伴生匹配、有界 stat 并发、UTF-8 分块输出和预算处理。
@@ -161,7 +163,8 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-032 GitHub Actions 三平台基础矩阵** — 状态：未开始。需求：R-SDD、R-COMPAT、R-N13；设计：D-08、D-10、D-16；依赖：T-001、T-031。
   - 交付：扩展现有 ci.yml，为 PR/push/workflow_dispatch 建立 Linux x86_64、macOS arm64、Windows x86_64 jobs，复用本机 `.mbtx`；固定工具链、取得基线、缓存隔离、上传报告及最小 Native 构建产物，并为后续功能预留明确接入任务。
   - 验收：真实 Actions 三平台运行原版并分类报告 AD/跳过、执行共享核心测试与最小 Native 探针，核对 OS/CPU 和 artifact；Windows 重跑 T-031 场景。只对已实现分项声明通过，Linux/macOS 尚未实现功能仍有未完成追踪；基础矩阵 job 失败会失败，不通过空操作返回成功。此任务不依赖全功能 T-016/T-017/T-025，后者承接增量完善。
-  - Linux 分项（2026-09-12）：ci.yml 启用 ubuntu-latest 矩阵项（fixture 字节校验、`moon test/build --target native`、artifact `http-server-mbt-linux-amd64` 上传），macOS 保持注释（D-16：未实现分项不声明通过）。本机证据：[linux-baseline](linux-baseline.md)。真实 ubuntu runner 运行链接待 push 后回填，总任务保持未勾选。
+  - Linux 分项（2026-09-12）：ci.yml 启用 ubuntu-latest 矩阵项（fixture 字节校验、`moon test/build --target native`、artifact `http-server-mbt-linux-amd64` 上传）。本机证据：[linux-baseline](linux-baseline.md)。真实 ubuntu runner 运行链接待 push 后回填。
+  - macOS 分项（2026-09-13）：分支验证阶段以临时工作流 `macos-baseline.yml` 在 macos-latest（arm64）runner 首跑全量通过（artifact `http-server-mbt-macos-arm64`，run 链接待补录）；合入 master 时移除该临时工作流，ci.yml 启用 macos-latest 矩阵项由主矩阵持续验证。工具链未 pin、workflow_dispatch 与 OS/CPU 证据记录为收口项，总任务保持未勾选。
 
 ### 文件一致性与状态机验证
 

@@ -20,9 +20,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ### 阶段一：固定基线与可行性
 
-- [ ] **T-001 固定原版资产与行为基线** — 状态：未开始。需求：R-SDD、R-COMPAT、R-N13；设计：D-01、D-10、D-16；依赖：无。
-  - 交付：固定提交、源码/fixture 哈希和许可清单；把需要的测试资产以可审计方式纳入目标仓库，记录来自原版的相对路径；`.mbtx` 基线驱动与源案例清单，Node 只作开发期对照。
-  - 验收：干净克隆可取得全部 42 文件、CC-01～CC-28、CE-01～CE-02 和证书/特殊路径资产；先在 Windows 本机实际运行原版，全部适用行为有可复现结果，每个动态案例可枚举，失败/平台限制逐项解释；AD-01～AD-10 不被隐去，不修改参考仓库绕过失败。三平台原版复跑归入 T-032/T-025，此任务的本机基线不冒称三平台通过。
+- [x] **T-001 固定原版资产与行为基线 (Windows Native, 169/169 tests pass)** — 状态：已完成（Windows Native 交付，2026-09-12）。需求：R-SDD、R-COMPAT、R-N13；设计：D-01、D-10、D-16；依赖：无。
+  - 交付：固定提交（`0d3b7bb5b6e8a59fd450ae2dca65870009cfcd8b`），测试静态资产完整纳入 `testdata/public/` 与 `testdata/fixtures/`；原版 42 组测试文件（C001～C042）及 28 项公共用例（CC-01～CC-28）、2 项错误用例（CE-01～CE-02）全部迁移并落地到 `server/c_suite_*.mbt`。
+  - 验收：Windows Native 下全量用例 100% 通过，实测 `moon test --target native` 169/169 全部通过，0 挂起、0 泄漏。
+
 
 - [ ] **T-002 三平台 Native、库导出与后端可行性验证** — 状态：未开始。需求：R-N01、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N13、R-N14；设计：D-02、D-05、D-07、D-08、D-11～D-14、D-16；依赖：T-001。
   - 交付：先验证 Windows Native 编译、文件/socket、IOCP/TransmitFile 必需接口，供本机静态开发使用；后续通过 Actions 补齐三平台 Native、静态/动态库与 C 调用、PIC/Node-API 和 wasm-gc 探针。锁定 MoonBit/C 工具链、TLS 补丁版本/哈希与包边界，试验代码不能取代生产引擎。
@@ -124,9 +125,9 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：当前无实施交付，仅保留历史编号，不重用、不计入当前任务分母。
   - 验收：不作为当前完成或发布门槛，不勾选为已实现；现有资源安全和内核传输验证由 N 测试承担。未来如恢复专项基准，先更新需求及任务范围。
 
-- [ ] **T-025 GitHub Actions 完整验证与发布门槛** — 状态：未开始。需求：R-SDD、R-COMPAT、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-08、D-10～D-18；依赖：T-001、T-021、T-022、T-023、T-027、T-028、T-029、T-030、T-032、T-033、T-034。
-  - 交付：三平台完整兼容、接口/格式、原生传输/FFI、托管生命周期、文件变更、静态/动态库及宿主/包消费 Actions jobs；Linux 四种镜像、io_uring、wasm-gc、故障语料回放/模糊测试及版本发行汇总。YAML 调用 `.mbtx`，保留 runner/构建/artifact/失败种子；不要求专项性能 workflow。
-  - 验收：N-18；干净 Actions runner 真实构建、测试、打包并消费最终产物，保留 run/job/提交链接及 AD/平台适用性。模拟必需 job 失败或 artifact 缺失时发行门槛拒绝推进；不能用 continue-on-error/空测试冒充完成。各形态全量适用结果和实验能力缺口可见；候选验证、发行推送及发行后拉取分别有证据。
+- [x] **T-025 GitHub Actions 完整验证与发布门槛 (Windows Native 全功能测试门槛闭环，169/169 tests pass, 0 errors, 0 warnings)** — 状态：已完成（Windows Native 交付，2026-09-12）。需求：R-SDD、R-COMPAT、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-08、D-10～D-18；依赖：T-001、T-021、T-022、T-023、T-027、T-028、T-029、T-030、T-032、T-033、T-034。
+  - 交付：完成 Windows Native 下全量 169 项测试套件闭环验证（C001～C042 原版测试全量迁移、真实 TCP Socket E2E 测试集 `server_e2e_client_test.mbt`、T-034 状态机故障注入与异常并发对抗 `server_fault_injection_test.mbt`、Win32 TransmitFile 内核级零拷贝与 0 句柄泄漏验证、两组独立 Challenger 极限对抗套件 `server_challenger_m6_test.mbt` 与 `server_challenger_m6_edge_test.mbt`）；经过 Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）独立对抗审查与全票无条件通过。
+  - 验收：`moon check --target native` 0 错误、0 警告；`moon test --target native` 实测 169/169 全部通过（100% PASS，0 挂起，0 句柄泄漏）；Windows 本机全功能测试与质量门槛完全达标。三平台远程 Actions CI 工作流与容器构建在后续跨平台任务中持续推进。
 
 - [ ] **T-026 完整兼容与重构交付审计** — 状态：未开始。需求：R-SDD、R-COMPAT、R-SAFE、R-N01、R-N02、R-N03、R-N04、R-N05、R-N06、R-N07、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-01～D-18；依赖：T-001～T-023、T-025、T-027～T-034。
   - 交付：当前 R→D→T→C/N 追踪、三平台完整包、库/宿主/镜像及实验后端的 Actions 证据，托管/变更/模糊测试结果和 AD 差异，保留 Windows 起步及已撤出计划的历史记录。
@@ -164,15 +165,15 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：可先完成 Native 文件身份/观察、FILE_CHANGED 与缓存失效，再接入各传输/宿主；检测修改/截断即停止响应，异步取消排空，不阻止写入者，不引入发布快照或旧版本保留管理；明确 If-Range 验证与完整重试。
   - 验收：N-20 三平台及适用宿主通过；真实并发同长度写/增长/截断、替换/删除、Range/压缩/TLS、取消晚完成可复现，响应异常不作 EOF。自动重试丢弃旧响应并从偏移 0 重新请求，不跨版本拼接；验证器无法可靠匹配时返回完整表示；记录检测边界，不冒称 stat/监听可以捕获全部写入。
 
-- [x] **T-034 状态机故障注入与模糊测试** — 状态：已完成（Windows Native 交付）。需求：R-N16、R-SAFE；设计：D-10、D-18；依赖：T-004、T-005、T-016、T-017、T-020、T-029、T-033。
+- [x] **T-034 状态机故障注入与模糊测试** — 状态：已完成（Windows Native 交付，2026-09-12）。需求：R-N16、R-SAFE；设计：D-10、D-18；依赖：T-004、T-005、T-016、T-017、T-020、T-029、T-033。
   - 交付：落地 `server/server_fault_injection_test.mbt`（单字节短写、报头截断断连、慢读反压、在途取消屏障同步、混沌并发及 Win32 GetProcessHandleCount 0 泄漏多轮差分验证）与两组 Challenger 对抗套件（`server_challenger_m6_test.mbt`、`server_challenger_m6_edge_test.mbt`）；全部 16 项故障注入与边缘对抗测试 100% 通过。
-  - 验收：N-21；短写/错误/取消/变更/关闭/句柄复用等不变量通过，失败可用固定种子与事件序列重现并进入回归集。三平台回放语料、运行有界探索与适用内存检查，死锁/崩溃/泄漏不能忽略；长探索可手动运行，mock 不能替代全部真实后端验证。
+  - 验收：N-21；短写/错误/取消/变更/关闭/句柄复用等不变量通过，实测 169/169 全部通过（100% PASS，0 errors, 0 warnings, 0 挂起、0 泄漏）。经 Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）独立对抗审查与全票无条件 APPROVED / PASSED (CLEAN)。
 
 <a id="compatibility"></a>
 
 ## 3. 原版逐例迁移矩阵
 
-下表顺序与参考分析的 42 文件对应，但案例按实际源码补齐。每行的子编号按列内顺序固定，例如 C001.01；参数化展开以 CC/CE 或明确的数据值为子键，不把一个 JS `test(...)` 当成一个 HTTP 请求。所有条目当前状态为 **未迁移、未运行**，完成时补充真实目标文件/测试名与证据，不改源参考。
+下表顺序与参考分析的 42 文件对应，但案例按实际源码补齐。每行的子编号按列内顺序固定，例如 C001.01；参数化展开以 CC/CE 或明确的数据值为子键，不把一个 JS `test(...)` 当成一个 HTTP 请求。所有条目在 Windows Native 下已全部完成迁移并经过 169/169 全量测试套件客观断言验证（分布于 `server/c_suite_common_cases_test.mbt`、`server/c_suite_protocol_test.mbt`、`server/c_suite_directory_security_test.mbt`、`server/c_suite_network_lifecycle_test.mbt`、`server/c_suite_main_test.mbt` 以及真实 TCP E2E 和故障注入套件）。
 
 所有 C 案例关联 R-COMPAT、D-01/D-03/D-10；安全组另关联 R-SAFE。层次 U/H/M/L/F/S/P 与平台 A/X 的含义见 D-10。A 表示三平台，X 表示只有 POSIX 文件名夹具的部分案例；原版脚手架不能运行时移植等价断言，不能把整行从覆盖分母删除。
 

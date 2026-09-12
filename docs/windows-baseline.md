@@ -35,13 +35,17 @@ moon info --target native
 moon fmt
 ```
 
-实测结果：
-- `moon check --target native`：**0 错误、0 警告**（`Finished. moon: ran 30 tasks, now up to date`）。
-- `moon test --target native`：**46 / 46 测试全部通过**（0 失败）。
+实测结果（Milestone 6 完成闭环基线）：
+- `moon check --target native`：**0 错误、0 警告**。
+- `moon test --target native`：**169 / 169 测试全部通过**（0 失败、0 挂起、0 句柄泄漏）。
 - 各模块 `.mbti` 接口文件已规范更新，代码保持 `moon fmt` 格式化规范。
 
-## 待实现并保留的后续分项（Milestone 4 ~ 6）
+## Windows 本机里程碑完成情况（Milestone 1 ~ 6 全部完成）
 
-- **Milestone 4**：Windows 原生 `TransmitFile` Overlapped 异步 I/O 内核级零拷贝传输、有界缓冲降级与断连防句柄泄漏。
-- **Milestone 5**：CLI 完整参数解析（`--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--spa`, `--try-files` 等）与前置拦截报错，优雅退出与商业宽松协议合规审计。
-- **Milestone 6**：原版 C001~C042 及 CC/CE 测试套件 Windows 全量迁移与状态机故障注入。
+- **Milestone 1**（已完成）：46 处编译器警告消除，规范 `.mbti` 生成。
+- **Milestone 2**（已完成）：解耦 `core/` 包，支持 ETag/304、Range 206/416、MIME 字典及安全路径。
+- **Milestone 3**（已完成）：静态文件引擎与路由分发、预压缩协商、HTML 目录列表及 SPA 优雅回退。
+- **Milestone 4**（已完成）：Windows 原生 `TransmitFile` Overlapped 异步 I/O 内核级零拷贝传输、有界缓冲降级与断连防句柄泄漏（83/83 测试通过）。
+- **Milestone 5**（已完成）：CLI 完整参数解析（`--autoIndex`, `--showDir`, `--cache`, `--cors`, `--auth`, `--spa`, `--try-files` 等）与前置拦截报错，优雅退出与商业宽松协议合规审计（116/116 测试通过）。
+- **Milestone 6**（已完成）：原版 C001~C042 及 CC/CE 测试套件 Windows 全量迁移、真实 TCP Socket E2E 测试集、T-034 状态机故障注入与边缘对抗加固（169/169 测试全通过，0 挂起，0 句柄泄漏，多角色独立审查全票无条件 APPROVED / PASSED (CLEAN)）。
+

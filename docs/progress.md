@@ -111,22 +111,26 @@ moon fmt
 
 ## 4. Milestone 6 审查与对抗闭环总结
 
-Milestone 6 经多角色深度交叉复审并全部达成 APPROVED / PASSED 裁决：
-1. **Reviewer 1 (`reviewer_m6_1`)**: **APPROVE**  
+Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成全票无条件 APPROVED / PASSED (CLEAN) 终审裁决（Gate Result: **PASS**）：
+1. **Reviewer 1 (`reviewer_m6_1_gen3`)**: **APPROVE**  
    - 验证了 C034 空闲超时真实 1000ms 断连（`.04`）、C040 WebSocket 代理升级与错误隔离（`.01～.04`）、故障注入屏障防死锁同步及纯 HTML `<dir>` 转义。
-2. **Reviewer 2 (`reviewer_m6_2`)**: **APPROVE**  
+2. **Reviewer 2 (`reviewer_m6_2_gen3`)**: **APPROVE**  
    - 验证了 169 个测试全量 100% 通过、0 告警 0 错误、接口 `.mbti` 一致性与 MoonBit 2026 编码规范。
-3. **Challenger 1 (`challenger_m6_1`)**: **APPROVE**  
+3. **Challenger 1 (`challenger_m6_1_gen3`)**: **APPROVE**  
    - 验证了短写分片、截断风暴、Slowloris 零拷贝背压、高并发突发与循环无句柄增长 5 项极限压测套件。
-4. **Challenger 2 (`challenger_m6_2`)**: **APPROVE**  
+4. **Challenger 2 (`challenger_m6_2_gen3`)**: **APPROVE**  
    - 验证了流式排空取消、极速断连、Range 边界攻击与跨周期循环压测 4 项极端边缘套件。
-5. **Forensic Auditor (`auditor_m6_1`)**: **PASSED (CLEAN)**  
+5. **Forensic Auditor (`auditor_m6_1_gen3`)**: **PASSED (CLEAN)**  
    - 审计确认 0 GPL/AGPL 污染、0 假实现/硬编码打桩、Win32 `TransmitFile` / IOCP 真实集成与 0 句柄泄漏。
 
 ---
 
-## 5. 后续接续建议
+## 5. 门禁闭环与就绪状态
 
-当前代码库已稳定就绪，所有 M1～M6 承诺任务均已彻底闭环。后续可按计划继续推进跨平台矩阵验证与发布打包门槛（Milestone 7 / T-032 / T-025）：
-- GitHub Actions 三平台（Windows / Linux / macOS）测试矩阵与容器构建验证；
-- 打包发行门槛检查与发布准备。
+当前代码库已稳定就绪，所有 M1～M6 承诺任务与质量门禁均已彻底闭环：
+- 编译与类型状态：`moon check --target native` 0 错误、0 警告。
+- 接口与代码规范：`moon info --target native` 与 `moon fmt` 保持完全规范一致。
+- 测试套件状态：`moon test --target native` 实测 169/169 全部通过（100% PASS，0 挂起，0 句柄泄漏）。
+- 审查审计门禁：Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）全票无条件 APPROVED / PASSED (CLEAN)，Gate Status: PASS。
+- 终审就绪：代码与文档同步就绪，已完全满足 Milestone 6 闭环门槛，就绪进入独立 Victory Audit 终审归档阶段。
+

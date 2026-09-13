@@ -1,0 +1,73 @@
+# Branch-scoped CI for feat/tls-and-lib-export (D-16 / T-032 staging).
+#
+# The main "Build and Release" workflow only fires on master pushes, version
+# tags and PRs targeting master, so TLS work on this branch otherwise gets no
+# runner evidence. This workflow proves the branch compiles and passes the
+# test suite on Linux x86_64 and macOS arm64 — including the vendored MbedTLS
+# native-stub build (tls/mbedtls-4.2.0 + tls_bridge.c) and the TLS loopback
+# tests, which have so far only ever executed on Windows.
+#
+# Removal note: once the branch lands and the full three-OS matrix in ci.yml
+# covers this branch via PR/push, this file can be deleted.
+
+name: Branch Linux macOS Check
+
+on:
+  push:
+    branches:
+      - feat/tls-and-lib-export
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-linux-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: ${{ matrix.os }} · native check/test/build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: hustcer/setup-moonbit@v1
+
+      - name: Update Registry & Dependencies
+        run: moon update
+
+      - name: Check (native)
+        run: moon check --target native
+
+      - name: Test (native)
+        run: moon test --target native
+
+      - name: Build Release (native)
+        run: moon build --target native --release
+
+      # Smoke: the release binary must execute on the runner OS (dynamic
+      # loader, libc, TLS engine all linked). moon emits a .exe-suffixed
+      # binary on POSIX targets as well.
+      - name: Smoke-test the built CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe"
+          test -f "$bin"
+          "$bin" --version
+
+      # The dev_build rule regenerates cmd/http-server-mbt/generated_version.mbt
+      # from moon.mod; the committed copy must match (same gate as ci.yml).
+      - name: Verify generated version file is in sync
+        shell: bash
+        run: git diff --exit-code cmd/http-server-mbt/generated_version.mbt

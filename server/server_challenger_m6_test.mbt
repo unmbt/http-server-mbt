@@ -84,7 +84,9 @@ async fn m6_quick_request(
   }
   let is_head = raw_req.has_prefix("HEAD")
   let body = if !is_head && status != 304 && content_len > 0 {
-    conn.read_exactly(content_len)
+    conn.read_exactly(content_len) catch {
+      _ => b""
+    }
   } else {
     b""
   }
@@ -383,8 +385,7 @@ async test "challenger_m6: Empirical Win32 zero handle leak verification across 
     }
   })
 
-  @async.sleep(50)
-  let h_baseline = @server.get_handle_count()
+  let h_baseline = handle_leak_baseline()
 
   // Helper running an identical cycle of 100 adversarial requests
   async fn run_cycle() -> Unit {
@@ -409,8 +410,9 @@ async test "challenger_m6: Empirical Win32 zero handle leak verification across 
           conn.write(req[i:i + 1].to_owned())
           @async.pause()
         }
-        let _ = conn.read_until("\r\n\r\n")
-        let _ = conn.read_exactly(14)
+        if conn.read_until("\r\n\r\n") is Some(_) {
+          let _ = conn.read_exactly(14) catch { _ => b"" }
+        }
         conn.close()
       }
 
@@ -429,7 +431,7 @@ async test "challenger_m6: Empirical Win32 zero handle leak verification across 
           "GET /m6_leak_check.dat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
         )
         let _ = conn.read_until("\r\n\r\n")
-        let _ = conn.read_exactly(32768)
+        let _ = conn.read_exactly(32768) catch { _ => b"" }
         conn.close()
         @async.pause()
       }
@@ -443,8 +445,9 @@ async test "challenger_m6: Empirical Win32 zero handle leak verification across 
             conn.write(
               "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
             )
-            let _ = conn.read_until("\r\n\r\n")
-            let _ = conn.read_exactly(14)
+            if conn.read_until("\r\n\r\n") is Some(_) {
+              let _ = conn.read_exactly(14) catch { _ => b"" }
+            }
           })
         }
       }
@@ -453,18 +456,16 @@ async test "challenger_m6: Empirical Win32 zero handle leak verification across 
 
   // 2. Execute Cycle 1
   run_cycle()
-  @async.sleep(50)
-  let h_cycle1 = @server.get_handle_count()
+  assert_no_handle_leak(h_baseline)
+  let h_cycle1 = handle_leak_baseline()
 
   // 3. Execute Cycle 2 (Exact identical 100 adversarial requests)
   run_cycle()
-  @async.sleep(50)
-  let h_cycle2 = @server.get_handle_count()
 
   // Definitive proof of 0 leaks:
   // Cycle 2 executed 100 mixed requests (TransmitFile, socket open/close, stream aborts).
-  // If handles leaked per request or abort, h_cycle2 would grow by >= 100.
-  // (buffer accommodates concurrent background test suites in the same test runner process)
-  assert_true(h_cycle2 <= h_cycle1 + 35U)
-  assert_true(h_cycle1 <= h_baseline + 60U)
+  // If handles leaked per request or abort, the count would grow by >= 100 and
+  // never subside. The quiescence wait absorbs transient handles of concurrent
+  // test suites in the same process.
+  assert_no_handle_leak(h_cycle1, tolerance=35U)
 }

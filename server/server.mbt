@@ -187,7 +187,10 @@ async fn handle_single_request(
           Ok(client_ws) => {
             let _ = try
               @async.with_task_group() <| group => {
-                let _ = group.spawn(allow_failure=true, () => {
+                let t1_ref : Ref[@async.Task[Unit]?] = Ref(None)
+                let t2_ref : Ref[@async.Task[Unit]?] = Ref(None)
+                let t1 = group.spawn(allow_failure=true, () => {
+                  defer (if t2_ref.val is Some(t) { t.cancel() })
                   for ;; {
                     let msg = client_ws.recv() catch { _ => break }
                     match msg.kind {
@@ -211,7 +214,9 @@ async fn handle_single_request(
                     _ => ()
                   }
                 })
-                let _ = group.spawn(allow_failure=true, () => {
+                t1_ref.val = Some(t1)
+                let t2 = group.spawn(allow_failure=true, () => {
+                  defer (if t1_ref.val is Some(t) { t.cancel() })
                   for ;; {
                     let msg = upstream_ws.recv() catch { _ => break }
                     match msg.kind {
@@ -235,6 +240,7 @@ async fn handle_single_request(
                     _ => ()
                   }
                 })
+                t2_ref.val = Some(t2)
               }
             catch {
               _ => ()

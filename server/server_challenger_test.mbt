@@ -174,8 +174,7 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
       )
       assert_eq(s, 200)
     }
-    @async.sleep(50)
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     // 1. First client requests 2MB file, reads only 128KB, and abruptly closes socket
     let addr = @socket.Addr::new(0x7F000001, port)
@@ -219,10 +218,8 @@ async test "challenger1: Abrupt client disconnection during large file transfer"
     assert_eq(s3, 200)
     assert_eq(@utf8.decode_lossy(b3), "hello moonbit\n")
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
     // Ensure no handles were leaked during multiple abrupt disconnections
-    assert_true(after_handles <= before_handles + 60U)
+    assert_no_handle_leak(before_handles)
   })
 }
 
@@ -241,8 +238,7 @@ async test "challenger1: 60 consecutive requests stress test with handle leak ve
       )
       assert_eq(s, 200)
     }
-    @async.sleep(50)
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     // 60 consecutive requests alternating across static files, ranges, and 404
     for i in 0..<60 {
@@ -273,9 +269,7 @@ async test "challenger1: 60 consecutive requests stress test with handle leak ve
       @async.pause()
     }
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
     // Verification: handle count delta must be bounded (zero leaks)
-    assert_true(after_handles <= before_handles + 60U)
+    assert_no_handle_leak(before_handles)
   })
 }

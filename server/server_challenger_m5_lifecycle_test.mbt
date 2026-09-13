@@ -247,15 +247,21 @@ async test "challenger_m5: stop_and_drain timeout enforcement prevents permanent
     @async.with_task_group() <| group => {
       // Spawn a client that connects, sends request, but does not read response
       let client_conn_ref : Ref[@socket.Tcp?] = Ref(None)
+      let client_done = Ref(false)
       let _ = group.spawn(allow_failure=true, () => {
         let addr = @socket.Addr::new(0x7F000001, port)
         let conn = @socket.Tcp::connect(addr)
+        defer conn.close()
         client_conn_ref.val = Some(conn)
         conn.write(
           "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
         )
-        // Sleep for a long time to keep connection open without reading
-        @async.sleep(5000)
+        // Keep connection open without reading until stop_and_drain finishes or timeout
+        let mut w = 0
+        while !client_done.val && w < 200 {
+          @async.sleep(10)
+          w += 1
+        }
       })
 
       // Wait until request is registered
@@ -268,6 +274,7 @@ async test "challenger_m5: stop_and_drain timeout enforcement prevents permanent
       // Call stop_and_drain with a short timeout of 50ms
       // Must return within ~150ms instead of hanging
       server.stop_and_drain(timeout_ms=50)
+      client_done.val = true
 
       // Clean up client connection
       match client_conn_ref.val {
@@ -319,9 +326,7 @@ async test "challenger_m5: zero handle leaks across repeated in-flight drain lif
       assert_eq(s, 200)
     }
   })
-  @async.sleep(50)
-
-  let before_handles = @server.get_handle_count()
+  let before_handles = handle_leak_baseline()
 
   // Execute 12 server lifecycle cycles with stop_and_drain
   for _ in 0..<12 {
@@ -336,8 +341,6 @@ async test "challenger_m5: zero handle leaks across repeated in-flight drain lif
     @async.pause()
   }
 
-  @async.sleep(100)
-  let after_handles = @server.get_handle_count()
   // Ensure handle count remains strictly bounded
-  assert_true(after_handles <= before_handles + 60U)
+  assert_no_handle_leak(before_handles)
 }

@@ -4,6 +4,7 @@ package "unmbt/http-server-mbt/server"
 import {
   "moonbitlang/async",
   "moonbitlang/async/socket",
+  "moonbitlang/async/types",
   "moonbitlang/core/ref",
   "unmbt/http-server-mbt",
   "unmbt/http-server-mbt/core",
@@ -12,7 +13,7 @@ import {
 // Values
 pub fn get_handle_count() -> UInt
 
-pub async fn transmit_file(UInt64, String, Int64, Int64) -> Int
+pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
 
 pub async fn with_server(@core.Config, async (Server) -> Unit) -> Unit
 

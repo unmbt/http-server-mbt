@@ -297,3 +297,14 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 文档版本 3 校验记录（2026-09-09，同一 Windows 工具链）：更新并运行上述临时 `.mbtx` 检查器与 `git diff --check`，核对 32 项未勾选任务、依赖无环、16 个设计章节、18 个新增测试组、稳定编号与 59 处本地链接；42/42 原版测试文件、28 项公共及 2 项错误 fixtures 覆盖保留。另人工核对 Distroless/scratch × min/full 与 CLI 档位、Windows 本机→Actions 阶段顺序、分项前置条件和最终三平台门槛。结果均通过；没有改动源码、Dockerfile 或 GitHub Actions 文件，没有执行应用测试、Docker 构建、远程 workflow 或发布。
 
 文档版本 4 校验记录（2026-09-10，Windows，moon 0.1.20260824）：运行临时 `http_server_sdd_validate_v4.mbtx`，核对 42/42 原版测试文件、R-N01～R-N16、D-01～D-18、N-01～N-21、T-001～T-034、CC-01～CC-28、CE-01～CE-02；34 个任务均未勾选，当前任务依赖不引用已撤出的 T-024，量化性能旧表述未出现在当前契约。另核对 66 个 Markdown 链接、偶数个代码围栏和无行尾空白，并执行 `git diff --check`；结果均通过。检查器位于系统临时目录，不作为项目源文件提交；本轮未运行源码、`moon info`、`moon fmt`、Docker、Actions 或发布验证，因此不代表功能实现完成。
+
+句柄泄漏断言偶发失败与测试套件卡死排查修复记录（2026-09-13，Windows，moon 0.1.20260904，关联 T-031/T-034 已交付测试）：
+1. 句柄泄漏断言偶发失败修复：async 测试默认同进程并行，而 `get_handle_count()` 是进程级瞬时快照，兄弟测试的临时句柄污染快照导致断言偶发失败（修复前 5 轮中 3 轮失败）。修复方式：新增 `server/handle_leak_assert_test.mbt`（基线多次探测最小值 + `assert_no_handle_leak` 轮询等待静默回落），将 8 个测试文件的句柄断言迁移至此机制。
+2. 测试卡死与死锁排查修复：
+   - 根因一（WebSocket 转发对死锁）：`server/server.mbt` 中 WebSocket 客户端与上游的双向转发协程在对端关闭后未被主动 cancel，另一侧协程永久悬挂于 `recv()`（Windows IOCP 悬挂），导致 `with_task_group` 无法退出。修复方式：在两侧转发协程退出时的 `defer` 中互相调用 `t.cancel()`，使另一侧阻塞的 IOCP 读操作被唤醒退出。
+   - 根因二（TransmitFile 密集轮询饥饿）：`server/transmit_file.mbt` 中重叠 I/O 处于挂起态（`ERROR_IO_PENDING` / code 2）时，使用 `@async.pause()` 密集自旋占用单线程事件循环，导致其他协程饥饿。修复方式：在重叠 I/O 挂起时使用 `@async.sleep(2)` 让渡调度。
+   - 根因三（流式取消测试挂起读协程）：`server/server_fault_injection_test.mbt` 第 4 项测试中的客户端长读协程在连接关闭后未能自然从 IOCP 读取唤醒。修复方式：保存 reader 协程 task 并在连接关闭与 defer 中显式执行 `t.cancel()`。
+3. 验证证据：
+   - `moon test --target native server`：10 轮压力循环，10/10 全部通过（每轮 75 个测试耗时 ~8s，0 失败，0 卡死）。
+   - `moon test --target native`：全仓全量包测试连续 5 轮，5/5 全部通过（每轮 178 个测试耗时 ~8s，0 失败，0 卡死）。
+   - 工具链检查：`moon check --target native` 通过、`moon info --target native` 更新、`moon fmt` 格式化通过。

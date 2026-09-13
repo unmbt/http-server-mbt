@@ -342,9 +342,7 @@ async test "e2e client: Zero handle leaks across diverse socket lifecycle operat
         port, "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
       )
     }
-    @async.sleep(50)
-
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     // Perform 30 mixed operations
     for _ in 0..<10 {
@@ -372,8 +370,6 @@ async test "e2e client: Zero handle leaks across diverse socket lifecycle operat
       @async.pause()
     }
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 60U)
+    assert_no_handle_leak(before_handles)
   })
 }

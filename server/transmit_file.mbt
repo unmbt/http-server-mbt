@@ -136,7 +136,7 @@ pub async fn transmit_file(
       @async.pause()
       continue
     } else if ret == 2 {
-      @async.pause()
+      @async.sleep(2)
       continue
     } else {
       return ret

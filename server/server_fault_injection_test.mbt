@@ -133,9 +133,7 @@ async test "fault_injection: Incomplete request header abruptly truncated" {
       )
       assert_eq(s, 200)
     }
-    @async.sleep(50)
-
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     // Send 30 incomplete requests cut off mid-header
     for _ in 0..<30 {
@@ -154,9 +152,7 @@ async test "fault_injection: Incomplete request header abruptly truncated" {
     assert_eq(h.get("content-length"), Some("14"))
     assert_eq(@utf8.decode_lossy(b), "hello moonbit\n")
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 60U)
+    assert_no_handle_leak(before_handles)
   })
 }
 
@@ -230,9 +226,7 @@ async test "fault_injection: Abrupt mid-stream disconnect during multi-chunk Tra
       assert_eq(s, 200)
     }
   })
-  @async.sleep(50)
-
-  let before_handles = @server.get_handle_count()
+  let before_handles = handle_leak_baseline()
 
   @server.with_server_at(config, 0, async fn(server) {
     defer server.stop()
@@ -260,18 +254,13 @@ async test "fault_injection: Abrupt mid-stream disconnect during multi-chunk Tra
     assert_eq(@utf8.decode_lossy(b), "hello moonbit\n")
   })
 
-  @async.sleep(100)
-  let after_handles = @server.get_handle_count()
   // Zero handle leaks verification
-  assert_true(after_handles <= before_handles + 60U)
+  assert_no_handle_leak(before_handles)
 }
 
 ///|
 async test "fault_injection: In-flight cancellation via stop_and_drain during active streaming" {
   let config = @core.Config::default("testdata/public")
-  // The response must exceed kernel socket buffer ceilings (Linux sndbuf
-  // autotunes up to tcp_wmem max ~4MB) so stalled readers genuinely
-  // backpressure the server mid-sendfile and in-flight state is observable.
   let test_file = "testdata/public/fi_drain_cancel.dat"
   let file_size = 8388608 // 8MB
   let test_bytes = Bytes::makei(file_size, fn(i) {
@@ -288,8 +277,15 @@ async test "fault_injection: In-flight cancellation via stop_and_drain during ac
 
     @async.with_task_group() <| group => {
       let client_conns : Array[@socket.Tcp] = []
+      let reader_tasks : Array[@async.Task[Unit]] = []
+      defer {
+        stop_reading.val = true
+        for t in reader_tasks {
+          t.cancel()
+        }
+      }
       for _ in 0..<num_readers {
-        let _ = group.spawn(allow_failure=true, () => {
+        let t = group.spawn(allow_failure=true, () => {
           try {
             let addr = @socket.Addr::new(0x7F000001, port)
             let conn = @socket.Tcp::connect(addr)
@@ -302,14 +298,17 @@ async test "fault_injection: In-flight cancellation via stop_and_drain during ac
             if hdr is Some(_) {
               let _ = conn.read_exactly(4096)
               readers_active.val += 1
-              while !stop_reading.val {
+              let mut r_wait = 0
+              while !stop_reading.val && r_wait < 200 {
                 @async.sleep(10)
+                r_wait += 1
               }
             }
           } catch {
             _ => ()
           }
         })
+        reader_tasks.push(t)
       }
 
       // Wait until all readers are actively in-flight streaming
@@ -329,6 +328,9 @@ async test "fault_injection: In-flight cancellation via stop_and_drain during ac
 
       // Clean up client connections so in-flight tasks complete
       stop_reading.val = true
+      for t in reader_tasks {
+        t.cancel()
+      }
       for c in client_conns {
         c.close()
       }
@@ -401,8 +403,7 @@ async test "fault_injection: Multi-round empirical zero handle leak verification
     }
   })
 
-  @async.sleep(50)
-  let h0 = @server.get_handle_count()
+  let h0 = handle_leak_baseline()
 
   // Helper running a cycle of 30 abrupt disconnects and 10 truncated requests
   async fn run_fi_cycle() -> Unit {
@@ -434,15 +435,12 @@ async test "fault_injection: Multi-round empirical zero handle leak verification
 
   // 2. Cycle 1
   run_fi_cycle()
-  @async.sleep(100)
-  let h1 = @server.get_handle_count()
-  assert_true(h1 <= h0 + 60U)
+  assert_no_handle_leak(h0)
+  let h1 = handle_leak_baseline()
 
   // 3. Cycle 2
   run_fi_cycle()
-  @async.sleep(100)
-  let h2 = @server.get_handle_count()
-  // Definitive proof of 0 leaks: h2 is not growing relative to h1
-  // (buffer accommodates concurrent background test suites in the same test runner process)
-  assert_true(h2 <= h1 + 35U)
+  // Definitive proof of 0 leaks: Cycle 2 is not growing relative to Cycle 1
+  // (quiescence wait absorbs transient handles of concurrent test suites in the same process)
+  assert_no_handle_leak(h1, tolerance=35U)
 }

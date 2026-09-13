@@ -70,12 +70,11 @@ async fn run() -> Unit {
     print_startup_banner(final_config, port)
     @async.sleep(2147483647)
   }) catch {
-    _ if @async.is_being_cancelled() => {
+    _ if @async.is_being_cancelled() =>
       if !final_config.silent {
         println(red(colors_enabled(), "http-server stopped."))
         flush_stdout()
       }
-    }
     error => {
       eprint_err("server error: \{error}\n")
       runtime_native_exit(1)

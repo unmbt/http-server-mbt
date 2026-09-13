@@ -84,8 +84,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
       )
       assert_eq(s, 200)
     }
-    @async.sleep(50)
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     let addr = @socket.Addr::new(0x7F000001, port)
     let conn = @socket.Tcp::connect(addr)
@@ -240,9 +239,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_eq(h_single.get("content-length"), Some("1"))
     assert_eq(@utf8.decode_lossy(b_single), "h")
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
-    assert_true(after_handles <= before_handles + 60U)
+    assert_no_handle_leak(before_handles)
   })
 }
 

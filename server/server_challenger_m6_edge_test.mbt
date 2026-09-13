@@ -192,14 +192,20 @@ async test "challenger_m6_edge: stop_and_drain timeout enforcement on unresponsi
     let port = server.port()
     @async.with_task_group() <| group => {
       let stalled_conn_ref : Ref[@socket.Tcp?] = Ref(None)
+      let client_done = Ref(false)
       let _ = group.spawn(allow_failure=true, () => {
         let addr = @socket.Addr::new(0x7F000001, port)
         let conn = @socket.Tcp::connect(addr)
+        defer conn.close()
         stalled_conn_ref.val = Some(conn)
         conn.write(
           "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
         )
-        @async.sleep(3000)
+        let mut wait_cycles = 0
+        while !client_done.val && wait_cycles < 200 {
+          @async.sleep(10)
+          wait_cycles += 1
+        }
       })
 
       // Wait until request is registered
@@ -211,6 +217,7 @@ async test "challenger_m6_edge: stop_and_drain timeout enforcement on unresponsi
 
       // stop_and_drain with short 50ms timeout must return promptly without hanging
       server.stop_and_drain(timeout_ms=50)
+      client_done.val = true
 
       // Close stalled connection immediately so task group completes
       if stalled_conn_ref.val is Some(c) {
@@ -701,21 +708,17 @@ async test "challenger_m6_edge: multi-round cyclic stress with 0 handle leaks" {
   })
 
   // Baseline handle count after warm-up
-  @async.sleep(50)
-  let h_base = @server.get_handle_count()
+  let h_base = handle_leak_baseline()
 
   // 2. Cycle 1: 40 adversarial stress requests
   m6_edge_run_cycle(config)
-  @async.sleep(100)
-  let h1 = @server.get_handle_count()
-  assert_true(h1 <= h_base + 60U)
+  assert_no_handle_leak(h_base)
+  let h1 = handle_leak_baseline()
 
   // 3. Cycle 2: Identical 40 adversarial stress requests
   m6_edge_run_cycle(config)
-  @async.sleep(100)
-  let h2 = @server.get_handle_count()
 
   // EMPIRICAL PROOF OF 0 LEAKS: Cycle 2 does not grow relative to Cycle 1
-  // (buffer accommodates concurrent background test suites in the same test runner process)
-  assert_true(h2 <= h1 + 35U)
+  // (quiescence wait absorbs transient handles of concurrent test suites in the same process)
+  assert_no_handle_leak(h1, tolerance=35U)
 }

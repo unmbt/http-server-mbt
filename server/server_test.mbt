@@ -245,9 +245,7 @@ async test "server zero handle leaks across repeated requests" {
       )
       assert_eq(warm_status, 200)
     }
-    @async.sleep(50)
-
-    let before_handles = @server.get_handle_count()
+    let before_handles = handle_leak_baseline()
 
     // Perform 40 consecutive requests of various types
     for i in 0..<40 {
@@ -260,11 +258,9 @@ async test "server zero handle leaks across repeated requests" {
       @async.pause()
     }
 
-    @async.sleep(100)
-    let after_handles = @server.get_handle_count()
     // With unconditional CloseHandle, handle count must remain bounded with 0 leaks
-    // (buffer accommodates concurrent background test suites in the same test runner process)
-    assert_true(after_handles <= before_handles + 60U)
+    // (quiescence wait absorbs transient handles of concurrent test suites in the same process)
+    assert_no_handle_leak(before_handles)
   })
 }
 

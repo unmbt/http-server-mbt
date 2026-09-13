@@ -9,3 +9,14 @@ import {
 }
 
 pkgtype(kind: "executable")
+
+rule(
+  name: "gen_version",
+  command: "moon run scripts/gen_version.mbtx $input $output",
+)
+
+dev_build(
+  rule: "gen_version",
+  input: "../../moon.mod",
+  output: "generated_version.mbt",
+)

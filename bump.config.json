@@ -1,0 +1,4 @@
+{
+  "execute": "moon build --release",
+  "all": true
+}

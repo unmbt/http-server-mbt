@@ -37,11 +37,11 @@ test "cli: help flag" {
 ///|
 test "cli: version flag" {
   match parse_cli(["-v"]) {
-    Ok(Version(msg)) => assert_true(msg.contains("0.1.5"))
+    Ok(Version(msg)) => assert_eq(msg, "http-server-mbt \{server_version}")
     _ => fail("expected Ok(Version)")
   }
   match parse_cli(["--version"]) {
-    Ok(Version(msg)) => assert_true(msg.contains("0.1.5"))
+    Ok(Version(msg)) => assert_eq(msg, "http-server-mbt \{server_version}")
     _ => fail("expected Ok(Version)")
   }
 }

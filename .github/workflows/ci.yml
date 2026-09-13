@@ -60,6 +60,15 @@ jobs:
       - name: Build Release
         run: moon build --target native --release
 
+      # The dev_build rule regenerates cmd/http-server-mbt/generated_version.mbt
+      # from moon.mod; the committed copy must match or the version bumped
+      # without regenerating would silently drift.
+      - name: Verify generated version file is in sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code cmd/http-server-mbt/generated_version.mbt
+
       - name: Prepare Artifact
         shell: bash
         run: cp _build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe ${{ matrix.artifact_name }}

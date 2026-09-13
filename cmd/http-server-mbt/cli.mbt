@@ -27,7 +27,7 @@ pub fn build_command() -> @argparse.Command {
   @argparse.Command(
     "http-server-mbt",
     about="Windows Native static HTTP server",
-    version="http-server-mbt 0.1.5",
+    version="\{server_version}",
     disable_help_flag=true,
     disable_version_flag=true,
     flags=[
@@ -239,7 +239,7 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     return Ok(CliAction::Help(cmd.render_help()))
   }
   if matches.flags.get("version") == Some(true) {
-    return Ok(CliAction::Version("http-server-mbt 0.1.5"))
+    return Ok(CliAction::Version("\{server_version}"))
   }
 
   // 1. Port

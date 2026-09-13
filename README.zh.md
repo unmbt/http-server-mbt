@@ -7,6 +7,7 @@
 *一款使用 [MoonBit](https://moonbitlang.com) 编写的极速、零依赖、高性能静态 HTTP 服务器。*
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
+[![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
 [![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-平台支持矩阵)
@@ -52,6 +53,37 @@
 - **生产级安全性**：路径穿越防御（`..`、反斜杠、NUL 字符与越界拦截）、常量时间 Basic 认证、敏感错误隔离。
 - **美观目录列表**：支持自动生成现代风格 HTML 目录列表视图，包含文件大小、伴生文件折叠与智能排序。
 - **极简生命周期**：优雅响应 `Ctrl+C` 信号，支持在途请求排空，历经极端压测保证 0 句柄泄漏。
+
+---
+
+## 📦 安装指南
+
+推荐使用 MoonBit 包管理器从源码编译安装：
+
+```bash
+moon install unmbt/http-server-mbt/cmd/http-server-mbt
+http-server-mbt -v
+```
+
+`moon install` 会将可执行文件安装到 `~/.moon/bin`。请确保该目录已加入 `PATH`。
+
+### 预编译二进制
+
+如果不希望从源码构建，可使用对应系统的安装脚本下载最新的 GitHub Release：
+
+#### Linux & macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
+```
+
+#### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
+```
+
+> **注意**：预编译二进制安装脚本会将文件安装到 `~/.unmbt`，并将该目录加入 `PATH`。安装完成后可能需要重启终端。
 
 ---
 

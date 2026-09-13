@@ -54,7 +54,7 @@ fi
 
 # Check if already installed and version matches
 if [ -f "$BIN_PATH" ]; then
-    CURRENT_VERSION=$("$BIN_PATH" -V 2>/dev/null || echo "unknown")
+    CURRENT_VERSION=$("$BIN_PATH" -v 2>/dev/null || echo "unknown")
     if [ "$CURRENT_VERSION" == "$LATEST_VERSION" ]; then
         echo "✨ You already have the latest version ($LATEST_VERSION) installed at $BIN_PATH."
         exit 0

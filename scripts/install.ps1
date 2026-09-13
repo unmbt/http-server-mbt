@@ -45,7 +45,7 @@ if (-not $LatestVersion -or -not $DownloadUrl) {
 
 if (Test-Path $BinPath) {
     # Execute to get version
-    $CurrentVersion = & $BinPath -V
+    $CurrentVersion = & $BinPath -v
     if ($CurrentVersion -eq $LatestVersion) {
         Write-Host "✨ You already have the latest version ($LatestVersion) installed at $BinPath." -ForegroundColor Green
         return

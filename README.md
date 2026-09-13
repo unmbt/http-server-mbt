@@ -7,6 +7,7 @@
 *A blazing fast, zero-dependency, high-performance static HTTP server written in [MoonBit](https://moonbitlang.com).*
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
+[![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
 [![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-platform-support-matrix)
@@ -52,6 +53,37 @@
 - **Enterprise-Grade Security**: Path traversal defense (`..`, `\`, `NUL` bytes and cross-drive boundaries), constant-time HTTP Basic Auth, strict 401/403 isolation.
 - **Clean Directory Listing**: Auto-generated modern HTML directory browser with file sizes, companion file folding, and natural sorting.
 - **Graceful Lifecycle**: Clean `Ctrl+C` interrupt handling, bounded connection draining, and 0 handle leaks under stress.
+
+---
+
+## 📦 Installation
+
+The recommended installation method is using the MoonBit package manager to compile and install directly from source:
+
+```bash
+moon install unmbt/http-server-mbt/cmd/http-server-mbt
+http-server-mbt -v
+```
+
+`moon install` places the executable in `~/.moon/bin`. Make sure that directory is included in your `PATH`.
+
+### Pre-compiled Binary
+
+If you prefer not to build from source, use the installation script for your system to download the latest GitHub Release:
+
+#### Linux & macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
+```
+
+#### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
+```
+
+> **Note**: The pre-compiled binary scripts install to `~/.unmbt` and add that directory to your `PATH`. You may need to restart your terminal for the changes to take effect.
 
 ---
 
@@ -155,4 +187,3 @@ The compiled binary will be located at `_build/native/release/build/cmd/http-ser
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE). The underlying asynchronous networking library `moonbitlang/async` is licensed under Apache-2.0.
-

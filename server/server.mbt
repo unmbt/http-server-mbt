@@ -4,6 +4,7 @@ pub struct Server {
   inner : @socket.TcpServer
   engine : @root.StaticEngine
   config : @core.Config
+  tls_acceptor : @tls.TlsAcceptor?
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : Ref[Int]
@@ -31,14 +32,90 @@ pub async fn with_server(
 }
 
 ///|
+/// Build the TLS acceptor from configured certificate/key files.
+/// Part of the D-01 preflight: runs before the listener is created, so a
+/// missing/unreadable/mismatching certificate prevents listening entirely.
+async fn build_tls_acceptor(config : @core.Config) -> @tls.TlsAcceptor {
+  let cert_path = match config.cert_file {
+    Some(p) => p
+    None => ""
+  }
+  let key_path = match config.key_file {
+    Some(p) => p
+    None => ""
+  }
+  let cert = @fs.read_file(cert_path).binary() catch {
+    err =>
+      raise @core.ConfigError::InvalidTls(
+        "cannot read cert_file \{cert_path}: \{err}",
+      )
+  }
+  let key = @fs.read_file(key_path).binary() catch {
+    err =>
+      raise @core.ConfigError::InvalidTls(
+        "cannot read key_file \{key_path}: \{err}",
+      )
+  }
+  let passphrase = match config.key_passphrase {
+    Some(p) => Some(@utf8.encode(p))
+    None => None
+  }
+  try {
+    match passphrase {
+      Some(pass) => @tls.TlsAcceptor::new_server(cert, key, passphrase=pass)
+      None => @tls.TlsAcceptor::new_server(cert, key)
+    }
+  } catch {
+    err => raise tls_preflight_error(err)
+  }
+}
+
+///|
+/// Translate TLS preflight failures into configuration errors with
+/// actionable messages (D-01: preflight failures prevent listening). PK-domain
+/// strings are missing from the shipped MbedTLS error table (they are CMake
+/// build-time generated for TF-PSA-Crypto), so the common codes are mapped
+/// here.
+fn tls_preflight_error(err : Error) -> @core.ConfigError {
+  match err {
+    @tls.TlsError::TlsError(code=-15232, ..) => // MBEDTLS_ERR_PK_PASSWORD_MISMATCH
+      @core.ConfigError::InvalidTls(
+        "key passphrase mismatch (check --key-passphrase)",
+      )
+    @tls.TlsError::TlsError(code=-15360, ..) => // MBEDTLS_ERR_PK_PASSWORD_REQUIRED
+      @core.ConfigError::InvalidTls(
+        "key is encrypted: --key-passphrase is required",
+      )
+    @tls.TlsError::TlsError(code=-15616, ..) => // MBEDTLS_ERR_PK_KEY_INVALID_FORMAT
+      @core.ConfigError::InvalidTls(
+        "key parse failed: wrong key file or wrong passphrase",
+      )
+    @tls.TlsError::TlsError(code~, message~) =>
+      @core.ConfigError::InvalidTls("\{message} (mbedtls \{code})")
+    _ => @core.ConfigError::InvalidTls("\{err}")
+  }
+}
+
+///|
 /// Start a server on an explicit TCP port. Port validation is performed before
 /// the listener is created by callers; this helper keeps the listener lifecycle
-/// managed by the async scope.
+/// managed by the async scope. The TLS acceptor (when configured) is built
+/// before the listener so certificate problems prevent listening (D-01).
 pub async fn with_server_at(
   config : @core.Config,
   port : Int,
   action : async (Server) -> Unit,
 ) -> Unit {
+  @core.validate_tls(config)
+  let tls_acceptor : @tls.TlsAcceptor? = if config.has_tls() {
+    Some(build_tls_acceptor(config))
+  } else {
+    None
+  }
+  defer (match tls_acceptor {
+    Some(acc) => acc.close()
+    None => ()
+  })
   let engine = @root.StaticEngine::new(config)
   // SO_REUSEADDR on Linux/macOS so an immediate re-bind after stop succeeds
   // through TIME_WAIT (Windows ignores this flag; libuv in the original
@@ -48,6 +125,7 @@ pub async fn with_server_at(
     inner: listener,
     engine,
     config,
+    tls_acceptor,
     stopped: false,
     task: None,
     active_requests: { val: 0, },
@@ -119,9 +197,107 @@ pub fn Server::port(self : Server) -> Int {
 }
 
 ///|
+/// Connection transport: plaintext TCP or a TLS-wrapped connection.
+/// Kernel zero-copy transmission (transmit_file) applies only to the
+/// plaintext arm; TLS uses the bounded-buffer path (D-05 / T-017).
+priv enum Transport {
+  Plain(@socket.Tcp)
+  Encrypted(@tls.TlsConn)
+}
+
+///|
+/// Write a data chunk to the transport. Returns false on failure so the
+/// caller can tear the connection down.
+async fn Transport::send(self : Transport, data : &@io.Data) -> Bool {
+  match self {
+    Plain(tcp) =>
+      try {
+        tcp.write(data)
+        true
+      } catch {
+        _ => false
+      }
+    Encrypted(conn) =>
+      try {
+        conn.write(data)
+        true
+      } catch {
+        _ => false
+      }
+  }
+}
+
+///|
+/// Map a parsed HTTP request method onto the engine method model.
+fn map_request_method(meth : @http.RequestMethod) -> @core.Method {
+  match meth {
+    @http.RequestMethod::Get => @core.Method::Get
+    @http.RequestMethod::Head => @core.Method::Head
+    @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
+    @http.RequestMethod::Post => @core.Method::Other("POST")
+    @http.RequestMethod::Put => @core.Method::Other("PUT")
+    @http.RequestMethod::Delete => @core.Method::Other("DELETE")
+    @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
+    @http.RequestMethod::Trace => @core.Method::Other("TRACE")
+    @http.RequestMethod::Patch => @core.Method::Other("PATCH")
+  }
+}
+
+///|
+/// Lower-case the request headers into the engine's header model.
+fn lower_headers(request_headers : @http.Headers) -> Map[String, String] {
+  let headers : Map[String, String] = Map([])
+  for key, value in request_headers {
+    headers[key.to_string().to_lower()] = value
+  }
+  headers
+}
+
+///|
+/// Decide whether the connection should accept another request.
+fn should_keep_alive(server : Server, headers : Map[String, String]) -> Bool {
+  let conn_val = match headers.get("connection") {
+    Some(v) => v.to_lower()
+    None => ""
+  }
+  !(conn_val == "close" || server.stopped)
+}
+
+///|
+/// Dispatch a parsed request to the engine and send the response over the
+/// transport. Returns false when the connection must close.
+async fn dispatch_engine_request(
+  server : Server,
+  transport : Transport,
+  meth : @core.Method,
+  headers : Map[String, String],
+  target : String,
+) -> Bool {
+  let result = server.engine.handle({ meth, target, headers, })
+  let ok = match result {
+    @root.HandleResult::Handled(response) => send_response(transport, response)
+    @root.HandleResult::Next => {
+      let _ = if meth is Other(_) {
+        send_fallback_status(transport, 405, "Method Not Allowed")
+      } else {
+        send_fallback_status(transport, 404, "Not Found")
+      }
+      return false
+    }
+    @root.HandleResult::Error(_) => {
+      let _ = send_fallback_status(transport, 500, "Internal Server Error")
+      return false
+    }
+  }
+  ok && should_keep_alive(server, headers)
+}
+
+///|
+/// Plain-path request handling (unchanged behavior over
+/// `@http.ServerConnection`, including the WebSocket upgrade branch).
 async fn handle_single_request(
   server : Server,
-  tcp_conn : @socket.Tcp,
+  transport : Transport,
   http_conn : @http.ServerConnection,
 ) -> Bool {
   let req_opt = if server.config.idle_timeout_ms > 0 {
@@ -253,63 +429,90 @@ async fn handle_single_request(
       }
     }
   }
-  let meth = match request.meth {
-    @http.RequestMethod::Get => @core.Method::Get
-    @http.RequestMethod::Head => @core.Method::Head
-    @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
-    @http.RequestMethod::Post => @core.Method::Other("POST")
-    @http.RequestMethod::Put => @core.Method::Other("PUT")
-    @http.RequestMethod::Delete => @core.Method::Other("DELETE")
-    @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
-    @http.RequestMethod::Trace => @core.Method::Other("TRACE")
-    @http.RequestMethod::Patch => @core.Method::Other("PATCH")
-  }
-  let headers : Map[String, String] = Map([])
-  for key, value in request.headers {
-    headers[key.to_string().to_lower()] = value
-  }
-  let result = server.engine.handle({ meth, target: request.path, headers, })
-  let ok = match result {
-    @root.HandleResult::Handled(response) => send_response(tcp_conn, response)
-    @root.HandleResult::Next => {
-      let _ = if meth is Other(_) {
-        send_fallback_status(tcp_conn, 405, "Method Not Allowed")
-      } else {
-        send_fallback_status(tcp_conn, 404, "Not Found")
-      }
-      return false
+  dispatch_engine_request(
+    server,
+    transport,
+    map_request_method(request.meth),
+    lower_headers(request.headers),
+    request.path,
+  )
+}
+
+///|
+/// TLS request handling: the parser operates on the decrypted transport.
+/// The WebSocket upgrade branch is not available here (T-014 scope).
+async fn handle_tls_single_request(
+  server : Server,
+  transport : Transport,
+  reader : HttpReader,
+) -> Bool {
+  let req_opt = if server.config.idle_timeout_ms > 0 {
+    @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
+      reader.read_request()
+    }) catch {
+      _ => None
     }
-    @root.HandleResult::Error(_) => {
-      let _ = send_fallback_status(tcp_conn, 500, "Internal Server Error")
-      return false
+  } else {
+    Some(reader.read_request()) catch {
+      _ => None
     }
   }
-  if !ok {
-    return false
+  let request = match req_opt {
+    Some(r) => r
+    None => return false
   }
-  let conn_val = match headers.get("connection") {
-    Some(v) => v.to_lower()
-    None => ""
+  server.active_requests.val += 1
+  defer {
+    server.active_requests.val = server.active_requests.val - 1
   }
-  if conn_val == "close" || server.stopped {
-    return false
-  }
-  true
+  dispatch_engine_request(
+    server,
+    transport,
+    map_request_method(request.meth),
+    lower_headers(request.headers),
+    request.path,
+  )
 }
 
 ///|
 async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
   defer tcp_conn.close()
-  let http_conn = @http.ServerConnection::new(tcp_conn)
-  for ;; {
-    if server.stopped {
-      break
+  match server.tls_acceptor {
+    Some(acceptor) => {
+      // TLS path (D-08/T-012): handshake failures reclaim all resources and
+      // close the connection (T-012 acceptance).
+      let tls_conn = acceptor.accept(reader=tcp_conn, writer=tcp_conn) catch {
+        _ => return
+      }
+      defer tls_conn.close()
+      let transport = Encrypted(tls_conn)
+      let reader = HttpReader::new(tls_conn)
+      for ;; {
+        if server.stopped {
+          break
+        }
+        let keep_going = handle_tls_single_request(server, transport, reader) catch {
+          _ => false
+        }
+        if !keep_going {
+          break
+        }
+      }
     }
-    let keep_going = handle_single_request(server, tcp_conn, http_conn) catch {
-      _ => false
-    }
-    if !keep_going {
-      break
+    None => {
+      let http_conn = @http.ServerConnection::new(tcp_conn)
+      let transport = Plain(tcp_conn)
+      for ;; {
+        if server.stopped {
+          break
+        }
+        let keep_going = handle_single_request(server, transport, http_conn) catch {
+          _ => false
+        }
+        if !keep_going {
+          break
+        }
+      }
     }
   }
 }
@@ -335,7 +538,7 @@ fn status_reason(status : Int) -> String {
 
 ///|
 async fn send_response(
-  tcp_conn : @socket.Tcp,
+  transport : Transport,
   response : @root.Response,
 ) -> Bool {
   let header_buf = StringBuilder(size_hint=256)
@@ -346,20 +549,20 @@ async fn send_response(
     header_buf.write_string("\{key}: \{value}\r\n")
   }
   header_buf.write_string("\r\n")
-  tcp_conn.write(header_buf.to_string()) catch {
-    _ => return false
+  let ok = transport.send(header_buf.to_string())
+  if !ok {
+    return false
   }
-
   match response.body {
     Empty => true
-    Bytes(b) => send_bytes_bounded(tcp_conn, b)
+    Bytes(b) => send_bytes_bounded(transport, b)
     FileRegion(path, offset, length) =>
-      send_file_region(tcp_conn, response, path, offset, length)
+      send_file_region(transport, response, path, offset, length)
   }
 }
 
 ///|
-async fn send_bytes_bounded(tcp_conn : @socket.Tcp, bytes : Bytes) -> Bool {
+async fn send_bytes_bounded(transport : Transport, bytes : Bytes) -> Bool {
   let chunk_size = 65536
   let total = bytes.length()
   let mut pos = 0
@@ -370,8 +573,9 @@ async fn send_bytes_bounded(tcp_conn : @socket.Tcp, bytes : Bytes) -> Bool {
       chunk_size
     }
     let chunk = bytes[pos:pos + cur_len].to_owned()
-    tcp_conn.write(chunk) catch {
-      _ => return false
+    let ok = transport.send(chunk)
+    if !ok {
+      return false
     }
     pos += cur_len
   }
@@ -380,7 +584,7 @@ async fn send_bytes_bounded(tcp_conn : @socket.Tcp, bytes : Bytes) -> Bool {
 
 ///|
 async fn send_file_region(
-  tcp_conn : @socket.Tcp,
+  transport : Transport,
   response : @root.Response,
   path : String,
   offset : Int64,
@@ -389,8 +593,12 @@ async fn send_file_region(
   if length <= 0L {
     return true
   }
-  // Try Windows Native zero-copy TransmitFile
-  let ret = transmit_file(tcp_conn.fd(), path, offset, length)
+  // Kernel zero-copy only exists for plaintext TCP; TLS connections always
+  // take the bounded-buffer path (D-05 / T-017, no kTLS).
+  let ret = match transport {
+    Plain(tcp) => transmit_file(tcp.fd(), path, offset, length)
+    Encrypted(_) => -1
+  }
   if ret == 0 {
     return true
   }
@@ -403,12 +611,12 @@ async fn send_file_region(
     return false
   }
   // Fallback: bounded 64KB chunk streaming
-  send_file_region_bounded_buffer(tcp_conn, response, length)
+  send_file_region_bounded_buffer(transport, response, length)
 }
 
 ///|
 async fn send_file_region_bounded_buffer(
-  tcp_conn : @socket.Tcp,
+  transport : Transport,
   response : @root.Response,
   length : Int64,
 ) -> Bool {
@@ -425,8 +633,9 @@ async fn send_file_region_bounded_buffer(
     if bytes.length() == 0 {
       return false
     }
-    tcp_conn.write(bytes) catch {
-      _ => return false
+    let ok = transport.send(bytes)
+    if !ok {
+      return false
     }
     pos += bytes.length()
   }
@@ -435,7 +644,7 @@ async fn send_file_region_bounded_buffer(
 
 ///|
 async fn send_fallback_status(
-  tcp_conn : @socket.Tcp,
+  transport : Transport,
   status : Int,
   reason : String,
 ) -> Bool {
@@ -446,10 +655,5 @@ async fn send_fallback_status(
   buf.write_string("Content-Type: text/plain; charset=utf-8\r\n")
   buf.write_string("Connection: close\r\n\r\n")
   buf.write_string(body)
-  try {
-    tcp_conn.write(buf.to_string())
-    true
-  } catch {
-    _ => false
-  }
+  transport.send(buf.to_string())
 }

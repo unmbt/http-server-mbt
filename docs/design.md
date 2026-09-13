@@ -1,6 +1,6 @@
 # http-server-mbt 重构设计
 
-版本：4。日期：2026-09-10。更新托管生命周期、单进程高效 I/O，新增 D-17 文件变更和 D-18 故障注入/模糊测试；原量化性能计划撤出，编号保留。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
+版本：5。日期：2026-09-13。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；D-11 增补 TLS 归档进静态库传递依赖清单。版本 4 内容（托管生命周期、单进程高效 I/O、D-17 文件变更、D-18 故障注入/模糊测试，撤出量化性能计划）保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
 
 **实施前**：阅读 `moonbit-agent-guide`；Native FFI/C ABI 工作另须阅读 `moonbit-c-binding`，按本地工具链核实导出、所有权和链接能力。不要直接修改 `.mooncakes/` 中的依赖缓存。
 
@@ -277,7 +277,7 @@ Native C ABI 由库创建并管理内部 owner 线程，同一 runtime 的托管
 | Windows 独立包 | CRT 策略避免要求用户安装额外 redistributable；仅依赖目标系统自带 DLL；DLL 与宿主不能跨 CRT 交叉 free |
 | Docker min/full | 分别封装精简/完整 Linux 静态 CLI；默认 Distroless static nonroot 基础层，保留 scratch 变体；功能、标签与验收见 D-15 |
 
-TLS 选用静态链接的受支持 OpenSSL 3 稳定系列，T-002/T-012 固定具体补丁版本、源码哈希、构建选项和许可证，并验证三平台可链接性；不继承当前 async Unix 动态加载 OpenSSL 的实现。所需 provider 随库链接，不要求外部 provider 模块或系统 OpenSSL 配置。TLS 握手、证书/私钥/passphrase、上游 SNI、主机名与证书校验纳入测试；`secure=false` 仅在显式配置时关闭上游验证。
+TLS 选用源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0 子模块，Apache-2.0/GPL-2.0 双许可、采用 Apache-2.0），T-002/T-012 固定补丁版本、tarball SHA-256、最小化构建配置和许可证，并验证三平台可链接性；不继承当前 async Unix 动态加载 OpenSSL 的实现，也不要求用户安装任何 TLS 运行库。版本 5 变更理由（替代原 OpenSSL 3 决策，经用户 2026-09-13 确认）：源码随包经 moon native-stub 直接编译，无预编译产物与外部 `-l` 链接依赖（实测依赖包声明的 cc-link-flags 不传播到最终链接，moonbitlang/moon#1595）；PSA Crypto 为唯一加密 API 且 RNG 由 PSA 托管，无需 entropy/ctr_drbg 接线；组件更小、嵌入与三平台静态分发更可控。引入方式为 `scripts/vendor_tls.mbtx` 可复现引入：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 TLS/X.509/PSA 源码树（排除 net_sockets 等），对 `mbedtls_config.h` 追加托管 `#undef` 覆盖（禁用 NET/TIMING/FS_IO/ITS 文件/密钥存储/NV seed 等），证书过期检查所需 `MBEDTLS_HAVE_TIME_DATE` 保留；PSA `crypto_config.h` 的最小化裁剪由测试守护逐步收紧。socket 系统调用不进 C 层：TLS 经 `mbedtls_ssl_set_bio` 自定义回调桥接到 async 事件循环，WANT_READ/WANT_WRITE 映射为异步等待，PSA 初始化在进程内幂等执行一次。TLS 握手、证书/私钥/passphrase、上游 SNI、主机名与证书校验纳入测试；`secure=false` 仅在显式配置时关闭上游验证。
 
 完整包内嵌有来源/版本记录的信任根 bundle，支持显式 CA 配置覆盖；证书、私钥和站点文件属于部署数据，不是语言运行时依赖。精简包不携带 TLS 信任根。静态 Linux 的 DNS/localhost 与 IPv6 行为在最小环境实测，不能用“链接成功”证明无运行依赖。
 
@@ -344,7 +344,7 @@ T-002 验证路径为：固定支持 C 生成的工具链/编译模式 → 导�
 
 正式静态产物与动态库共用 C 头文件、hs_* 版本、错误码及 D-07 所有权；Linux/macOS 为 `.a`，Windows MSVC 为静态 `.lib`，MinGW 为 `.a`。Windows 的 DLL import library 必须使用明确的 import 名称，不能冒充真正静态 archive。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
 
-静态分发包包含引擎 archive、必要 runtime 对象及随包依赖 archives、同版头文件、target triple/CRT/PIC/构建特性/许可证与传递链接清单。可以是明确清单中的多个 archive，不承诺将一切塞入一个 .a；支持静态链接进 `.node`/其他共享对象的构建须包含适用的 PIC，不能仅把非 PIC 的 CLI 对象归档。
+静态分发包包含引擎 archive、必要 runtime 对象及随包依赖 archives、同版头文件、target triple/CRT/PIC/构建特性/许可证与传递链接清单。可以是明确清单中的多个 archive，不承诺将一切塞入一个 .a；支持静态链接进 `.node`/其他共享对象的构建须包含适用的 PIC，不能仅把非 PIC 的 CLI 对象归档。D-08 的 MbedTLS/TF-PSA-Crypto 以源码随包编译，其对象随引擎 archive 一并归档，不引入独立的预编译 TLS archive 条目；许可证与源码哈希进传递依赖清单。
 
 运行时初始化只能由桥接的受控入口执行，多个 engine 共享同一份已链接 runtime；静态与动态两种加载路径不能把对象相互传递。隐藏/隔离内部符号，避免宿主已有 MoonBit runtime 或其他 addon 引入第二份同名实现。库不携带 CLI main，不安装进程信号处理器或调用 exit；最终应用是否完全静态由其全部依赖及链接参数决定。N-13 必须在干净 C/Rust 消费项目验证，而非只检查 archive 中有符号。
 

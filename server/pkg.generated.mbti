@@ -8,6 +8,7 @@ import {
   "moonbitlang/core/ref",
   "unmbt/http-server-mbt",
   "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/tls",
 }
 
 // Values
@@ -26,6 +27,7 @@ pub struct Server {
   inner : @socket.TcpServer
   engine : @http-server-mbt.StaticEngine
   config : @core.Config
+  tls_acceptor : @tls.TlsAcceptor?
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int]

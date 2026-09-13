@@ -110,6 +110,9 @@ http-server-mbt [root] [选项]
 | `-d`, `--showDir` / `--no-showDir` | 是否在找不到 `index.html` 时展示美观的 HTML 目录文件列表 | 开启 (`true`) |
 | `--cors` | 启用 CORS 跨域支持，注入 `Access-Control-Allow-Origin` 等响应头 | 禁用 |
 | `-a`, `--auth <user:pass>` | 启用 HTTP Basic 认证（用户名与密码以冒号隔开） | 禁用 |
+| `--cert <file>` | TLS 证书链文件（PEM），配置后启用 HTTPS 服务（内置 MbedTLS 4.2.0） | 禁用 |
+| `--key <file>` | TLS 私钥文件（PEM） | 无 |
+| `--key-passphrase <pass>` | 加密私钥的口令（或 `TLS_KEY_PASSPHRASE` 环境变量） | 无 |
 | `-l`, `--log-ip` | 在控制台日志中记录访问客户端的 IP 地址 | 禁用 |
 | `-s`, `--silent` | 静默模式，关闭终端请求日志输出 | 禁用 |
 | `-h`, `--help` | 显示命令行帮助信息并退出 | - |

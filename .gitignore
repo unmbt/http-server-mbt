@@ -6,3 +6,4 @@ target
 .moonagent/
 /http-server/
 embedded_mod.mbt
+.zcode

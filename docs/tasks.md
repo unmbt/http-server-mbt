@@ -1,6 +1,6 @@
 # http-server-mbt 实施任务与测试迁移清单
 
-版本：4。日期：2026-09-10。更新默认托管生命周期与单进程高效 I/O，追加 T-033 文件变更、T-034 故障注入/模糊测试，T-024 撤出当前范围并保留编号。共保留 34 个任务编号，其中 33 项为当前实施范围，全部未完成；无实现/测试通过声明。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
+版本：5。日期：2026-09-13。随 design 版本 5 同步：TLS 后端改为源码 vendor 的 MbedTLS 4.2.0（D-08），T-002 补充 TLS 探针分项、T-012 进入进行中（Windows 分项）。共保留 34 个任务编号，其中 33 项为当前实施范围。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
 
 **实施前**：加载 `moonbit-agent-guide`；涉及 Native FFI/C ABI 时另须阅读 `moonbit-c-binding`，先验证所有权、C 桥接、导出/链接及内存检查方式。自动化驱动使用 `.mbtx`。
 
@@ -30,6 +30,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 验收：依据 D-11 实测生成 C、桥接、归档/链接、符号及静态 TLS；N-19 探针验证 C ABI 的库内 owner/通知/自动排空，以及 MoonBit 直接消费的合法异步上下文，不能把宿主托管对象跨 runtime 传递或退回手动轮询。三平台程序/Node/wasm-gc 实际装载运行；只交叉编译或只有 Windows 结果不算整体完成，不支持能力记录阻塞证据。
   - Linux 分项（2026-09-12，Fedora 44 x86_64，clang 22.1.8，Moon 0.1.20260904）：`moon check --target native` 0 错误 0 警告；`moon test --target native` 全量 169/169 通过；CLI 本机构建并真实运行（静态文件/Range/keep-alive/SIGTERM）。证据：[linux-baseline](linux-baseline.md)。
   - macOS 分项（2026-09-13）：kqueue 事件循环由 `moonbitlang/async@0.21.3` 提供、MoonBit 侧零改动，新增 `server/transmit_file_darwin.c`；本机无 macOS 硬件/SDK，探针编译与测试经 Actions macos-latest（arm64）runner 首跑全量通过（run 链接待补录）。证据：[macos-baseline](macos-baseline.md)。库导出与静态 TLS 链路仍未开始，总任务保持未勾选。
+  - Windows TLS 探针分项（2026-09-13，Windows x86_64，clang-cl 22.1.3（moon 工具链），Moon 0.1.20260904，依 D-08 版本 5）：确认 moon `native-stub` 支持包内子目录 C 源路径，`options("link": { "native": { "stub-cc-flags": ... } })` 生效，`-I` 与模块根相对路径三平台通用；mbedtls-4.2.0 官方 tarball（SHA-256 `2bed9d71…6ffea`）107 个 .c 编译归档零告警；最小桥完成 `psa_crypto_init`、PEM/DER 证书与 SEC1 私钥解析（注意 `mbedtls_pk_parse_key` 要求缓冲区 NUL 结尾）、内存回路完整 TLS 1.3 握手、应用数据双向交换与 close_notify，自测返回 0。vendor 固定化为 `scripts/vendor_tls.mbtx`（幂等，哈希校验、config 托管覆盖、moon.pkg 清单再生）。证据：`tls/`、`scripts/vendor_tls.mbtx`、探针记录（本节与 progress）。库导出/PIC/C 消费探针仍未开始，总任务保持未勾选。
 
 ### 阶段二：配置、协议和静态核心
 
@@ -71,9 +72,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 验收：Windows Native 验证完成。`moon check --target native` 0 错误、0 警告；`moon test --target native` 116/116 测试全部通过（0 失败、0 阻塞、0 句柄泄漏）。CLI 参数解析与预检拦截在 `cli_wbtest.mbt` 和 `cli_challenger_wbtest.mbt` 中经全矩阵验证，C031～C033、C041 核心参数映射与布尔参数不吞位置参数特性已完全覆盖；真实子进程生命周期与资源排空退出在 `server_challenger_m5_lifecycle_test.mbt` 中经真实套接字绑定与优雅停机验证。
   - 2026-09-13 增强：`--version`/`-v` 不再硬编码，构建期从 `moon.mod` 注入。`cmd/http-server-mbt/moon.pkg` 以 rule+dev_build 调用 `scripts/gen_version.mbtx` 生成包内 `generated_version.mbt`（提交入库、字节稳定，moon.mod 变更后任一 dev 命令自动重生成），cli.mbt 引用 `server_version` 常量；输出契约不变（仍为 `http-server-mbt <version>`）。证据（Windows Native，moon 0.1.20260904）：`moon check --target native` 0 错误（1 个既有 server 包 unused_package 警告，干净树复现一致，与本次无关）；cmd 包 28/28 测试通过；`moon build --target native --release` 后 `--version`/`-v` 实测输出 `0.1.5`，临时改 moon.mod 为 0.1.6 后自动重生成并实测输出 `0.1.6`，还原后恢复 0.1.5；CI 增加生成文件 `git diff --exit-code` 防漂移检查。全量 `moon test --target native` 168/169，唯一失败为 server 包句柄计数时序断言，干净树同样失败，与本次改动无关。
 
-- [ ] **T-012 静态链接 TLS** — 状态：未开始。需求：R-COMPAT、R-N02、R-SAFE；设计：D-05、D-08；依赖：T-002、T-003、T-004。
-  - 交付：非阻塞 TLS 适配、静态依赖、证书/passphrase、信任根/CA 配置、上游主机名验证。
-  - 验收：C039 的 HTTPS 前提、N-10/N-12；三平台不动态加载用户 OpenSSL，TLS 错误回收资源，正常验证与 secure=false 显式例外均测试。
+- [ ] **T-012 静态链接 TLS** — 状态：进行中（Windows 分项完成，TLS 后端依 D-08 版本 5 变更为 MbedTLS 4.2.0）。需求：R-COMPAT、R-N02、R-SAFE；设计：D-05、D-08；依赖：T-002、T-003、T-004。
+  - 交付：非阻塞 TLS 适配、静态依赖、证书/passphrase、信任根/CA 配置、上游主机名验证。实现路径：MbedTLS 4.2.0 源码 vendor（`tls/` 包 + `scripts/vendor_tls.mbtx`）；`tls` 包 C 桥（`mbedtls_ssl_set_bio` 自定义回调、有界环形缓冲、`psa_crypto_init` 幂等）与 `TlsAcceptor`/`TlsConn`（实现 `@io.Reader`/`@io.Writer`，服务端+客户端，WANT_READ/WANT_WRITE 映射异步等待）；async http parser 复制泛化（Apache-2.0 保留版权头）供 TLS 路径解析为 `@http.Request`；`server.mbt` 传输抽象（Plain/Tls），transmit_file 仅明文、TLS 走有界缓冲降级（D-05）；`core.Config` TLS 字段与 CLI `--cert/--key/--key-passphrase`，监听前预检（D-01）。
+  - 验收：C039 的 HTTPS 前提、N-10/N-12；三平台不动态加载用户 OpenSSL/TLS 库（Linux `readelf` 无第三方 DT_NEEDED、macOS/Windows 依赖清单），TLS 错误回收资源，正常验证与 secure=false 显式例外均测试。三平台分项齐备后方勾选总任务。
+  - Windows 分项（2026-09-13）：183/183 测试通过（既有 169 项零回归 + 新增 TLS 回环/失败矩阵/泄漏探针）；真实 HTTPS E2E 与 curl/OpenSSL 互操作（TLS 1.3 与 1.2、显式 CA 强校验、Range/HEAD/keep-alive/3MB 有界缓冲完整性）；300 请求压力句柄 143→143 零增长；预检失败（证书不配对/口令错误/缺口令）均不监听。覆盖缺口与证据详见 [progress §8](progress.md)。Linux/macOS 分项与 ASan 未完成，总任务保持未勾选。
 
 - [ ] **T-013 HTTP/HTTPS 代理与规则重写** — 状态：未开始。需求：R-COMPAT、R-SAFE；设计：D-03、D-05；依赖：T-006、T-010、T-012。
   - 交付：显式规则、proxy-all、静态未命中兜底、上游选项、路径重写与流式双向背压。

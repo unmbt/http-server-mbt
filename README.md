@@ -110,6 +110,9 @@ http-server-mbt [root] [options]
 | `-d`, `--showDir` / `--no-showDir` | Show HTML directory listings when no index file is present | Enabled (`true`) |
 | `--cors` | Enable CORS headers via `Access-Control-Allow-Origin` | Disabled |
 | `-a`, `--auth <user:pass>` | HTTP Basic Auth credentials | Disabled |
+| `--cert <file>` | TLS certificate chain file (PEM) — enables HTTPS serving (vendored MbedTLS 4.2.0) | Disabled |
+| `--key <file>` | TLS private key file (PEM) | None |
+| `--key-passphrase <pass>` | Passphrase for encrypted TLS keys (or `TLS_KEY_PASSPHRASE` env) | None |
 | `-l`, `--log-ip` | Log client IP address to terminal output | Disabled |
 | `-s`, `--silent` | Suppress log messages in terminal | Disabled |
 | `-h`, `--help` | Show command-line help and exit | - |

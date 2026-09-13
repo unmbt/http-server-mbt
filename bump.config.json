@@ -1,4 +1,4 @@
 {
-  "execute": "moon build --release",
+  "execute": "moon check",
   "all": true
 }

@@ -154,6 +154,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-030 Mooncakes 包与外部 MoonBit 消费** — 状态：未开始。需求：R-N11、R-N14；设计：D-02、D-07、D-13、D-14；依赖：T-015、T-016、T-019、T-029。
   - 交付：可发布的 `unmbt/http-server-mbt` 模块；根静态引擎、server 和 core 公共入口，版本/依赖/许可证及真实 repository 元数据，必要 native-stub/头文件/资源与经过编译的 README.mbt.md；干净独立消费模块和候选包资源清单。
   - 验收：N-16/N-19；三平台外部 MoonBit 模块分别验证配置 start/stop 服务，以及无监听异步静态请求/正文/关闭，公共接口无手动循环与裸句柄。GET/HEAD/Range、目录/Next/BaseURL/SPA 通过，根包不拉入完整 TLS/代理或 CLI/npm/C ABI 产物；core wasm-gc 正确隔离。候选包与发行后 registry 消费分别留证。
+  - CI 发版分项（2026-09-13）：ci.yml 参照 moon-bump 工作流新增 tag 触发的 `publish` job——三平台 build（含测试）通过后，`moon -q run cmd/http-server-mbt -- --version` 校验 tag 与 `moon.mod` 版本一致，写入 `MOONCAKES_CREDENTIALS` secret 后执行 `moon publish`；GitHub Release job（99cd99a 已有）保持不变，与 D-16「验证 job 不承担 registry 推送，发行 job 才拥有发布权限」一致。本机证据（Windows，moon 0.1.20260904）：`moon -q run cmd/http-server-mbt -- --version` 输出 `0.1.5` 且 `generated_version.mbt` 无漂移。repository 元数据按 D-14 补为真实地址（moon.mod 此前为空）。总任务保持未勾选：实际发行还需配置 MOONCAKES_CREDENTIALS secret，并完成候选包/registry 消费验收。
 
 ### 提前执行的 Windows 本机与 Actions 基础任务
 

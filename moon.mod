@@ -8,7 +8,7 @@ import {
 
 readme = "README.md"
 
-repository = ""
+repository = "https://github.com/unmbt/http-server-mbt"
 
 license = "MIT"
 

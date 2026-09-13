@@ -347,3 +347,118 @@ test "cli: parse_cache helper coverage" {
   assert_true(parse_cache("bad") is Err(_))
   assert_true(parse_cache("max-age=-1") is Err(_))
 }
+
+///|
+test "cli: default banner reproduces the original layout without colors" {
+  let config = @core.Config::default(".")
+  let banner = startup_banner(config, 8080, "0.1.5", ["192.168.1.5"], false)
+  inspect(
+    banner,
+    content=(
+      #|Starting up http-server, serving ./
+      #|
+      #|http-server version: 0.1.5
+      #|
+      #|http-server settings: 
+      #|COOP: disabled
+      #|CORS: disabled
+      #|Private Network Access: disabled
+      #|Cache: 3600 seconds
+      #|Connection Timeout: 120 seconds
+      #|Directory Listings: visible
+      #|AutoIndex: visible
+      #|Serve GZIP Files: false
+      #|Serve Brotli Files: false
+      #|Default File Extension: html
+      #|Base directory: /
+      #|
+      #|Available on:
+      #|  http://192.168.1.5:8080
+      #|  http://127.0.0.1:8080
+      #|Hit CTRL-C to stop the server
+      #|
+    ),
+  )
+}
+
+///|
+test "cli: banner wraps segments in ANSI colors like the original chalk output" {
+  let config = @core.Config::default(".")
+  let banner = startup_banner(config, 8080, "0.1.5", [], true)
+  assert_true(
+    banner.contains("\u{1b}[33mStarting up http-server, serving \u{1b}[39m"),
+  )
+  assert_true(banner.contains("\u{1b}[36m./\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[33m\nhttp-server version: \u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[36m0.1.5\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[33m\nhttp-server settings: \u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[31mdisabled\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[36mvisible\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[31mfalse\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[33m\nAvailable on:\u{1b}[39m"))
+  assert_true(banner.contains("\u{1b}[32m8080\u{1b}[39m"))
+  // The CTRL-C hint stays uncolored, like the original.
+  assert_true(banner.contains("\nHit CTRL-C to stop the server\n"))
+}
+
+///|
+test "cli: banner reflects the effective config values" {
+  let config = {
+    ..@core.Config::default("."),
+    cache_seconds: -1,
+    idle_timeout_ms: 0,
+    show_dir: false,
+    auto_index: false,
+    gzip: true,
+    brotli: true,
+    cors: true,
+    base_url: "/app",
+    default_ext: Some("html"),
+  }
+  let banner = startup_banner(config, 9000, "0.1.5", [], false)
+  assert_true(banner.contains("Cache: disabled"))
+  assert_true(banner.contains("Connection Timeout: disabled"))
+  assert_true(banner.contains("Directory Listings: not visible"))
+  assert_true(banner.contains("AutoIndex: not visible"))
+  assert_true(banner.contains("Serve GZIP Files: true"))
+  assert_true(banner.contains("Serve Brotli Files: true"))
+  assert_true(banner.contains("CORS: true"))
+  assert_true(banner.contains("Default File Extension: html"))
+  assert_true(banner.contains("Base directory: /app"))
+  // The base_url mount prefix is appended to every advertised address.
+  assert_true(banner.contains("  http://127.0.0.1:9000/app"))
+  assert_true(banner.contains("\nHit CTRL-C to stop the server\n"))
+}
+
+///|
+test "cli: banner lists loopback last and honors the root spelling" {
+  let config = @core.Config::default(".")
+  let banner = startup_banner(
+    config,
+    8080,
+    "0.1.5",
+    ["10.0.0.2", "10.0.0.1"],
+    false,
+  )
+  let available = "Available on:\n  http://10.0.0.2:8080\n  http://10.0.0.1:8080\n  http://127.0.0.1:8080\n"
+  assert_true(banner.contains(available))
+  assert_eq(display_root("."), "./")
+  assert_eq(display_root("public"), "public")
+  assert_eq(available_path_suffix("/"), "")
+  assert_eq(available_path_suffix("/app"), "/app")
+}
+
+///|
+test "cli: color enablement follows the chalk-style env rules" {
+  let none : Map[String, String] = Map([])
+  assert_true(colors_enabled_for(true, name => none.get(name)))
+  assert_false(colors_enabled_for(false, name => none.get(name)))
+  let no_color : Map[String, String] = { "NO_COLOR": "1" }
+  assert_false(colors_enabled_for(true, name => no_color.get(name)))
+  let force_on : Map[String, String] = { "FORCE_COLOR": "1" }
+  assert_true(colors_enabled_for(false, name => force_on.get(name)))
+  let force_off : Map[String, String] = { "FORCE_COLOR": "0" }
+  assert_false(colors_enabled_for(true, name => force_off.get(name)))
+  let dumb_term : Map[String, String] = { "TERM": "dumb" }
+  assert_false(colors_enabled_for(true, name => dumb_term.get(name)))
+}

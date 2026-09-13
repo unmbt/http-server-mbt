@@ -466,3 +466,11 @@ GitHub Actions YAML 与 Dockerfile 是工作流/构建声明格式，允许编�
 模糊测试包含 HTTP 字节流与随机分片、头部/URL/Range 边界、配置组合、状态机事件序列及 C ABI 合法生命周期内的边界输入。只在原版有定义的行为域作差分对照，AD 差异和新增契约由独立断言验证，不能把原版缺陷当作目标。真实平台测试补充 IOCP/epoll/kqueue、io_uring 可用环境及异步宿主关闭，模拟事件测试不能替代全部系统调用验证。
 
 保存输入语料、种子、调度事件、工具链/平台和最小复现；对失败案例最小化后加入固定回归集。PR 在三平台回放固定语料并运行有界探索，workflow_dispatch 可运行更长探索；运行预算只控制测试资源，不是产品性能指标。ASan/UBSan 或平台适用检查与模糊测试结合，超时/死锁、崩溃、泄漏及断言失败必须报失败，不把无法运行记录为通过。驱动和语料管理使用 `.mbtx`；底层可调用适用的编译器模糊测试工具。
+
+## D-19 CLI 启动横幅与停止提示
+
+CLI 在监听成功后按基线 `0d3b7bb` 的 `bin/http-server` listen 回调还原启动横幅：Starting up 行（黄色标签 + 青色根目录，显示层把默认根 `.` 写作原版的 `./`，D-01 规范化不变）、版本行、settings 块（COOP、CORS、Private Network Access、Cache、Connection Timeout、Directory Listings、AutoIndex、Serve GZIP Files、Serve Brotli Files、Default File Extension、Base directory，黄色标签；启用值青色、禁用/关闭值红色）、可选 Additional Headers 块（制表符缩进，黄色键 + 青色值）、Available on 地址列表（`http://IP:` 无色 + 绿色端口 + BaseURL 后缀；非回环 IPv4 按枚举顺序在前，127.0.0.1 最后对齐原版 Windows 枚举顺序）、无色的 `Hit CTRL-C to stop the server` 及尾部空行（请求日志间距）。settings 数值全部读取生效配置：Cache `-1` 显示 disabled，`idle_timeout_ms` 按整秒换算、0 显示 disabled，Default File Extension 按 D-01 默认显示 html（原版 CLI 默认 none，此差异随 D-01 记录）；原版 `argv.d`/`argv.i` 的原始真值判断在显式传参时显示反转（原版缺陷），本项目按 `show_dir`/`auto_index` 生效值显示 visible/not visible。IPv6 地址不展示：服务器绑定 IPv4 通配地址，展示 IPv6 会给出不可达链接。COOP/CORS/PNA 启用时显示 true 或自定义头值。网卡展示、横幅与停止提示属于 CLI 适配（D-01），静态引擎不打印。
+
+颜色开关近似原版 chalk/supports-color 语义：`FORCE_COLOR`（非 `0`/`false`）优先强制开启，其次非空 `NO_COLOR` 或 `TERM=dumb` 关闭，否则要求 stdout 为 TTY；TTY 检测由 native stub `http_server_cli_is_stdout_tty` 提供（POSIX `isatty(1)`，Windows `_isatty` 并对控制台启用 `ENABLE_VIRTUAL_TERMINAL_PROCESSING` 使 ANSI 转义在传统 conhost 可渲染）。ANSI 序列按 chalk 的 `\x1b[3xm ... \x1b[39m` 包裹各片段；非 TTY（重定向、管道、CI 捕获）输出纯文本，字节与原版禁色输出一致。silent 模式抑制横幅与停止提示，对齐原版空 logger；此前 silent 下动作回调立即返回导致服务器随即退出，属缺陷，现横幅可静默而服务持续运行。
+
+终止信号对齐原版 SIGINT/SIGTERM handler：`moonbitlang/async` 的全局取消信号（默认含 SIGINT/SIGTERM/SIGHUP/SIGBREAK）把终止转为主任务取消，取消路径打印红色 `http-server stopped.`（silent 时静默）后以退出码 0 结束，`with_server_at` 仍走停止排空；普通错误路径维持 stderr + 退出码 1。请求级访问日志（原版 `[GET] /path` 行）不属于本设计，仍由日志钩子任务承载。

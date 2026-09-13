@@ -67,18 +67,15 @@ async fn run() -> Unit {
   }
 
   @server.with_server_at(final_config, port, async fn(_server) {
-    if !final_config.silent {
-      println("Starting up http-server, serving \{final_config.root}")
-      println("Available on:")
-      println("  http://127.0.0.1:\{port}")
-      for ip in local_ips() {
-        println("  http://\{ip}:\{port}")
-      }
-      println("Hit CTRL-C to stop the server")
-    }
+    print_startup_banner(final_config, port)
     @async.sleep(2147483647)
   }) catch {
-    _ if @async.is_being_cancelled() => ()
+    _ if @async.is_being_cancelled() => {
+      if !final_config.silent {
+        println(red(colors_enabled(), "http-server stopped."))
+        flush_stdout()
+      }
+    }
     error => {
       eprint_err("server error: \{error}\n")
       runtime_native_exit(1)

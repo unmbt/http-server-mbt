@@ -23,5 +23,5 @@ dev_build(
 )
 
 options(
-  "native-stub": [ "local_ips.c" ],
+  "native-stub": [ "local_ips.c", "tty.c" ],
 )

@@ -35,8 +35,3 @@ test "local_ips ffi output only contains reportable unique addresses" {
     }
   }
 }
-
-///|
-test "TEMP debug dump local_ips" {
-  debug_inspect(local_ips(), content="")
-}

@@ -1,4 +1,4 @@
-# ADR-02: 选择 Mbed TLS 4.2 作为底层 TLS 引擎
+# ADR-01: 选择 Mbed TLS 4.2 作为底层 TLS 引擎
 
 ## 状态
 

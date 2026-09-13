@@ -38,7 +38,7 @@
      Produced executable `_build\native\release\build\cmd\http-server-mbt\http-server-mbt.exe`.
    - Release Binary Smoke Testing:
      - `-h` -> Usage help rendered, exit code 0.
-     - `-v` -> `http-server-mbt 0.1.5`, exit code 0.
+     - `-v` -> `0.1.5`, exit code 0.
      - `--invalid-flag` -> Stderr error, exit code 1.
      - `-p 99999` -> `error: invalid port '99999': port must be an integer between 1 and 65535`, exit code 1.
      - `./non_existent_folder_xyz` -> `error: root directory './non_existent_folder_xyz' does not exist or is not a directory`, exit code 1.

@@ -290,7 +290,7 @@ _build\native\release\build\cmd\http-server-mbt\http-server-mbt.exe -h
 
 # 2. Version flag test
 _build\native\release\build\cmd\http-server-mbt\http-server-mbt.exe -v
-# Expected: exit code 0, displays "http-server-mbt 0.1.5"
+# Expected: exit code 0, displays "0.1.5"
 
 # 3. Invalid port pre-flight rejection
 _build\native\release\build\cmd\http-server-mbt\http-server-mbt.exe -p 99999

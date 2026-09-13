@@ -18,7 +18,7 @@ Direct CLI executions yielded the following empirical measurements:
    - Output: Formatted usage string showing `Usage: http-server-mbt [options] [root]` and complete parameter listing (`-p`, `--base-url`, `--base-dir`, `--spa`, `--try-files`, `-i`, `-d`, `-c`, `-a`, `-l`, `-s`, `-h`, `-v`).
 2. **`-v` / `--version` (Version flag)**:
    - Exit Code: `0`
-   - Output: `http-server-mbt 0.1.5`
+   - Output: `0.1.5`
 3. **Unknown argument `--non-existent-flag`**:
    - Command: `http-server-mbt.exe --non-existent-flag`
    - Exit Code: `1`
@@ -80,7 +80,7 @@ Authored empirical stress tests in `server/server_challenger_m5_lifecycle_test.m
 1. **Pre-flight Error Safety (Observation 1.1 & 1.2)**:
    In `cmd/http-server-mbt/main.mbt`, CLI argument parsing (`parse_cli`), mutual exclusion validation, and root directory checks (`@fs.exists` and `@fs.kind == Directory`) occur strictly prior to calling `@server.with_server_at`. When any error condition is met, the process writes to `@stdio.stderr` and executes `runtime_native_exit(1)`. Empirical probes confirm that no listening socket is ever bound or opened when configuration errors occur.
 2. **Help and Version Transparency (Observation 1.1)**:
-   `-h` and `--help` render formatted help via `@argparse` and return normally with exit code 0. `-v` and `--version` emit `http-server-mbt 0.1.5` and return normally with exit code 0.
+   `-h` and `--help` render formatted help via `@argparse` and return normally with exit code 0. `-v` and `--version` emit `0.1.5` and return normally with exit code 0.
 3. **In-Flight Request Drain Correctness (Observation 1.3, Test 1 & 2)**:
    In `server/server.mbt`, `active_requests` tracks requests from the moment `read_request()` parses the HTTP header until `send_response` completes. `stop_and_drain` sets `self.stopped = true` (rejecting subsequent requests) and enters a wait loop bounded by `timeout_ms`. In-flight payloads (including 512KB zero-copy transfers) successfully drain to the client before socket closure.
 4. **Socket and Handle Cleanup (Observation 1.3, Test 4 & 5)**:

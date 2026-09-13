@@ -55,7 +55,7 @@
    - Created executable: `_build\native\release\build\cmd\http-server-mbt\http-server-mbt.exe`.
 6. CLI pre-flight validation smoke test results:
    - `-h` -> ExitCode: 0, help text to stdout.
-   - `-v` -> ExitCode: 0, `http-server-mbt 0.1.5` to stdout.
+   - `-v` -> ExitCode: 0, `0.1.5` to stdout.
    - `-p 0` -> ExitCode: 1, `error: invalid port '0': port must be an integer between 1 and 65535` to stderr.
    - `-p 99999` -> ExitCode: 1, `error: invalid port '99999': port must be an integer between 1 and 65535` to stderr.
    - `-p abc` -> ExitCode: 1, `error: invalid port 'abc': port must be an integer between 1 and 65535` to stderr.

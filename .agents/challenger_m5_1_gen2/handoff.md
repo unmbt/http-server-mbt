@@ -102,7 +102,7 @@
    - Help `-h` and `--help`:
      - Outputs standard help message to stdout, exit code: `0`.
    - Version `-v` and `--version`:
-     - Outputs `http-server-mbt 0.1.5` to stdout, exit code: `0`.
+     - Outputs `0.1.5` to stdout, exit code: `0`.
    - Live HTTP integration:
      - Basic launch: `GET /hello.txt` returned `HTTP 200 OK` with `hello moonbit`.
      - Basic Auth (`-a testuser:testpass`): unauthenticated request returned `HTTP 401 Unauthorized`; authenticated request returned `HTTP 200 OK`.

@@ -71,6 +71,9 @@ async fn run() -> Unit {
       println("Starting up http-server, serving \{final_config.root}")
       println("Available on:")
       println("  http://127.0.0.1:\{port}")
+      for ip in local_ips() {
+        println("  http://\{ip}:\{port}")
+      }
       println("Hit CTRL-C to stop the server")
     }
     @async.sleep(2147483647)

@@ -266,7 +266,7 @@ pub fn parse_cli(argv : ArrayView[String]) -> Result[CliAction, String] {
     return Ok(CliAction::Help(cmd.render_help()))
   }
   if matches.flags.get("version") == Some(true) {
-    return Ok(CliAction::Version("http-server-mbt 0.1.5"))
+    return Ok(CliAction::Version("0.1.5"))
   }
   // Parse & validate port (1..65535)
   // Resolve base-url & base-dir via @core.resolve_base_url

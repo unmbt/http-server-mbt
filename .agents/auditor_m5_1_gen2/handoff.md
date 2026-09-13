@@ -122,7 +122,7 @@
 
 4. **Empirical Release CLI Smoke Tests**:
    - `-h`: Exited with code 0, rendered full usage text to stdout.
-   - `-v`: Exited with code 0, rendered `"http-server-mbt 0.1.5"` to stdout.
+   - `-v`: Exited with code 0, rendered `"0.1.5"` to stdout.
    - `--invalid-option`: Exited with code 1, rendered `"error: unexpected argument '--invalid-option' found"` to stderr.
    - `-p 99999`: Exited with code 1, rendered `"error: invalid port '99999': port must be an integer between 1 and 65535"` to stderr.
    - `-p 0`: Exited with code 1, rendered `"error: invalid port '0': port must be an integer between 1 and 65535"` to stderr.

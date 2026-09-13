@@ -38,7 +38,7 @@
    - `moon build cmd/http-server-mbt --target native --release`: Clean compilation, produced executable.
    - Release CLI smoke tests:
      - `-h` -> Usage help displayed, exit code 0.
-     - `-v` -> Version `http-server-mbt 0.1.5` displayed, exit code 0.
+     - `-v` -> Version `0.1.5` displayed, exit code 0.
      - `--invalid-flag` -> Error message to stderr, exit code 1.
      - `-p 99999` -> Error message to stderr, exit code 1.
      - `./non_existent_folder_xyz` -> Error message to stderr, exit code 1.

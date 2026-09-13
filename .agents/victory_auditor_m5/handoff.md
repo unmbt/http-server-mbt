@@ -147,7 +147,7 @@ Direct invocations of the newly compiled release binary:
    - Output: Formatted usage string `Usage: http-server-mbt [options] [root]` detailing all options.
    - Exit code: `0`.
 2. Version flag (`.\http-server-mbt.exe -v`):
-   - Output: `http-server-mbt 0.1.5`
+   - Output: `0.1.5`
    - Exit code: `0`.
 3. Out-of-bounds port (`.\http-server-mbt.exe -p 99999`):
    - Stderr: `error: invalid port '99999': port must be an integer between 1 and 65535`

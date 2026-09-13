@@ -6,6 +6,7 @@ import {
   "moonbitlang/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/argparse",
+  "moonbitlang/core/encoding/utf8",
 }
 
 pkgtype(kind: "executable")
@@ -19,4 +20,8 @@ dev_build(
   rule: "gen_version",
   input: "../../moon.mod",
   output: "generated_version.mbt",
+)
+
+options(
+  "native-stub": [ "local_ips.c" ],
 )

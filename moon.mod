@@ -11,3 +11,5 @@ readme = "README.md"
 repository = ""
 
 license = "MIT"
+
+preferred_target = "native"

@@ -1,6 +1,6 @@
 {
   "name": "@unmbt/http-server-mbt-win32-x64-msvc",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Windows x86_64 prebuilt native binary for @unmbt/http-server-mbt",
   "main": "http_server.win32-x64-msvc.node",
   "files": [

@@ -1,6 +1,6 @@
 {
   "name": "@unmbt/http-server-mbt-darwin-arm64",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "macOS ARM64 (Apple Silicon) prebuilt native binary for @unmbt/http-server-mbt",
   "main": "http_server.darwin-arm64.node",
   "files": [

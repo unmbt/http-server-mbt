@@ -81,12 +81,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          EXE_EXT="${{ matrix.exe_ext }}"
-          FULL_BIN="_build/native/release/build/cmd/http-server-mbt/http-server-mbt${EXE_EXT}"
-          THIN_BIN="_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin${EXE_EXT}"
 
-          test -f "$FULL_BIN"
-          test -f "$THIN_BIN"
+          # MoonBit native currently outputs .exe on all platforms (Windows/Linux/macOS).
+          # resolve_bin transparently finds either <bin>.exe or <bin> to prevent platform drift.
+          resolve_bin() {
+            local target="$1"
+            if [ -f "${target}.exe" ]; then
+              echo "${target}.exe"
+            elif [ -f "${target}" ]; then
+              echo "${target}"
+            else
+              echo "Error: binary not found at '${target}.exe' or '${target}'" >&2
+              return 1
+            fi
+          }
+
+          FULL_BIN="$(resolve_bin "_build/native/release/build/cmd/http-server-mbt/http-server-mbt")"
+          THIN_BIN="$(resolve_bin "_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin")"
 
           chmod +x "$FULL_BIN" "$THIN_BIN" || true
 
@@ -123,8 +134,24 @@ jobs:
           mkdir -p release-cli
           EXE_EXT="${{ matrix.exe_ext }}"
           PLATFORM="${{ matrix.platform }}"
-          cp "_build/native/release/build/cmd/http-server-mbt/http-server-mbt${EXE_EXT}" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
-          cp "_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin${EXE_EXT}" "release-cli/http-server-mbt-thin-${PLATFORM}${EXE_EXT}"
+
+          resolve_bin() {
+            local target="$1"
+            if [ -f "${target}.exe" ]; then
+              echo "${target}.exe"
+            elif [ -f "${target}" ]; then
+              echo "${target}"
+            else
+              echo "Error: binary not found at '${target}.exe' or '${target}'" >&2
+              return 1
+            fi
+          }
+
+          FULL_SRC="$(resolve_bin "_build/native/release/build/cmd/http-server-mbt/http-server-mbt")"
+          THIN_SRC="$(resolve_bin "_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin")"
+
+          cp "$FULL_SRC" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
+          cp "$THIN_SRC" "release-cli/http-server-mbt-thin-${PLATFORM}${EXE_EXT}"
           chmod +x release-cli/* || true
 
       - name: Upload Artifacts

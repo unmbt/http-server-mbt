@@ -57,14 +57,14 @@ jobs:
         run: git config --global core.autocrlf false
 
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
 
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
@@ -74,10 +74,10 @@ jobs:
       - name: Build and Verify C ABI Libraries (min & full)
         run: moon run scripts/build_cabi.mbtx
 
-      - name: Setup Node.js (v22 LTS)
-        uses: actions/setup-node@v4
+      - name: Setup Node.js (v24 LTS)
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Build Node-API Native Module (full)
         run: moon run scripts/build_node.mbtx
@@ -86,7 +86,7 @@ jobs:
         run: node npm/test/index.test.js
 
       - name: Upload Node-API Binary Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-binary-${{ matrix.npm_dir }}
           path: npm/${{ matrix.npm_dir }}/${{ matrix.node_file }}
@@ -132,7 +132,7 @@ jobs:
           ls -la "$RELEASE_DIR"
 
       - name: Upload C ABI Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cabi-${{ matrix.platform }}
           path: release-cabi/
@@ -148,28 +148,28 @@ jobs:
       id-token: write # Required for npm provenance / Trusted Publishing
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
       - name: Download win32-x64-msvc binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: node-binary-win32-x64-msvc
           path: npm/win32-x64-msvc
 
       - name: Download linux-x64-gnu binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: node-binary-linux-x64-gnu
           path: npm/linux-x64-gnu
 
       - name: Download darwin-arm64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: node-binary-darwin-arm64
           path: npm/darwin-arm64
@@ -242,14 +242,14 @@ jobs:
       contents: write
     steps:
       - name: Download all C ABI artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: cabi-*
           path: artifacts
           merge-multiple: true
 
       - name: Release C ABI SDK
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
           generate_release_notes: true

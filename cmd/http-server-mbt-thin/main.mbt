@@ -52,9 +52,11 @@ async fn run() -> Unit {
   }
 
   // Verify final_config.root exists and is a directory
-  let exists = @fs.exists(final_config.root)
+  let exists = @fs.exists(final_config.root) catch { _ => false }
   let is_dir = if exists {
-    @fs.kind(final_config.root) == Directory
+    try @fs.kind(final_config.root) == Directory catch {
+      _ => false
+    }
   } else {
     false
   }
@@ -66,8 +68,8 @@ async fn run() -> Unit {
     return
   }
 
-  // Full build uses @full.with_server_at, which injects TLS when configured
-  @full.with_server_at(final_config, port, async fn(_server) {
+  // Thin build runs standard plain HTTP server (0 crypto/TLS/proxy dependencies)
+  @server.with_server_at(final_config, port, async fn(_server) {
     print_startup_banner(final_config, port)
     @async.sleep(2147483647)
   }) catch {

@@ -46,6 +46,10 @@ pub fn is_text_mime(String) -> Bool
 
 pub fn match_and_strip_base_url(String, String) -> String?
 
+pub fn match_glob_path(String, String) -> Bool
+
+pub fn match_proxy_rule(ProxyRule, String) -> (String, String)?
+
 pub fn normalize_base_url(String) -> String raise ConfigError
 
 pub fn normalize_charset(String) -> String
@@ -158,6 +162,7 @@ pub(all) struct Config {
   proxy_all : String?
   proxy_options : Map[String, String]
   websocket : Bool
+  proxy_config : String?
   cert_file : String?
   key_file : String?
   key_passphrase : String?
@@ -209,6 +214,12 @@ pub fn MimeRegistry::new() -> Self
 pub fn MimeRegistry::register(Self, String, String) -> Unit
 pub fn MimeRegistry::set(Self, String, String) -> Unit
 pub fn MimeRegistry::set_all(Self, Map[String, String]) -> Unit
+
+pub(all) struct ProxyRule {
+  pattern : String
+  target : String
+  path_rewrite : Array[(String, String)]
+} derive(Eq, @debug.Debug)
 
 pub(all) enum RangeResult {
   Satisfiable(ByteRange)

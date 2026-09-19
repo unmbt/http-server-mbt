@@ -66,6 +66,11 @@ pub fn build_command() -> @argparse.Command {
         long="silent",
         about="Suppress log messages",
       ),
+      @argparse.FlagArg(
+        "proxy-all",
+        long="proxy-all",
+        about="Proxy all requests (bypasses local static files)",
+      ),
     ],
     options=[
       @argparse.OptionArg(
@@ -114,6 +119,17 @@ pub fn build_command() -> @argparse.Command {
         long="key-passphrase",
         env="TLS_KEY_PASSPHRASE",
         about="Passphrase for encrypted TLS private keys",
+      ),
+      @argparse.OptionArg(
+        "proxy",
+        short='P',
+        long="proxy",
+        about="Fallback proxy URL for unhandled requests",
+      ),
+      @argparse.OptionArg(
+        "proxy-config",
+        long="proxy-config",
+        about="Proxy config file with route matching rules",
       ),
     ],
     positionals=[
@@ -323,7 +339,16 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   let key_file = first_value(matches, "key")
   let key_passphrase = first_value(matches, "key-passphrase")
 
-  // 11. Construct Config
+  // 11. Proxy arguments
+  let proxy = first_value(matches, "proxy")
+  let proxy_all_flag = matches.flags.get("proxy-all").unwrap_or(false)
+  if proxy_all_flag && proxy is None {
+    return Err("--proxy-all requires --proxy to be configured")
+  }
+  let proxy_all = if proxy_all_flag { proxy } else { None }
+  let proxy_config = first_value(matches, "proxy-config")
+
+  // 12. Construct Config
   let mut config = @core.Config::default(root)
   config = {
     ..config,
@@ -342,9 +367,12 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     cert_file,
     key_file,
     key_passphrase,
+    proxy,
+    proxy_all,
+    proxy_config,
   }
 
-  // 12. Core Validation
+  // 13. Core Validation
   config.validate() catch {
     err => return Err(err.to_string())
   }

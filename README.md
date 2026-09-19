@@ -65,9 +65,9 @@ The recommended installation method is using the MoonBit package manager to comp
 moon install unmbt/http-server-mbt/cmd/http-server-mbt
 http-server-mbt -v
 
-# Or Min version (pure MoonBit static server, zero crypto C dependencies)
-moon install unmbt/http-server-mbt/cmd/http-server-min
-http-server-min -v
+# Or Thin version (pure MoonBit static server, zero crypto and zero proxy dependencies)
+moon install unmbt/http-server-mbt/cmd/http-server-mbt-thin
+http-server-mbt-thin -v
 ```
 
 `moon install` places the executable in `~/.moon/bin`. Make sure that directory is included in your `PATH`.
@@ -77,8 +77,8 @@ http-server-min -v
 If you prefer not to build from source, use the installation script for your system to download the standalone executable directly from the latest GitHub Release:
 
 Two editions are available:
-- **Full (Default)**: Full-featured static server with TLS 1.2/1.3 (HTTPS) via embedded MbedTLS and reverse/WebSocket proxy.
-- **Min**: Pure MoonBit static server with zero C crypto dependencies (~30% smaller binary size).
+- **Full (Default)**: Full-featured static server with TLS 1.2/1.3 (HTTPS) via embedded MbedTLS and reverse/WebSocket proxy (`http-server-mbt`).
+- **Thin**: Pure MoonBit static server with zero C crypto or proxy dependencies (~30% smaller binary size, `http-server-mbt-thin`).
 
 #### Linux & macOS
 
@@ -86,8 +86,8 @@ Two editions are available:
 # Full version (Default)
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
 
-# Min version (Lightweight zero-crypto variant)
-curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --min
+# Thin version (Lightweight zero-crypto variant)
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --thin
 ```
 
 #### Windows (PowerShell)
@@ -96,11 +96,11 @@ curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/script
 # Full version (Default)
 irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
 
-# Min version (Lightweight zero-crypto variant)
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Min
+# Thin version (Lightweight zero-crypto variant)
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Thin
 ```
 
-> **Note**: Pre-compiled binary scripts install to `~/.unmbt` (or `$HOME\.unmbt`) and automatically configure your `PATH`. Both editions install the primary executable as `http-server-mbt` (installing with `--min` / `-Min` also creates an `http-server-min` symlink/copy). Restart your terminal for `PATH` updates to take effect.
+> **Note**: Pre-compiled binary scripts install to `~/.unmbt` (or `$HOME\.unmbt`) and automatically configure your `PATH`. Both editions install the primary executable as `http-server-mbt` (installing with `--thin` / `-Thin` also creates an `http-server-mbt-thin` symlink/copy). Restart your terminal for `PATH` updates to take effect.
 
 #### C ABI SDK for Native Embedding
 
@@ -131,6 +131,9 @@ http-server-mbt [root] [options]
 | `-d`, `--showDir` / `--no-showDir` | Show HTML directory listings when no index file is present | Enabled (`true`) |
 | `--cors` | Enable CORS headers via `Access-Control-Allow-Origin` | Disabled |
 | `-a`, `--auth <user:pass>` | HTTP Basic Auth credentials | Disabled |
+| `-P`, `--proxy <url>` | Fallback proxy URL for unhandled requests | Disabled |
+| `--proxy-all <url>` | Proxy all incoming requests unconditionally to target URL | Disabled |
+| `--proxy-config <file>` | JSON route-based proxy configuration file or inline JSON | Disabled |
 | `--cert <file>` | TLS certificate chain file (PEM) — enables HTTPS serving (vendored MbedTLS 4.2.0) | Disabled |
 | `--key <file>` | TLS private key file (PEM) | None |
 | `--key-passphrase <pass>` | Passphrase for encrypted TLS keys (or `TLS_KEY_PASSPHRASE` env) | None |

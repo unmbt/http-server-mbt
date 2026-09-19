@@ -1,0 +1,131 @@
+name: C ABI Libraries (Matrix CI)
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cabi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix-build:
+    name: ${{ matrix.os_name }} (${{ matrix.arch }}) · C ABI Libraries
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_name: Windows
+            arch: x86_64
+            platform: windows-amd64
+          - os: ubuntu-latest
+            os_name: Linux
+            arch: x86_64
+            platform: linux-amd64
+          - os: macos-latest
+            os_name: macOS
+            arch: arm64
+            platform: macos-arm64
+
+    steps:
+      - name: Disable Git EOL conversion
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MoonBit
+        uses: hustcer/setup-moonbit@v1
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Update Registry & Dependencies
+        run: moon update
+
+      - name: Build and Verify C ABI Libraries (min & full)
+        run: moon run scripts/build_cabi.mbtx
+
+      - name: Prepare C ABI SDK Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="release-cabi"
+          SDK_DIR="cabi-sdk"
+          rm -rf "$RELEASE_DIR" "$SDK_DIR"
+          mkdir -p "$RELEASE_DIR" "$SDK_DIR/include" "$SDK_DIR/lib"
+
+          PLATFORM="${{ matrix.platform }}"
+
+          # C ABI SDK (header + libraries)
+          cp "target/cabi/include/http_server.h" "$SDK_DIR/include/"
+
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/cabi/hs_min.dll "$SDK_DIR/lib/"
+            cp target/cabi/hs_min.lib "$SDK_DIR/lib/"
+            cp target/cabi/hs_min_static.lib "$SDK_DIR/lib/"
+            cp target/cabi/hs_full.dll "$SDK_DIR/lib/"
+            cp target/cabi/hs_full.lib "$SDK_DIR/lib/"
+            cp target/cabi/hs_full_static.lib "$SDK_DIR/lib/"
+            tar -acf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.zip" -C "$SDK_DIR" include lib
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            cp target/cabi/libhs_min.dylib "$SDK_DIR/lib/"
+            cp target/cabi/libhs_min.a "$SDK_DIR/lib/"
+            cp target/cabi/libhs_full.dylib "$SDK_DIR/lib/"
+            cp target/cabi/libhs_full.a "$SDK_DIR/lib/"
+            tar -czf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.tar.gz" -C "$SDK_DIR" include lib
+          else
+            cp target/cabi/libhs_min.so "$SDK_DIR/lib/"
+            cp target/cabi/libhs_min.a "$SDK_DIR/lib/"
+            cp target/cabi/libhs_full.so "$SDK_DIR/lib/"
+            cp target/cabi/libhs_full.a "$SDK_DIR/lib/"
+            tar -czf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.tar.gz" -C "$SDK_DIR" include lib
+          fi
+
+          echo "=== C ABI Assets Ready ==="
+          ls -la "$RELEASE_DIR"
+
+      - name: Upload C ABI Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cabi-${{ matrix.platform }}
+          path: release-cabi/
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release (C ABI)
+    needs: matrix-build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all C ABI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cabi-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Release C ABI SDK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

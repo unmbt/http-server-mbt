@@ -6,6 +6,7 @@ import {
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
   "moonbitlang/async/types",
+  "moonbitlang/core/debug",
   "moonbitlang/core/ref",
   "unmbt/http-server-mbt",
   "unmbt/http-server-mbt/core",
@@ -13,6 +14,14 @@ import {
 
 // Values
 pub fn get_handle_count() -> UInt
+
+pub async fn load_proxy_rules(String?) -> Array[@core.ProxyRule]
+
+pub fn parse_proxy_rules(String) -> Array[@core.ProxyRule]
+
+pub fn parse_target_url(String) -> TargetUrl?
+
+pub async fn proxy_http_request(Server, Transport, @core.Method, Map[String, String], String, String) -> Bool
 
 pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
 
@@ -34,6 +43,7 @@ pub struct Server {
   engine : @http-server-mbt.StaticEngine
   config : @core.Config
   acceptor : &Acceptor
+  proxy_rules : Array[@core.ProxyRule]
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int]
@@ -43,9 +53,17 @@ pub fn Server::active_request_count(Self) -> Int
 pub fn Server::config(Self) -> @core.Config
 pub fn Server::engine(Self) -> @http-server-mbt.StaticEngine
 pub fn Server::has_upgrade_capability(Self) -> Bool
+pub fn Server::match_proxy_rule(Self, String) -> (String, String)?
 pub fn Server::port(Self) -> Int
 pub fn Server::stop(Self) -> Unit
 pub async fn Server::stop_and_drain(Self, timeout_ms? : Int) -> Unit
+
+pub struct TargetUrl {
+  scheme : String
+  host : String
+  port : Int
+  base_path : String
+} derive(Eq, @debug.Debug)
 
 pub struct Transport {
   reader : &@io.Reader

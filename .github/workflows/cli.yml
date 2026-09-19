@@ -1,4 +1,4 @@
-name: Build and Release
+name: CLI (Matrix CI)
 
 on:
   push:
@@ -9,28 +9,39 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: ${{ matrix.os_name }} (${{ matrix.arch }}) · CLI
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # macOS arm64 enabled by the T-002/T-017 macOS sub-deliverables
-          # (D-16): kqueue event loop from moonbitlang/async + Darwin
-          # sendfile zero-copy backend (server/transmit_file_darwin.c).
-          - os: macos-latest
-            platform: macos-arm64
-            exe_ext: ""
-          # Linux x86_64 enabled by T-032 Linux sub-deliverable (D-16):
-          # native check/test + artifact.
-          - os: ubuntu-latest
-            platform: linux-amd64
-            exe_ext: ""
           - os: windows-latest
+            os_name: Windows
+            arch: x86_64
             platform: windows-amd64
             exe_ext: ".exe"
+          - os: ubuntu-latest
+            os_name: Linux
+            arch: x86_64
+            platform: linux-amd64
+            exe_ext: ""
+          - os: macos-latest
+            os_name: macOS
+            arch: arm64
+            platform: macos-arm64
+            exe_ext: ""
 
     steps:
       - name: Disable Git EOL conversion
@@ -57,30 +68,63 @@ jobs:
       - name: Update Registry & Dependencies
         run: moon update
 
-      - name: Test
+      - name: Check (native)
+        run: moon check --target native
+
+      - name: Test (native)
         run: moon test --target native
 
-      - name: Build Release
-        run: moon build --target native --release
+      - name: Build Release (native)
+        run: moon build cmd/http-server-mbt cmd/http-server-mbt-thin --target native --release
 
-      # The dev_build rule regenerates cmd/http-server-mbt/generated_version.mbt
-      # from moon.mod; the committed copy must match or the version bumped
-      # without regenerating would silently drift.
+      - name: Smoke-test CLI variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXE_EXT="${{ matrix.exe_ext }}"
+          FULL_BIN="_build/native/release/build/cmd/http-server-mbt/http-server-mbt${EXE_EXT}"
+          THIN_BIN="_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin${EXE_EXT}"
+
+          test -f "$FULL_BIN"
+          test -f "$THIN_BIN"
+
+          chmod +x "$FULL_BIN" "$THIN_BIN" || true
+
+          # 1. Verify versions
+          "$FULL_BIN" --version
+          "$THIN_BIN" --version
+
+          # 2. Thin CLI parameter rejection test (strictly exit code 1)
+          for flag in "--cert cert.pem" "--key key.pem" "--key-passphrase pass" "-P" "--proxy http://127.0.0.1:3000" "--proxy-all" "--proxy-config proxy.json"; do
+            set +e
+            "$THIN_BIN" $flag 2>/dev/null
+            exit_code=$?
+            set -e
+            if [ $exit_code -eq 0 ]; then
+              echo "Error: http-server-mbt-thin accepted unsupported flag: $flag"
+              exit 1
+            fi
+          done
+
+          # 3. Full CLI help and proxy options
+          "$FULL_BIN" --help
+          "$THIN_BIN" --help
+
       - name: Verify generated version file is in sync
         shell: bash
         run: |
           set -euo pipefail
           git diff --exit-code cmd/http-server-mbt/generated_version.mbt
 
-      - name: Prepare Artifacts (Full & Min CLI)
+      - name: Prepare Artifacts (Full & Thin CLI)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p release-cli
           EXE_EXT="${{ matrix.exe_ext }}"
           PLATFORM="${{ matrix.platform }}"
-          cp "_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
-          cp "_build/native/release/build/cmd/http-server-min/http-server-min.exe" "release-cli/http-server-min-${PLATFORM}${EXE_EXT}"
+          cp "_build/native/release/build/cmd/http-server-mbt/http-server-mbt${EXE_EXT}" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
+          cp "_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin${EXE_EXT}" "release-cli/http-server-mbt-thin-${PLATFORM}${EXE_EXT}"
           chmod +x release-cli/* || true
 
       - name: Upload Artifacts
@@ -133,21 +177,21 @@ jobs:
         run: moon publish
 
   release:
-    name: Create GitHub Release
+    name: Create GitHub Release (CLI)
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download all CLI artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: cli-*
           path: artifacts
           merge-multiple: true
 
-      - name: Release
+      - name: Release CLI Binaries
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*

@@ -462,3 +462,40 @@ test "cli: color enablement follows the chalk-style env rules" {
   let dumb_term : Map[String, String] = { "TERM": "dumb" }
   assert_false(colors_enabled_for(true, name => dumb_term.get(name)))
 }
+
+///|
+test "cli: accepts --proxy and -P" {
+  let res1 = parse_cli(["--proxy", "http://127.0.0.1:3000"])
+  match res1 {
+    Ok(Run(config, _port)) =>
+      assert_eq(config.proxy, Some("http://127.0.0.1:3000"))
+    _ => fail("expected Ok(Run) with --proxy")
+  }
+  let res2 = parse_cli(["-P", "http://127.0.0.1:4000"])
+  match res2 {
+    Ok(Run(config, _port)) =>
+      assert_eq(config.proxy, Some("http://127.0.0.1:4000"))
+    _ => fail("expected Ok(Run) with -P")
+  }
+}
+
+///|
+test "cli: accepts --proxy-all" {
+  let res = parse_cli(["--proxy", "http://127.0.0.1:3000", "--proxy-all"])
+  match res {
+    Ok(Run(config, _port)) => {
+      assert_eq(config.proxy, Some("http://127.0.0.1:3000"))
+      assert_eq(config.proxy_all, Some("http://127.0.0.1:3000"))
+    }
+    _ => fail("expected Ok(Run) with proxy-all")
+  }
+}
+
+///|
+test "cli: accepts --proxy-config" {
+  let res = parse_cli(["--proxy-config", "proxy.json"])
+  match res {
+    Ok(Run(config, _port)) => assert_eq(config.proxy_config, Some("proxy.json"))
+    _ => fail("expected Ok(Run) with proxy-config")
+  }
+}

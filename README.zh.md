@@ -65,9 +65,9 @@
 moon install unmbt/http-server-mbt/cmd/http-server-mbt
 http-server-mbt -v
 
-# 或 精简版（纯 MoonBit 静态托管，零 C 密码学依赖）
-moon install unmbt/http-server-mbt/cmd/http-server-min
-http-server-min -v
+# 或 Thin 版（纯 MoonBit 静态托管，零 C 密码学与零代理依赖）
+moon install unmbt/http-server-mbt/cmd/http-server-mbt-thin
+http-server-mbt-thin -v
 ```
 
 `moon install` 会将可执行文件安装到 `~/.moon/bin`。请确保该目录已加入 `PATH`。
@@ -77,8 +77,8 @@ http-server-min -v
 如果不希望从源码构建，可使用对应系统的安装脚本直接从最新的 GitHub Release 下载独立可执行程序：
 
 提供两种独立 CLI 二进制版本：
-- **Full（完整版，默认）**：包含完整静态文件托管、内置 MbedTLS 的 TLS 1.2/1.3 (HTTPS) 加密以及 HTTP/WebSocket 全双工反向代理。
-- **Min（精简版）**：零 C 密码学依赖，纯 MoonBit 静态文件托管，体积减少约 30%。
+- **Full（完整版，默认）**：包含完整静态文件托管、内置 MbedTLS 的 TLS 1.2/1.3 (HTTPS) 加密以及 HTTP/WebSocket 全双工反向代理（`http-server-mbt`）。
+- **Thin（精简版）**：零 C 密码学依赖，零反向代理网络依赖，纯 MoonBit 静态文件托管，体积减少约 30%（`http-server-mbt-thin`）。
 
 #### Linux & macOS
 
@@ -86,8 +86,8 @@ http-server-min -v
 # 完整版（默认）
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
 
-# 精简版（轻量零密码学依赖）
-curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --min
+# Thin 版（轻量零密码学依赖）
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --thin
 ```
 
 #### Windows (PowerShell)
@@ -96,11 +96,11 @@ curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/script
 # 完整版（默认）
 irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
 
-# 精简版（轻量零密码学依赖）
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Min
+# Thin 版（轻量零密码学依赖）
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Thin
 ```
 
-> **注意**：预编译二进制安装脚本会将文件安装到 `~/.unmbt`（Windows 下为 `$HOME\.unmbt`），并将该目录加入 `PATH`。无论安装哪个版本，主执行程序均命名为 `http-server-mbt`（选择 `--min` / `-Min` 时还会额外创建 `http-server-min` 软链接或副本）。安装完成后可能需要重启终端以使环境变量生效。
+> **注意**：预编译二进制安装脚本会将文件安装到 `~/.unmbt`（Windows 下为 `$HOME\.unmbt`），并将该目录加入 `PATH`。无论安装哪个版本，主执行程序均命名为 `http-server-mbt`（选择 `--thin` / `-Thin` 时还会额外创建 `http-server-mbt-thin` 软链接或副本）。安装完成后可能需要重启终端以使环境变量生效。
 
 #### 嵌入式 C ABI SDK
 
@@ -131,6 +131,9 @@ http-server-mbt [root] [选项]
 | `-d`, `--showDir` / `--no-showDir` | 是否在找不到 `index.html` 时展示美观的 HTML 目录文件列表 | 开启 (`true`) |
 | `--cors` | 启用 CORS 跨域支持，注入 `Access-Control-Allow-Origin` 等响应头 | 禁用 |
 | `-a`, `--auth <user:pass>` | 启用 HTTP Basic 认证（用户名与密码以冒号隔开） | 禁用 |
+| `-P`, `--proxy <url>` | 未命中静态文件时的备用反向代理目标 URL | 禁用 |
+| `--proxy-all <url>` | 将所有传入请求无条件代理转发到目标 URL | 禁用 |
+| `--proxy-config <file>` | 路由级反向代理规则配置文件路径或内联 JSON | 禁用 |
 | `--cert <file>` | TLS 证书链文件（PEM），配置后启用 HTTPS 服务（内置 MbedTLS 4.2.0） | 禁用 |
 | `--key <file>` | TLS 私钥文件（PEM） | 无 |
 | `--key-passphrase <pass>` | 加密私钥的口令（或 `TLS_KEY_PASSPHRASE` 环境变量） | 无 |

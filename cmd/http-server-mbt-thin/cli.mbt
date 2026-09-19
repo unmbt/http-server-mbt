@@ -25,8 +25,8 @@ pub impl Show for CliAction with fn output(self, logger) {
 /// Build the declarative command specification using `@argparse`.
 pub fn build_command() -> @argparse.Command {
   @argparse.Command(
-    "http-server-full",
-    about="Windows Native full static HTTP/HTTPS server with TLS and Proxy support",
+    "http-server-mbt-thin",
+    about="Windows Native minimal static HTTP server (zero crypto/TLS/proxy dependencies)",
     version="\{server_version}",
     disable_help_flag=true,
     disable_version_flag=true,
@@ -69,7 +69,7 @@ pub fn build_command() -> @argparse.Command {
       @argparse.FlagArg(
         "proxy-all",
         long="proxy-all",
-        about="Proxy all requests (bypasses local static files)",
+        about="[Unsupported in min build] Proxy all requests",
       ),
     ],
     options=[
@@ -111,25 +111,29 @@ pub fn build_command() -> @argparse.Command {
       @argparse.OptionArg(
         "cert",
         long="cert",
-        about="TLS certificate chain file (PEM) — enables HTTPS",
+        about="[Unsupported in min build] TLS certificate chain file (PEM)",
       ),
-      @argparse.OptionArg("key", long="key", about="TLS private key file (PEM)"),
+      @argparse.OptionArg(
+        "key",
+        long="key",
+        about="[Unsupported in min build] TLS private key file (PEM)",
+      ),
       @argparse.OptionArg(
         "key-passphrase",
         long="key-passphrase",
         env="TLS_KEY_PASSPHRASE",
-        about="Passphrase for encrypted TLS private keys",
+        about="[Unsupported in min build] Passphrase for encrypted TLS private keys",
       ),
       @argparse.OptionArg(
         "proxy",
         short='P',
         long="proxy",
-        about="Fallback proxy URL for unhandled requests",
+        about="[Unsupported in min build] Fallback proxy URL",
       ),
       @argparse.OptionArg(
         "proxy-config",
         long="proxy-config",
-        about="Proxy config file with route matching rules",
+        about="[Unsupported in min build] Proxy config file",
       ),
     ],
     positionals=[
@@ -252,7 +256,8 @@ pub fn parse_auth(val : String) -> Result[(String, String), String] {
 }
 
 ///|
-/// Parse CLI arguments and validate configuration for http-server-full.
+/// Parse CLI arguments and validate configuration for http-server-min.
+/// Strictly rejects TLS and Proxy options with explicit error messages (D-08 / D-15).
 pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   let cmd = build_command()
   let matches = cmd.parse(argv=args) catch {
@@ -263,6 +268,23 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   }
   if matches.flags.get("version") == Some(true) {
     return Ok(CliAction::Version("\{server_version}"))
+  }
+
+  // Preflight rejection of unsupported options in thin build (D-08 / D-15)
+  if first_value(matches, "cert") is Some(_) ||
+    first_value(matches, "key") is Some(_) ||
+    first_value(matches, "key-passphrase") is Some(_) {
+    return Err(
+      "TLS is not supported in thin build; use http-server-mbt (full build)",
+    )
+  }
+
+  if first_value(matches, "proxy") is Some(_) ||
+    matches.flags.get("proxy-all") == Some(true) ||
+    first_value(matches, "proxy-config") is Some(_) {
+    return Err(
+      "Proxy is not supported in thin build; use http-server-mbt (full build)",
+    )
   }
 
   // 1. Port
@@ -328,17 +350,7 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   let log_ip = matches.flags.get("log-ip").unwrap_or(false)
   let silent = matches.flags.get("silent").unwrap_or(false)
 
-  // 10. TLS (D-08): cert+key enable HTTPS serving
-  let cert_file = first_value(matches, "cert")
-  let key_file = first_value(matches, "key")
-  let key_passphrase = first_value(matches, "key-passphrase")
-
-  // 11. Proxy arguments
-  let proxy = first_value(matches, "proxy")
-  let proxy_all_flag = matches.flags.get("proxy-all").unwrap_or(false)
-  let proxy_all = if proxy_all_flag { proxy } else { None }
-
-  // 12. Construct Config
+  // 10. Construct Config
   let mut config = @core.Config::default(root)
   config = {
     ..config,
@@ -354,14 +366,12 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     basic_auth,
     log_ip,
     silent,
-    cert_file,
-    key_file,
-    key_passphrase,
-    proxy,
-    proxy_all,
+    cert_file: None,
+    key_file: None,
+    key_passphrase: None,
   }
 
-  // 13. Core Validation
+  // 11. Core Validation
   config.validate() catch {
     err => return Err(err.to_string())
   }

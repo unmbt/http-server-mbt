@@ -449,6 +449,227 @@ test "C039: Proxy Options — options configuration and upstream scheme validati
   assert_true(bad_failed)
 }
 
+///|
+async test "C037: Live ProxyAll routes every request through proxy target" {
+  let target_server = @socket.TcpServer(@socket.Addr::new(0, 0))
+  defer target_server.close()
+  let target_port = target_server.addr.port()
+  @async.with_task_group() <| group => {
+    let target_task = group.spawn(allow_failure=true, () => {
+      target_server.run_forever((conn, _addr) => {
+        defer conn.close()
+        let req_line = conn.read_until("\r\n").unwrap_or("")
+        for ;; {
+          let h = conn.read_until("\r\n").unwrap_or("")
+          if h == "" || h == "\r" {
+            break
+          }
+        }
+        if req_line.contains("/file") {
+          conn.write(
+            "HTTP/1.1 200 OK\r\nContent-Length: 14\r\nContent-Type: text/plain\r\n\r\nremote content",
+          )
+        } else {
+          conn.write(
+            "HTTP/1.1 404 Not Found\r\nContent-Length: 18\r\nContent-Type: text/plain\r\n\r\nFile not found. :(",
+          )
+        }
+      })
+    })
+    defer target_task.cancel()
+
+    let proxy_cfg : @core.Config = {
+      ..@core.Config::default("testdata/fixtures/root"),
+      proxy: Some("http://127.0.0.1:\{target_port}"),
+      proxy_all: Some("http://127.0.0.1:\{target_port}"),
+    }
+
+    @server.with_server_at(proxy_cfg, 0, async fn(server) {
+      let proxy_port = server.port()
+      let addr = @socket.Addr::new(0x7F000001, proxy_port)
+
+      // /file: local root has "file", but proxy_all must return "remote content"
+      let conn1 = @socket.Tcp::connect(addr)
+      defer conn1.close()
+      conn1.write(
+        "GET /file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st1 = conn1.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st1), 200)
+      let hdrs1 = fi_read_headers(conn1)
+      let cl1 = match hdrs1.get("content-length") {
+        Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+        None => 0
+      }
+      let body1 = conn1.read_exactly(cl1)
+      assert_eq(@utf8.decode_lossy(body1).trim().to_owned(), "remote content")
+
+      // /does-not-exist: status 404 from upstream
+      let conn2 = @socket.Tcp::connect(addr)
+      defer conn2.close()
+      conn2.write(
+        "GET /does-not-exist HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st2 = conn2.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st2), 404)
+      let hdrs2 = fi_read_headers(conn2)
+      let cl2 = match hdrs2.get("content-length") {
+        Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+        None => 0
+      }
+      let body2 = conn2.read_exactly(cl2)
+      assert_true(@utf8.decode_lossy(body2).contains("File not found"))
+    })
+    target_task.cancel()
+  }
+}
+
+///|
+async test "C038: Live ProxyConfig route rewrite and local file serving" {
+  let target_server = @socket.TcpServer(@socket.Addr::new(0, 0))
+  defer target_server.close()
+  let target_port = target_server.addr.port()
+  @async.with_task_group() <| group => {
+    let target_task = group.spawn(allow_failure=true, () => {
+      target_server.run_forever((conn, _addr) => {
+        defer conn.close()
+        let req_line = conn.read_until("\r\n").unwrap_or("")
+        for ;; {
+          let h = conn.read_until("\r\n").unwrap_or("")
+          if h == "" || h == "\r" {
+            break
+          }
+        }
+        if req_line.contains("/file") {
+          conn.write(
+            "HTTP/1.1 200 OK\r\nContent-Length: 12\r\nContent-Type: text/plain\r\n\r\nproxied file",
+          )
+        } else {
+          conn.write(
+            "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nnot found",
+          )
+        }
+      })
+    })
+    defer target_task.cancel()
+
+    let rule_json = "{\"/rewrite/**\": {\"target\": \"http://127.0.0.1:\{target_port}\", \"pathRewrite\": {\"^/rewrite\": \"\"}}}"
+    let proxy_cfg : @core.Config = {
+      ..@core.Config::default("testdata/fixtures/root"),
+      proxy_config: Some(rule_json),
+    }
+
+    @server.with_server_at(proxy_cfg, 0, async fn(server) {
+      let proxy_port = server.port()
+      let addr = @socket.Addr::new(0x7F000001, proxy_port)
+
+      // GET /file: local file hit
+      let conn1 = @socket.Tcp::connect(addr)
+      defer conn1.close()
+      conn1.write(
+        "GET /file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st1 = conn1.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st1), 200)
+      let hdrs1 = fi_read_headers(conn1)
+      let cl1 = match hdrs1.get("content-length") {
+        Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+        None => 0
+      }
+      let body1 = conn1.read_exactly(cl1)
+      let local_file = @fs.read_file("testdata/fixtures/root/file")
+        .text()
+        .trim()
+        .to_owned()
+      assert_eq(@utf8.decode_lossy(body1).trim().to_owned(), local_file)
+
+      // GET /rewrite/file: matched rule, rewritten to /file and proxied
+      let conn2 = @socket.Tcp::connect(addr)
+      defer conn2.close()
+      conn2.write(
+        "GET /rewrite/file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st2 = conn2.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st2), 200)
+      let hdrs2 = fi_read_headers(conn2)
+      let cl2 = match hdrs2.get("content-length") {
+        Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+        None => 0
+      }
+      let body2 = conn2.read_exactly(cl2)
+      assert_eq(@utf8.decode_lossy(body2).trim().to_owned(), "proxied file")
+    })
+    target_task.cancel()
+  }
+}
+
+///|
+async test "C039: Live Fallback Proxy for unhandled requests" {
+  let target_server = @socket.TcpServer(@socket.Addr::new(0, 0))
+  defer target_server.close()
+  let target_port = target_server.addr.port()
+  @async.with_task_group() <| group => {
+    let target_task = group.spawn(allow_failure=true, () => {
+      target_server.run_forever((conn, _addr) => {
+        defer conn.close()
+        let req_line = conn.read_until("\r\n").unwrap_or("")
+        for ;; {
+          let h = conn.read_until("\r\n").unwrap_or("")
+          if h == "" || h == "\r" {
+            break
+          }
+        }
+        if req_line.contains("/remote-only") {
+          conn.write(
+            "HTTP/1.1 200 OK\r\nContent-Length: 11\r\nContent-Type: text/plain\r\n\r\nremote only",
+          )
+        } else {
+          conn.write(
+            "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nnot found",
+          )
+        }
+      })
+    })
+    defer target_task.cancel()
+
+    let proxy_cfg : @core.Config = {
+      ..@core.Config::default("testdata/fixtures/root"),
+      proxy: Some("http://127.0.0.1:\{target_port}"),
+    }
+
+    @server.with_server_at(proxy_cfg, 0, async fn(server) {
+      let proxy_port = server.port()
+      let addr = @socket.Addr::new(0x7F000001, proxy_port)
+
+      // /file: local hit
+      let conn1 = @socket.Tcp::connect(addr)
+      defer conn1.close()
+      conn1.write(
+        "GET /file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st1 = conn1.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st1), 200)
+
+      // /remote-only: not on local disk, fallback proxy forwards to upstream
+      let conn2 = @socket.Tcp::connect(addr)
+      defer conn2.close()
+      conn2.write(
+        "GET /remote-only HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+      )
+      let st2 = conn2.read_until("\r\n").unwrap_or("")
+      assert_eq(fi_parse_status(st2), 200)
+      let hdrs2 = fi_read_headers(conn2)
+      let cl2 = match hdrs2.get("content-length") {
+        Some(s) => fi_parse_int(s[:]).unwrap_or(0)
+        None => 0
+      }
+      let body2 = conn2.read_exactly(cl2)
+      assert_eq(@utf8.decode_lossy(body2).trim().to_owned(), "remote only")
+    })
+    target_task.cancel()
+  }
+}
+
 // ----------------------------------------------------------------------------
 // C040: WebSocket Proxy Upgrade and Error Handling (AD-07)
 // ----------------------------------------------------------------------------

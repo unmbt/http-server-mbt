@@ -5,6 +5,7 @@ pub struct Server {
   engine : @root.StaticEngine
   config : @core.Config
   acceptor : &Acceptor
+  proxy_rules : Array[@core.ProxyRule]
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   active_requests : Ref[Int]
@@ -26,6 +27,21 @@ pub fn Server::has_upgrade_capability(self : Server) -> Bool {
 /// Return the server acceptor.
 pub fn Server::acceptor(self : Server) -> &Acceptor {
   self.acceptor
+}
+
+///|
+/// Match a request path against the configured proxy rules.
+pub fn Server::match_proxy_rule(
+  self : Server,
+  path : String,
+) -> (String, String)? {
+  for rule in self.proxy_rules {
+    match @core.match_proxy_rule(rule, path) {
+      Some(res) => return Some(res)
+      None => ()
+    }
+  }
+  None
 }
 
 ///|
@@ -82,11 +98,13 @@ pub async fn with_server_at(
   // through TIME_WAIT (Windows ignores this flag; libuv in the original
   // http-server enables it by default). See D-05 platform parity.
   let listener = @socket.TcpServer(@socket.Addr::new(0, port), reuse_addr=true)
+  let proxy_rules = load_proxy_rules(config.proxy_config)
   let server : Server = {
     inner: listener,
     engine,
     config,
     acceptor: effective_acceptor,
+    proxy_rules,
     stopped: false,
     task: None,
     active_requests: { val: 0, },
@@ -295,10 +313,31 @@ async fn dispatch_engine_request(
   headers : Map[String, String],
   target : String,
 ) -> Bool {
+  // 1. Direct proxy-all (bypasses local static files)
+  if server.config.proxy_all is Some(upstream) {
+    return proxy_http_request(
+      server, transport, meth, headers, target, upstream,
+    )
+  }
+
+  // 2. Route-based proxy rules (proxy-config)
+  if server.match_proxy_rule(target) is Some((rule_target, rewritten_path)) {
+    return proxy_http_request(
+      server, transport, meth, headers, rewritten_path, rule_target,
+    )
+  }
+
+  // 3. Local static file engine
   let result = server.engine.handle({ meth, target, headers, })
   let ok = match result {
     @root.HandleResult::Handled(response) => send_response(transport, response)
     @root.HandleResult::Next => {
+      // 4. Fallback proxy for unhandled requests
+      if server.config.proxy is Some(upstream) {
+        return proxy_http_request(
+          server, transport, meth, headers, target, upstream,
+        )
+      }
       let _ = if meth is Other(_) {
         send_fallback_status(transport, 405, "Method Not Allowed")
       } else {

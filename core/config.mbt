@@ -86,6 +86,7 @@ pub(all) struct Config {
   proxy_all : String? // Proxy all requests upstream (requires proxy to be set)
   proxy_options : Map[String, String] // Upstream proxy options (must be empty if fallback active)
   websocket : Bool // Enable WebSocket proxy upgrade capability (default false)
+  proxy_config : String? // Upstream proxy config file or route rules
 
   // --- TLS (D-08) ---
   // TLS is disabled by default (D-01); setting cert_file and key_file
@@ -142,6 +143,7 @@ pub fn Config::default(root : String) -> Config {
     proxy_all: None,
     proxy_options: Map([]),
     websocket: false,
+    proxy_config: None,
     cert_file: None,
     key_file: None,
     key_passphrase: None,
@@ -188,6 +190,7 @@ pub fn Config::has_fallback(self : Config) -> Bool {
 pub fn Config::has_proxy(self : Config) -> Bool {
   self.proxy is Some(_) ||
   self.proxy_all is Some(_) ||
+  self.proxy_config is Some(_) ||
   !self.proxy_options.is_empty()
 }
 
@@ -370,6 +373,7 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
   let has_fallback = config.spa || config.try_files is Some(_)
   let has_proxy = config.proxy is Some(_) ||
     config.proxy_all is Some(_) ||
+    config.proxy_config is Some(_) ||
     !config.proxy_options.is_empty()
 
   if has_fallback && has_proxy {

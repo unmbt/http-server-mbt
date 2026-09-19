@@ -52,9 +52,11 @@ async fn run() -> Unit {
   }
 
   // Verify final_config.root exists and is a directory
-  let exists = @fs.exists(final_config.root)
+  let exists = @fs.exists(final_config.root) catch { _ => false }
   let is_dir = if exists {
-    @fs.kind(final_config.root) == Directory
+    try @fs.kind(final_config.root) == Directory catch {
+      _ => false
+    }
   } else {
     false
   }

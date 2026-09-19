@@ -659,8 +659,12 @@ pub async fn StaticEngine::handle(
       }
       return Handled({ status: 400, headers, body, })
     }
-    Err(@core.PathError::NotFound(_)) =>
+    Err(@core.PathError::NotFound(_)) => {
+      if self.config.proxy is Some(_) || !self.config.handle_error {
+        return Next
+      }
       return Handled(self.make_404_response(request))
+    }
   }
 
   let raw_target_parts = request.target.split("?").to_array()
@@ -881,6 +885,9 @@ pub async fn StaticEngine::handle(
     }
 
     // Neither auto_index with existing index nor show_dir -> 404
+    if self.config.proxy is Some(_) || !self.config.handle_error {
+      return Next
+    }
     return Handled(self.make_404_response(request))
   }
 
@@ -997,7 +1004,7 @@ pub async fn StaticEngine::handle(
     }
   }
 
-  if !self.config.handle_error {
+  if self.config.proxy is Some(_) || !self.config.handle_error {
     return Next
   }
 

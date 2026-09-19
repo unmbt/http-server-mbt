@@ -100,3 +100,54 @@ pub fn format_dir_redirect(raw_path : String, raw_query : String?) -> String {
     _ => path_with_slash
   }
 }
+
+///|
+/// A route-based proxy rule.
+pub(all) struct ProxyRule {
+  pattern : String
+  target : String
+  path_rewrite : Array[(String, String)]
+} derive(Debug, Eq)
+
+///|
+/// Check if a request path matches a glob or prefix pattern.
+pub fn match_glob_path(pattern : String, path : String) -> Bool {
+  if pattern == "**" || pattern == "*" {
+    return true
+  }
+  if pattern.has_suffix("/**") {
+    let pfx = pattern[:pattern.length() - 3].to_owned()
+    return path == pfx || path.has_prefix(pfx + "/")
+  }
+  if pattern.has_suffix("/*") {
+    let pfx = pattern[:pattern.length() - 2].to_owned()
+    if path.has_prefix(pfx + "/") {
+      let rest = path[pfx.length() + 1:].to_owned()
+      return !rest.contains("/")
+    }
+    return false
+  }
+  pattern == path
+}
+
+///|
+/// Match a URL path against a proxy rule and apply path rewriting.
+/// Returns Some((target, rewritten_path)) if matched, None otherwise.
+pub fn match_proxy_rule(rule : ProxyRule, path : String) -> (String, String)? {
+  if !match_glob_path(rule.pattern, path) {
+    return None
+  }
+  let mut rewritten = path
+  for pair in rule.path_rewrite {
+    let (from_pat, to_str) = pair
+    if from_pat.has_prefix("^") {
+      let pfx = from_pat[1:].to_owned()
+      if rewritten.has_prefix(pfx) {
+        rewritten = to_str + rewritten[pfx.length():].to_owned()
+      }
+    } else if rewritten.contains(from_pat) {
+      rewritten = rewritten.replace_all(old=from_pat, new=to_str)
+    }
+  }
+  Some((rule.target, rewritten))
+}

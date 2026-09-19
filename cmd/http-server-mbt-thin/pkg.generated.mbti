@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "unmbt/http-server-mbt/cmd/http-server-full"
+package "unmbt/http-server-mbt/cmd/http-server-mbt-thin"
 
 import {
   "moonbitlang/core/argparse",

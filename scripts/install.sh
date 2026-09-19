@@ -14,8 +14,8 @@ for arg in "$@"; do
         uninstall|--uninstall)
             ACTION="uninstall"
             ;;
-        min|--min|-m)
-            VARIANT="min"
+        thin|--thin|-t|min|--min|-m)
+            VARIANT="thin"
             ;;
         full|--full)
             VARIANT="full"
@@ -28,7 +28,7 @@ done
 # Check if uninstall flag is passed
 if [ "$ACTION" == "uninstall" ]; then
     echo "Uninstalling $BIN_NAME..."
-    rm -f "$BIN_PATH" "$INSTALL_DIR/http-server-min"
+    rm -f "$BIN_PATH" "$INSTALL_DIR/http-server-mbt-thin" "$INSTALL_DIR/http-server-min"
     echo "Uninstalled successfully."
     exit 0
 fi
@@ -55,8 +55,8 @@ else
     exit 1
 fi
 
-if [ "$VARIANT" == "min" ]; then
-    ASSET_PREFIX="http-server-min"
+if [ "$VARIANT" == "thin" ]; then
+    ASSET_PREFIX="http-server-mbt-thin"
 else
     ASSET_PREFIX="http-server-mbt"
 fi
@@ -78,16 +78,16 @@ fi
 
 # Check if already installed and version matches
 VARIANT_DESC="full"
-if [ "$VARIANT" == "min" ]; then
-    VARIANT_DESC="min"
+if [ "$VARIANT" == "thin" ]; then
+    VARIANT_DESC="thin"
 fi
 
 if [ -f "$BIN_PATH" ]; then
     CURRENT_VERSION=$("$BIN_PATH" -v 2>/dev/null || echo "unknown")
     if [ "$CURRENT_VERSION" == "$LATEST_VERSION" ]; then
         echo "✨ You already have the latest version ($LATEST_VERSION) installed at $BIN_PATH."
-        if [ "$VARIANT" == "min" ]; then
-            ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-min"
+        if [ "$VARIANT" == "thin" ]; then
+            ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-mbt-thin"
         fi
         exit 0
     else
@@ -118,15 +118,15 @@ fi
 
 chmod +x "$TEMP_PATH"
 mv -f "$TEMP_PATH" "$BIN_PATH"
-if [ "$VARIANT" == "min" ]; then
-    ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-min"
+if [ "$VARIANT" == "thin" ]; then
+    ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-mbt-thin"
 fi
 trap - EXIT
 
 echo ""
-if [ "$VARIANT" == "min" ]; then
-    echo "✅ Installed http-server-mbt (min variant) v$LATEST_VERSION successfully to $BIN_PATH"
-    echo "   (Also available as $INSTALL_DIR/http-server-min)"
+if [ "$VARIANT" == "thin" ]; then
+    echo "✅ Installed http-server-mbt (thin variant) v$LATEST_VERSION successfully to $BIN_PATH"
+    echo "   (Also available as $INSTALL_DIR/http-server-mbt-thin)"
 else
     echo "✅ Installed $BIN_NAME v$LATEST_VERSION successfully to $BIN_PATH"
 fi

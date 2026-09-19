@@ -216,9 +216,9 @@ jobs:
             rm -f ~/.npmrc
           fi
           echo "Publishing platform packages with provenance..."
-          npm publish npm/win32-x64-msvc --access public --provenance
-          npm publish npm/linux-x64-gnu --access public --provenance
-          npm publish npm/darwin-arm64 --access public --provenance
+          (cd npm/win32-x64-msvc && npm publish --access public --provenance)
+          (cd npm/linux-x64-gnu && npm publish --access public --provenance)
+          (cd npm/darwin-arm64 && npm publish --access public --provenance)
 
       - name: Publish Main Package
         shell: bash
@@ -231,7 +231,7 @@ jobs:
             rm -f ~/.npmrc
           fi
           echo "Publishing main package with provenance..."
-          npm publish npm/http-server --access public --provenance
+          (cd npm/http-server && npm publish --access public --provenance)
 
   release:
     name: Create GitHub Release (C ABI)

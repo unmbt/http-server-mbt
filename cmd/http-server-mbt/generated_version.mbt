@@ -2,4 +2,4 @@
 ///|
 /// Version injected from the module manifest at build time; regenerated
 /// by the dev_build rule after moon.mod changes.
-let server_version : String = "0.2.1"
+let server_version : String = "0.3.0"

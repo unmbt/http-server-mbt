@@ -103,6 +103,18 @@ pub fn build_command() -> @argparse.Command {
         long="auth",
         about="Basic Auth credentials <username:password>",
       ),
+      @argparse.OptionArg(
+        "cert",
+        long="cert",
+        about="TLS certificate chain file (PEM) — enables HTTPS",
+      ),
+      @argparse.OptionArg("key", long="key", about="TLS private key file (PEM)"),
+      @argparse.OptionArg(
+        "key-passphrase",
+        long="key-passphrase",
+        env="TLS_KEY_PASSPHRASE",
+        about="Passphrase for encrypted TLS private keys",
+      ),
     ],
     positionals=[
       @argparse.PositionArg(
@@ -305,7 +317,13 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   let log_ip = matches.flags.get("log-ip").unwrap_or(false)
   let silent = matches.flags.get("silent").unwrap_or(false)
 
-  // 10. Construct Config
+  // 10. TLS (D-08): cert+key enable HTTPS serving; passphrase may come from
+  // the TLS_KEY_PASSPHRASE environment variable or the CLI option.
+  let cert_file = first_value(matches, "cert")
+  let key_file = first_value(matches, "key")
+  let key_passphrase = first_value(matches, "key-passphrase")
+
+  // 11. Construct Config
   let mut config = @core.Config::default(root)
   config = {
     ..config,
@@ -321,9 +339,12 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     basic_auth,
     log_ip,
     silent,
+    cert_file,
+    key_file,
+    key_passphrase,
   }
 
-  // 11. Core Validation
+  // 12. Core Validation
   config.validate() catch {
     err => return Err(err.to_string())
   }

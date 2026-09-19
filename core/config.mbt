@@ -12,6 +12,7 @@ pub(all) suberror ConfigError {
   InvalidAuth(String)
   InvalidHeader(String)
   InvalidTimeout(String)
+  InvalidTls(String)
 } derive(Eq, Debug)
 
 ///|
@@ -27,6 +28,7 @@ pub fn ConfigError::to_string(self : ConfigError) -> String {
     InvalidAuth(s) => "InvalidAuth: " + s
     InvalidHeader(s) => "InvalidHeader: " + s
     InvalidTimeout(s) => "InvalidTimeout: " + s
+    InvalidTls(s) => "InvalidTls: " + s
   }
 }
 
@@ -85,6 +87,16 @@ pub(all) struct Config {
   proxy_options : Map[String, String] // Upstream proxy options (must be empty if fallback active)
   websocket : Bool // Enable WebSocket proxy upgrade capability (default false)
 
+  // --- TLS (D-08) ---
+  // TLS is disabled by default (D-01); setting cert_file and key_file
+  // together enables HTTPS serving. ca_file/secure configure client-side
+  // upstream verification (consumed by T-013 proxy work).
+  cert_file : String? // TLS certificate chain file (PEM/DER), leaf first
+  key_file : String? // TLS private key file (PEM/DER)
+  key_passphrase : String? // Private key passphrase for encrypted PEM keys
+  ca_file : String? // Trust-root CA bundle file (PEM) for upstream clients
+  secure : Bool // Verify upstream certificates and hostname (default true)
+
   // --- Lifecycle & Error Handling ---
   handle_error : Bool // If false, delegates 404/errors to host (middleware Next)
   idle_timeout_ms : Int // Socket idle timeout in ms (0 = disabled, default 120000)
@@ -130,6 +142,11 @@ pub fn Config::default(root : String) -> Config {
     proxy_all: None,
     proxy_options: Map([]),
     websocket: false,
+    cert_file: None,
+    key_file: None,
+    key_passphrase: None,
+    ca_file: None,
+    secure: true,
     handle_error: true,
     idle_timeout_ms: 120000, // 120 seconds per AD-03
     mime_types: Map([]),
@@ -178,6 +195,28 @@ pub fn Config::has_proxy(self : Config) -> Bool {
 /// Returns whether WebSocket proxy capability is enabled.
 pub fn Config::has_websocket_proxy(self : Config) -> Bool {
   self.has_proxy() && self.websocket
+}
+
+///|
+/// Returns whether TLS serving is enabled (D-01: disabled by default).
+pub fn Config::has_tls(self : Config) -> Bool {
+  self.cert_file is Some(_) || self.key_file is Some(_)
+}
+
+///|
+/// Validate TLS configuration pairing: enabling TLS requires both a
+/// certificate and a key (D-01). File readability and key/cert matching are
+/// verified during server startup preflight when the acceptor is built,
+/// before the listener is created.
+pub fn validate_tls(config : Config) -> Unit raise ConfigError {
+  match (config.cert_file, config.key_file) {
+    (Some(_), Some(_)) => ()
+    (Some(_), None) =>
+      raise ConfigError::InvalidTls("cert_file requires key_file to be set")
+    (None, Some(_)) =>
+      raise ConfigError::InvalidTls("key_file requires cert_file to be set")
+    (None, None) => ()
+  }
 }
 
 ///|
@@ -375,6 +414,8 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
       )
     }
   }
+
+  validate_tls(config)
 }
 
 ///|

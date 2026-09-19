@@ -66,7 +66,7 @@ async fn run() -> Unit {
     return
   }
 
-  @server.with_server_at(final_config, port, async fn(_server) {
+  @full.with_server_at(final_config, port, async fn(_server) {
     print_startup_banner(final_config, port)
     @async.sleep(2147483647)
   }) catch {

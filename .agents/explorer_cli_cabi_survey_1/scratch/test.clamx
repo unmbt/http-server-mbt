@@ -1,0 +1,10 @@
+
+
+#export_name("hs_abi_version")
+fn hs_abi_version() -> Int {
+  1
+}
+
+fn main {
+  ()
+}

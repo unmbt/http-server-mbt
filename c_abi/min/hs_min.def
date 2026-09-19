@@ -1,0 +1,7 @@
+LIBRARY hs_min
+EXPORTS
+    hs_abi_version
+    hs_server_start
+    hs_server_stop
+    hs_server_destroy
+    hs_error_copy

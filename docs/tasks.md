@@ -1,6 +1,6 @@
 # http-server-mbt 实施任务与测试迁移清单
 
-版本：4。日期：2026-09-10。更新默认托管生命周期与单进程高效 I/O，追加 T-033 文件变更、T-034 故障注入/模糊测试，T-024 撤出当前范围并保留编号。共保留 34 个任务编号，其中 33 项为当前实施范围，全部未完成；无实现/测试通过声明。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
+版本：5。日期：2026-09-13。随 design 版本 5 同步：TLS 后端改为源码 vendor 的 MbedTLS 4.2.0（D-08），T-002 补充 TLS 探针分项、T-012 进入进行中（Windows 分项）。共保留 34 个任务编号，其中 33 项为当前实施范围。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
 
 **实施前**：加载 `moonbit-agent-guide`；涉及 Native FFI/C ABI 时另须阅读 `moonbit-c-binding`，先验证所有权、C 桥接、导出/链接及内存检查方式。自动化驱动使用 `.mbtx`。
 
@@ -30,6 +30,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 验收：依据 D-11 实测生成 C、桥接、归档/链接、符号及静态 TLS；N-19 探针验证 C ABI 的库内 owner/通知/自动排空，以及 MoonBit 直接消费的合法异步上下文，不能把宿主托管对象跨 runtime 传递或退回手动轮询。三平台程序/Node/wasm-gc 实际装载运行；只交叉编译或只有 Windows 结果不算整体完成，不支持能力记录阻塞证据。
   - Linux 分项（2026-09-12，Fedora 44 x86_64，clang 22.1.8，Moon 0.1.20260904）：`moon check --target native` 0 错误 0 警告；`moon test --target native` 全量 169/169 通过；CLI 本机构建并真实运行（静态文件/Range/keep-alive/SIGTERM）。证据：[linux-baseline](linux-baseline.md)。
   - macOS 分项（2026-09-13）：kqueue 事件循环由 `moonbitlang/async@0.21.3` 提供、MoonBit 侧零改动，新增 `server/transmit_file_darwin.c`；本机无 macOS 硬件/SDK，探针编译与测试经 Actions macos-latest（arm64）runner 首跑全量通过（run 链接待补录）。证据：[macos-baseline](macos-baseline.md)。库导出与静态 TLS 链路仍未开始，总任务保持未勾选。
+  - Windows TLS 探针分项（2026-09-13，Windows x86_64，clang-cl 22.1.3（moon 工具链），Moon 0.1.20260904，依 D-08 版本 5）：确认 moon `native-stub` 支持包内子目录 C 源路径，`options("link": { "native": { "stub-cc-flags": ... } })` 生效，`-I` 与模块根相对路径三平台通用；mbedtls-4.2.0 官方 tarball（SHA-256 `2bed9d71…6ffea`）107 个 .c 编译归档零告警；最小桥完成 `psa_crypto_init`、PEM/DER 证书与 SEC1 私钥解析（注意 `mbedtls_pk_parse_key` 要求缓冲区 NUL 结尾）、内存回路完整 TLS 1.3 握手、应用数据双向交换与 close_notify，自测返回 0。vendor 固定化为 `scripts/vendor_tls.mbtx`（幂等，哈希校验、config 托管覆盖、moon.pkg 清单再生）。证据：`tls/`、`scripts/vendor_tls.mbtx`、探针记录（本节与 progress）。库导出/PIC/C 消费探针仍未开始，总任务保持未勾选。
 
 ### 阶段二：配置、协议和静态核心
 
@@ -71,9 +72,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 验收：Windows Native 验证完成。`moon check --target native` 0 错误、0 警告；`moon test --target native` 116/116 测试全部通过（0 失败、0 阻塞、0 句柄泄漏）。CLI 参数解析与预检拦截在 `cli_wbtest.mbt` 和 `cli_challenger_wbtest.mbt` 中经全矩阵验证，C031～C033、C041 核心参数映射与布尔参数不吞位置参数特性已完全覆盖；真实子进程生命周期与资源排空退出在 `server_challenger_m5_lifecycle_test.mbt` 中经真实套接字绑定与优雅停机验证。
   - 2026-09-13 增强：`--version`/`-v` 不再硬编码，构建期从 `moon.mod` 注入。`cmd/http-server-mbt/moon.pkg` 以 rule+dev_build 调用 `scripts/gen_version.mbtx` 生成包内 `generated_version.mbt`（提交入库、字节稳定，moon.mod 变更后任一 dev 命令自动重生成），cli.mbt 引用 `server_version` 常量；输出契约不变（仍为 `http-server-mbt <version>`）。证据（Windows Native，moon 0.1.20260904）：`moon check --target native` 0 错误（1 个既有 server 包 unused_package 警告，干净树复现一致，与本次无关）；cmd 包 28/28 测试通过；`moon build --target native --release` 后 `--version`/`-v` 实测输出 `0.1.5`，临时改 moon.mod 为 0.1.6 后自动重生成并实测输出 `0.1.6`，还原后恢复 0.1.5；CI 增加生成文件 `git diff --exit-code` 防漂移检查。全量 `moon test --target native` 168/169，唯一失败为 server 包句柄计数时序断言，干净树同样失败，与本次改动无关。
 
-- [ ] **T-012 静态链接 TLS** — 状态：未开始。需求：R-COMPAT、R-N02、R-SAFE；设计：D-05、D-08；依赖：T-002、T-003、T-004。
-  - 交付：非阻塞 TLS 适配、静态依赖、证书/passphrase、信任根/CA 配置、上游主机名验证。
-  - 验收：C039 的 HTTPS 前提、N-10/N-12；三平台不动态加载用户 OpenSSL，TLS 错误回收资源，正常验证与 secure=false 显式例外均测试。
+- [ ] **T-012 静态链接 TLS** — 状态：进行中（Windows 分项完成，TLS 后端依 D-08 版本 5 变更为 MbedTLS 4.2.0）。需求：R-COMPAT、R-N02、R-SAFE；设计：D-05、D-08；依赖：T-002、T-003、T-004。
+  - 交付：非阻塞 TLS 适配、静态依赖、证书/passphrase、信任根/CA 配置、上游主机名验证。实现路径：MbedTLS 4.2.0 源码 vendor（`tls/` 包 + `scripts/vendor_tls.mbtx`）；`tls` 包 C 桥（`mbedtls_ssl_set_bio` 自定义回调、有界环形缓冲、`psa_crypto_init` 幂等）与 `TlsAcceptor`/`TlsConn`（实现 `@io.Reader`/`@io.Writer`，服务端+客户端，WANT_READ/WANT_WRITE 映射异步等待）；async http parser 复制泛化（Apache-2.0 保留版权头）供 TLS 路径解析为 `@http.Request`；`server.mbt` 传输抽象（Plain/Tls），transmit_file 仅明文、TLS 走有界缓冲降级（D-05）；`core.Config` TLS 字段与 CLI `--cert/--key/--key-passphrase`，监听前预检（D-01）。
+  - 验收：C039 的 HTTPS 前提、N-10/N-12；三平台不动态加载用户 OpenSSL/TLS 库（Linux `readelf` 无第三方 DT_NEEDED、macOS/Windows 依赖清单），TLS 错误回收资源，正常验证与 secure=false 显式例外均测试。三平台分项齐备后方勾选总任务。
+  - Windows 分项（2026-09-13）：183/183 测试通过（既有 169 项零回归 + 新增 TLS 回环/失败矩阵/泄漏探针）；真实 HTTPS E2E 与 curl/OpenSSL 互操作（TLS 1.3 与 1.2、显式 CA 强校验、Range/HEAD/keep-alive/3MB 有界缓冲完整性）；300 请求压力句柄 143→143 零增长；预检失败（证书不配对/口令错误/缺口令）均不监听。覆盖缺口与证据详见 [progress §8](progress.md)。Linux/macOS 分项与 ASan 未完成，总任务保持未勾选。
 
 - [ ] **T-013 HTTP/HTTPS 代理与规则重写** — 状态：未开始。需求：R-COMPAT、R-SAFE；设计：D-03、D-05；依赖：T-006、T-010、T-012。
   - 交付：显式规则、proxy-all、静态未命中兜底、上游选项、路径重写与流式双向背压。
@@ -111,9 +113,11 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ### 阶段六：嵌入、分发、实验后端和交付
 
-- [ ] **T-020 C ABI v1 托管异步动态库** — 状态：未开始。需求：R-N06、R-SAFE、R-N14；设计：D-07、D-11；依赖：T-002、T-015、T-016、T-019。
+- [ ] **T-020 C ABI v1 托管异步动态库** — 状态：进行中（Windows 分项交付，2026-09-18）。需求：R-N06、R-SAFE、R-N14；设计：D-07、D-11；依赖：T-002、T-015、T-016、T-019。
   - 交付：静态/动态库及 Node 共用的异步 C 头文件、版本/错误码、跨线程命令与最终通知、chunk 所有权、自动关闭契约和三平台动态库；内部循环与托管布局不导出。
   - 验收：N-03/N-09/N-19，C 程序真实启动服务及嵌入静态引擎，无手动 poll；接纳回调次数、并发提交/关闭、输入复制/借用有效期、取消排空和卸载全部验证，导出无 CLI main/公开循环接口。
+  - Windows 分项（2026-09-18，Windows x86_64，MSVC 14.42，Moon 0.1.20260904）：`c_abi/include/http_server.h` 声明 5 项纯 C API（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`）与错误码/不透明句柄；`c_abi/min` 与 `c_abi/full` 分别实现轻量静态与全功能（TLS/代理）运行时桥接；`scripts/build_cabi.mbtx` 自动化构建生成 `target/cabi/hs_min.dll` (1.3MB) 与 `target/cabi/hs_full.dll` (2.6MB)；MSVC .def 模块定义文件与 llvm-objcopy `.drectve` 剥离确保绝对符号隔离，dumpbin 验证严格仅导出 5 项 `hs_*` 符号，0 `main`，0 `moonbit_*` 泄露；独立 C 消费者 `testdata/c_consumer/test_dynamic_min.c` 与 `testdata/c_consumer/test_dynamic_full.c` 编译并运行通过（ABI 版本 0x00010000、错误文本拷贝、TLS 预检拦截、服务启动/停止/销毁生命周期全 PASS）。Linux/macOS 分项待 CI 接入，总任务保持未勾选。
+  - 跨平台 CI 扩展（2026-09-19）：更新 `scripts/build_cabi.mbtx`，通过 `detect_target_os` 自动支持 Windows (MSVC `link.exe` + `.def`)、Linux (Clang `-shared` + ELF `version-script`) 与 macOS (Clang `-dynamiclib` + `exported_symbols_list`)；新增 `c_abi/min/hs_min.version`、`c_abi/full/hs_full.version`、`c_abi/min/hs_min_macos.syms`、`c_abi/full/hs_full_macos.syms` 确保严格导出 5 项 `hs_*` 符号；在 `.github/workflows/tls-and-lib-export.yml` 中接入 Windows、Linux、macOS 三系统矩阵自动化构建与 C consumer 测试。
 
 - [ ] **T-021 C 与 Python 最小集成示例** — 状态：未开始。需求：R-N06、R-N14；设计：D-07；依赖：T-020。
   - 交付：C 动态加载与 Python ctypes 的服务启动/停止、框架接入两种示例，异步通知/正文与自动排空关闭；C/Rust 静态消费归 T-027，Node 归 T-028。
@@ -139,9 +143,11 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：当前 R→D→T→C/N 追踪、三平台完整包、库/宿主/镜像及实验后端的 Actions 证据，托管/变更/模糊测试结果和 AD 差异，保留 Windows 起步及已撤出计划的历史记录。
   - 验收：42 文件的全部适用逻辑案例、共享 fixtures 和 N-01～N-21 按形态验收；原量化计划不在分母，未靠删用例/改预期取得通过。三平台能力与分发在 Actions 成立，候选包/镜像消费与实际 registry/npm 发布分别报告。
 
-- [ ] **T-027 静态库打包与 C/Rust 消费** — 状态：未开始。需求：R-N08、R-SAFE；设计：D-07、D-08、D-11；依赖：T-002、T-017、T-020。
+- [ ] **T-027 静态库打包与 C/Rust 消费** — 状态：进行中（Windows 分项交付，2026-09-18）。需求：R-N08、R-SAFE；设计：D-07、D-08、D-11；依赖：T-002、T-017、T-020。
   - 交付：三平台静态 archive、同版 C 头文件、runtime/依赖及传递链接清单、适用 PIC/CRT 构建；独立 C 与 Rust Cargo 最小消费示例，不要求 Rust 重写引擎或提供 .rlib。
   - 验收：N-13 与适用 N-09；三平台真实链接并执行 GET/HEAD/Range、Next、流式读取、取消/关闭，动态与静态结果一致。无 CLI main/重复 runtime/符号污染，MSVC 静态 .lib 与 DLL import library 可区分，PIC archive 可链接进测试共享对象；.node 实际消费在 T-028 重验。
+  - Windows 分项（2026-09-18，Windows x86_64，MSVC lib.exe，Moon 0.1.20260904）：`scripts/build_cabi.mbtx` 驱动对象剥离与静态归档，成功生成 `target/cabi/hs_min_static.lib` (4.4MB) 与 `target/cabi/hs_full_static.lib` (6.9MB)；dumpbin /SYMBOLS 严格验证 `hs_min_static.lib` 中零 `mbedtls_*` / `psa_*` 符号与零 `main` 污染；独立 C 静态消费者 `testdata/c_consumer/test_static_min.c` 与 `testdata/c_consumer/test_static_full.c` 真实链接 MSVC 静态库并执行通过，断言 100% 达成。Linux/macOS archive 与 Rust Cargo 消费待后续接入，总任务保持未勾选。
+  - 跨平台静态库与多语言文档交付（2026-09-19）：更新 `scripts/build_cabi.mbtx` 支持 Linux/macOS `ar rcs` 静态归档；落地详细多语言开发指南 `docs/cabi-usage-guide.md`，提供 C/C++、Rust（RAII safe wrapper + build.rs）、Python（ctypes context manager）、Go（cgo）、Node.js（koffi）与 Bun 的完整可运行示例与静态链接系统库矩阵；CI 流水线解耦发布独立 CLI 单文件（`http-server-mbt`、`http-server-min`）与纯净 C ABI SDK 归档（`.zip` / `.tar.gz`），`scripts/install.sh` 与 `install.ps1` 默认安装完整版并新增 `--min` / `-Min` 入参支持安装精简版。
 
 - [ ] **T-028 Node-API 插件与 npm 适配包** — 状态：未开始。需求：R-N09、R-SAFE、R-N14；设计：D-07、D-11、D-12；依赖：T-020、T-027。
   - 交付：静态嵌入引擎的 .node，调用库托管 hs_* 异步接口，映射 Promise/流/AbortSignal/close 和按 napi_env 清理；不在 addon 重建手动轮询线程。三平台预构建、Linux glibc/musl 区分与构建说明。

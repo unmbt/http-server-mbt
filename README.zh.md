@@ -61,29 +61,50 @@
 推荐使用 MoonBit 包管理器从源码编译安装：
 
 ```bash
+# 完整版（支持 TLS 加密与反向代理）
 moon install unmbt/http-server-mbt/cmd/http-server-mbt
 http-server-mbt -v
+
+# 或 精简版（纯 MoonBit 静态托管，零 C 密码学依赖）
+moon install unmbt/http-server-mbt/cmd/http-server-min
+http-server-min -v
 ```
 
 `moon install` 会将可执行文件安装到 `~/.moon/bin`。请确保该目录已加入 `PATH`。
 
 ### 预编译二进制
 
-如果不希望从源码构建，可使用对应系统的安装脚本下载最新的 GitHub Release：
+如果不希望从源码构建，可使用对应系统的安装脚本直接从最新的 GitHub Release 下载独立可执行程序：
+
+提供两种独立 CLI 二进制版本：
+- **Full（完整版，默认）**：包含完整静态文件托管、内置 MbedTLS 的 TLS 1.2/1.3 (HTTPS) 加密以及 HTTP/WebSocket 全双工反向代理。
+- **Min（精简版）**：零 C 密码学依赖，纯 MoonBit 静态文件托管，体积减少约 30%。
 
 #### Linux & macOS
 
 ```bash
+# 完整版（默认）
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
+
+# 精简版（轻量零密码学依赖）
+curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --min
 ```
 
 #### Windows (PowerShell)
 
 ```powershell
+# 完整版（默认）
 irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
+
+# 精简版（轻量零密码学依赖）
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Min
 ```
 
-> **注意**：预编译二进制安装脚本会将文件安装到 `~/.unmbt`，并将该目录加入 `PATH`。安装完成后可能需要重启终端。
+> **注意**：预编译二进制安装脚本会将文件安装到 `~/.unmbt`（Windows 下为 `$HOME\.unmbt`），并将该目录加入 `PATH`。无论安装哪个版本，主执行程序均命名为 `http-server-mbt`（选择 `--min` / `-Min` 时还会额外创建 `http-server-min` 软链接或副本）。安装完成后可能需要重启终端以使环境变量生效。
+
+#### 嵌入式 C ABI SDK
+
+如果需要在 C、C++、Rust、Zig、Go 或 Python 等项目中将 `http-server-mbt` 作为动态库（`.so` / `.dylib` / `.dll`）或静态库（`.a` / `.lib`）内嵌使用，可直接前往 [GitHub Releases](https://github.com/unmbt/http-server-mbt/releases) 页面下载独立的 `http-server-cabi-<platform>-<arch>.tar.gz`（Windows 为 `.zip`）归档包。该包内含 `http_server.h` 头文件、`min` 与 `full` 双变体库及完整嵌入调用示例。详见 [C ABI 嵌入使用指南](docs/cabi-usage-guide.md)。
 
 ---
 
@@ -110,6 +131,9 @@ http-server-mbt [root] [选项]
 | `-d`, `--showDir` / `--no-showDir` | 是否在找不到 `index.html` 时展示美观的 HTML 目录文件列表 | 开启 (`true`) |
 | `--cors` | 启用 CORS 跨域支持，注入 `Access-Control-Allow-Origin` 等响应头 | 禁用 |
 | `-a`, `--auth <user:pass>` | 启用 HTTP Basic 认证（用户名与密码以冒号隔开） | 禁用 |
+| `--cert <file>` | TLS 证书链文件（PEM），配置后启用 HTTPS 服务（内置 MbedTLS 4.2.0） | 禁用 |
+| `--key <file>` | TLS 私钥文件（PEM） | 无 |
+| `--key-passphrase <pass>` | 加密私钥的口令（或 `TLS_KEY_PASSPHRASE` 环境变量） | 无 |
 | `-l`, `--log-ip` | 在控制台日志中记录访问客户端的 IP 地址 | 禁用 |
 | `-s`, `--silent` | 静默模式，关闭终端请求日志输出 | 禁用 |
 | `-h`, `--help` | 显示命令行帮助信息并退出 | - |

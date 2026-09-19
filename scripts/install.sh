@@ -6,10 +6,29 @@ INSTALL_DIR="$HOME/.unmbt"
 BIN_NAME="http-server-mbt"
 BIN_PATH="$INSTALL_DIR/$BIN_NAME"
 
+VARIANT="full"
+ACTION="install"
+
+for arg in "$@"; do
+    case "$arg" in
+        uninstall|--uninstall)
+            ACTION="uninstall"
+            ;;
+        min|--min|-m)
+            VARIANT="min"
+            ;;
+        full|--full)
+            VARIANT="full"
+            ;;
+        *)
+            ;;
+    esac
+done
+
 # Check if uninstall flag is passed
-if [ "$1" == "uninstall" ] || [ "$1" == "--uninstall" ]; then
+if [ "$ACTION" == "uninstall" ]; then
     echo "Uninstalling $BIN_NAME..."
-    rm -f "$BIN_PATH"
+    rm -f "$BIN_PATH" "$INSTALL_DIR/http-server-min"
     echo "Uninstalled successfully."
     exit 0
 fi
@@ -36,7 +55,12 @@ else
     exit 1
 fi
 
-ASSET_NAME="${BIN_NAME}-${OS}-${ARCH}"
+if [ "$VARIANT" == "min" ]; then
+    ASSET_PREFIX="http-server-min"
+else
+    ASSET_PREFIX="http-server-mbt"
+fi
+ASSET_NAME="${ASSET_PREFIX}-${OS}-${ARCH}"
 
 # Fetch latest release info
 echo "Fetching latest version info from GitHub..."
@@ -48,21 +72,29 @@ LATEST_VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"
 DOWNLOAD_URL=$(echo "$LATEST_RELEASE" | grep "browser_download_url.*$ASSET_NAME" | cut -d '"' -f 4)
 
 if [ -z "$LATEST_VERSION" ] || [ -z "$DOWNLOAD_URL" ]; then
-    echo "Failed to fetch latest version or download URL. Please check your network or check if a Release exists."
+    echo "Failed to fetch latest version or download URL for $ASSET_NAME. Please check your network or check if a Release exists."
     exit 1
 fi
 
 # Check if already installed and version matches
+VARIANT_DESC="full"
+if [ "$VARIANT" == "min" ]; then
+    VARIANT_DESC="min"
+fi
+
 if [ -f "$BIN_PATH" ]; then
     CURRENT_VERSION=$("$BIN_PATH" -v 2>/dev/null || echo "unknown")
     if [ "$CURRENT_VERSION" == "$LATEST_VERSION" ]; then
         echo "✨ You already have the latest version ($LATEST_VERSION) installed at $BIN_PATH."
+        if [ "$VARIANT" == "min" ]; then
+            ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-min"
+        fi
         exit 0
     else
-        echo "🚀 Updating from $CURRENT_VERSION to $LATEST_VERSION..."
+        echo "🚀 Updating from $CURRENT_VERSION to $LATEST_VERSION ($VARIANT_DESC variant)..."
     fi
 else
-    echo "🚀 Installing version $LATEST_VERSION..."
+    echo "🚀 Installing version $LATEST_VERSION ($VARIANT_DESC variant)..."
 fi
 
 mkdir -p "$INSTALL_DIR"
@@ -86,10 +118,18 @@ fi
 
 chmod +x "$TEMP_PATH"
 mv -f "$TEMP_PATH" "$BIN_PATH"
+if [ "$VARIANT" == "min" ]; then
+    ln -sf "$BIN_NAME" "$INSTALL_DIR/http-server-min"
+fi
 trap - EXIT
 
 echo ""
-echo "✅ Installed $BIN_NAME v$LATEST_VERSION successfully to $BIN_PATH"
+if [ "$VARIANT" == "min" ]; then
+    echo "✅ Installed http-server-mbt (min variant) v$LATEST_VERSION successfully to $BIN_PATH"
+    echo "   (Also available as $INSTALL_DIR/http-server-min)"
+else
+    echo "✅ Installed $BIN_NAME v$LATEST_VERSION successfully to $BIN_PATH"
+fi
 
 # Auto add to PATH
 export_path_line="export PATH=\"\$HOME/.unmbt:\$PATH\""

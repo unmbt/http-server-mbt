@@ -88,6 +88,7 @@ fn tf_backend_open(
   offset : Int64,
   length : Int64,
 ) -> Int64 {
+  let _ = @utf8.encode("")
   http_server_tf_open_c(sock, path, offset, length)
 }
 

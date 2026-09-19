@@ -21,13 +21,16 @@ jobs:
           # (D-16): kqueue event loop from moonbitlang/async + Darwin
           # sendfile zero-copy backend (server/transmit_file_darwin.c).
           - os: macos-latest
-            artifact_name: http-server-mbt-macos-arm64
+            platform: macos-arm64
+            exe_ext: ""
           # Linux x86_64 enabled by T-032 Linux sub-deliverable (D-16):
           # native check/test + artifact.
           - os: ubuntu-latest
-            artifact_name: http-server-mbt-linux-amd64
+            platform: linux-amd64
+            exe_ext: ""
           - os: windows-latest
-            artifact_name: http-server-mbt-windows-amd64.exe
+            platform: windows-amd64
+            exe_ext: ".exe"
 
     steps:
       - name: Disable Git EOL conversion
@@ -69,15 +72,22 @@ jobs:
           set -euo pipefail
           git diff --exit-code cmd/http-server-mbt/generated_version.mbt
 
-      - name: Prepare Artifact
+      - name: Prepare Artifacts (Full & Min CLI)
         shell: bash
-        run: cp _build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe ${{ matrix.artifact_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-cli
+          EXE_EXT="${{ matrix.exe_ext }}"
+          PLATFORM="${{ matrix.platform }}"
+          cp "_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
+          cp "_build/native/release/build/cmd/http-server-min/http-server-min.exe" "release-cli/http-server-min-${PLATFORM}${EXE_EXT}"
+          chmod +x release-cli/* || true
 
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}
+          name: cli-${{ matrix.platform }}
+          path: release-cli/
           retention-days: 7
 
   publish:
@@ -133,6 +143,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: cli-*
           path: artifacts
           merge-multiple: true
 

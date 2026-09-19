@@ -1,0 +1,8 @@
+((Timpl_fun_decl
+  ((kind Fun_kind_regular) (fn_binder hs_abi_version)
+   (fn
+    ((params ()) (body (Texpr_constant 1 Int))
+     (ret_constraint ((Tname ((lid Int)) () Int)))
+     (err_constraint No_error_typ) (ty (() -> Int))))
+   (is_pub true)
+   (attrs ((Tattr_export_name (name hs_abi_version) (loc_ 0:1-0:31)))))))

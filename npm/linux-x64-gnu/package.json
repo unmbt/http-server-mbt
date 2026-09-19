@@ -1,0 +1,25 @@
+{
+  "name": "@unmbt/http-server-mbt-linux-x64-gnu",
+  "version": "0.3.1",
+  "description": "Linux x86_64 (glibc) prebuilt native binary for @unmbt/http-server-mbt",
+  "main": "http_server.linux-x64-gnu.node",
+  "files": [
+    "http_server.linux-x64-gnu.node",
+    "README.md"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unmbt/http-server-mbt.git",
+    "directory": "npm/linux-x64-gnu"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=16.13.0"
+  }
+}

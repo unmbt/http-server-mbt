@@ -1,0 +1,25 @@
+{
+  "name": "@unmbt/http-server-mbt-darwin-arm64",
+  "version": "0.3.1",
+  "description": "macOS ARM64 (Apple Silicon) prebuilt native binary for @unmbt/http-server-mbt",
+  "main": "http_server.darwin-arm64.node",
+  "files": [
+    "http_server.darwin-arm64.node",
+    "README.md"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unmbt/http-server-mbt.git",
+    "directory": "npm/darwin-arm64"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=16.13.0"
+  }
+}

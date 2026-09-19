@@ -8,3 +8,7 @@ target
 embedded_mod.mbt
 .zcode
 trace.json
+*.node
+*.exp
+*.lib
+c_abi/node/lib/

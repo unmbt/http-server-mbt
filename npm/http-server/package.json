@@ -1,0 +1,47 @@
+{
+  "name": "@unmbt/http-server-mbt",
+  "version": "0.3.1",
+  "description": "High-performance MoonBit HTTP/HTTPS static server and reverse proxy Node.js addon",
+  "main": "./index.cjs",
+  "module": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "require": "./index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.cjs",
+    "index.mjs",
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unmbt/http-server-mbt.git",
+    "directory": "npm/http-server"
+  },
+  "keywords": [
+    "http-server",
+    "static-server",
+    "https",
+    "proxy",
+    "moonbit",
+    "node-api",
+    "esm",
+    "cjs"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=16.13.0"
+  },
+  "optionalDependencies": {
+    "@unmbt/http-server-mbt-win32-x64-msvc": "0.3.1",
+    "@unmbt/http-server-mbt-linux-x64-gnu": "0.3.1",
+    "@unmbt/http-server-mbt-darwin-arm64": "0.3.1"
+  }
+}

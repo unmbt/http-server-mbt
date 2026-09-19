@@ -10,6 +10,11 @@ on:
     branches:
       - master
   workflow_dispatch:
+    inputs:
+      publish_npm:
+        description: 'Publish packages to npm'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,14 +36,20 @@ jobs:
             os_name: Windows
             arch: x86_64
             platform: windows-amd64
+            npm_dir: win32-x64-msvc
+            node_file: http_server.win32-x64-msvc.node
           - os: ubuntu-latest
             os_name: Linux
             arch: x86_64
             platform: linux-amd64
+            npm_dir: linux-x64-gnu
+            node_file: http_server.linux-x64-gnu.node
           - os: macos-latest
             os_name: macOS
             arch: arm64
             platform: macos-arm64
+            npm_dir: darwin-arm64
+            node_file: http_server.darwin-arm64.node
 
     steps:
       - name: Disable Git EOL conversion
@@ -46,7 +57,7 @@ jobs:
         run: git config --global core.autocrlf false
 
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
@@ -62,6 +73,24 @@ jobs:
 
       - name: Build and Verify C ABI Libraries (min & full)
         run: moon run scripts/build_cabi.mbtx
+
+      - name: Setup Node.js (v22 LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build Node-API Native Module (full)
+        run: moon run scripts/build_node.mbtx
+
+      - name: Run Node-API Native Module Integration Tests
+        run: node npm/test/index.test.js
+
+      - name: Upload Node-API Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-binary-${{ matrix.npm_dir }}
+          path: npm/${{ matrix.npm_dir }}/${{ matrix.node_file }}
+          retention-days: 7
 
       - name: Prepare C ABI SDK Artifacts
         shell: bash
@@ -108,6 +137,101 @@ jobs:
           name: cabi-${{ matrix.platform }}
           path: release-cabi/
           retention-days: 7
+
+  publish-npm:
+    name: Publish to npm Registry
+    needs: matrix-build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_npm == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for npm provenance / Trusted Publishing
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download win32-x64-msvc binary
+        uses: actions/download-artifact@v4
+        with:
+          name: node-binary-win32-x64-msvc
+          path: npm/win32-x64-msvc
+
+      - name: Download linux-x64-gnu binary
+        uses: actions/download-artifact@v4
+        with:
+          name: node-binary-linux-x64-gnu
+          path: npm/linux-x64-gnu
+
+      - name: Download darwin-arm64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: node-binary-darwin-arm64
+          path: npm/darwin-arm64
+
+      - name: Synchronize npm Package Versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(node -p 'require("./npm/http-server/package.json").version')"
+          fi
+          echo "Synchronizing npm packages to version: ${VERSION}"
+
+          update_version() {
+            local pkg_file="$1"
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('${pkg_file}', 'utf8'));
+              pkg.version = '${VERSION}';
+              if (pkg.optionalDependencies) {
+                for (const k of Object.keys(pkg.optionalDependencies)) {
+                  pkg.optionalDependencies[k] = '${VERSION}';
+                }
+              }
+              fs.writeFileSync('${pkg_file}', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          }
+
+          update_version "npm/win32-x64-msvc/package.json"
+          update_version "npm/linux-x64-gnu/package.json"
+          update_version "npm/darwin-arm64/package.json"
+          update_version "npm/http-server/package.json"
+
+      - name: Publish Platform Packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NODE_AUTH_TOKEN not provided; removing .npmrc to use npm Trusted Publishing (OIDC)..."
+            rm -f ~/.npmrc
+          fi
+          echo "Publishing platform packages with provenance..."
+          npm publish npm/win32-x64-msvc --access public --provenance
+          npm publish npm/linux-x64-gnu --access public --provenance
+          npm publish npm/darwin-arm64 --access public --provenance
+
+      - name: Publish Main Package
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NODE_AUTH_TOKEN not provided; removing .npmrc to use npm Trusted Publishing (OIDC)..."
+            rm -f ~/.npmrc
+          fi
+          echo "Publishing main package with provenance..."
+          npm publish npm/http-server --access public --provenance
 
   release:
     name: Create GitHub Release (C ABI)

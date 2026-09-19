@@ -298,85 +298,124 @@ fn main() {
 
 ### 3.3 Python
 
-借助 Python 标准库的 `ctypes`，**无需安装任何额外三方库（0 pip 依赖）**，即可直接调用动态库：
+借助 Python 标准库的 `ctypes`，**无需安装任何额外三方库（0 pip 依赖）**，即可直接调用动态库。支持 `hs_min`（纯静态 HTTP）与 `hs_full`（含 HTTPS/TLS 与反向代理）。
+
+#### 动态库加载与面向对象封装
 
 ```python
 # server.py
 import sys
 import os
 import json
+import signal
 import ctypes
 from ctypes import c_char_p, c_size_t, c_int32, c_uint32, c_void_p, POINTER
 
-def load_hs_library():
+def load_hs_library(variant: str = "full"):
+    """
+    加载 http-server-mbt 动态库。
+    variant: "full" (含 HTTPS/代理) 或 "min" (纯静态)
+    """
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    lib_dir = os.path.join(script_dir, "lib")
+    search_dirs = [
+        os.path.join(script_dir, "lib"),
+        os.path.join(script_dir, "../../target/cabi"),
+        script_dir,
+    ]
 
     if sys.platform.startswith("win"):
-        dll_name = "hs_min.dll"
+        dll_name = f"hs_{variant}.dll"
     elif sys.platform == "darwin":
-        dll_name = "libhs_min.dylib"
+        dll_name = f"libhs_{variant}.dylib"
     else:
-        dll_name = "libhs_min.so"
+        dll_name = f"libhs_{variant}.so"
 
-    dll_path = os.path.join(lib_dir, dll_name)
-    if not os.path.exists(dll_path):
-        # 尝试当前目录
-        dll_path = dll_name
+    for d in search_dirs:
+        cand = os.path.join(d, dll_name)
+        if os.path.exists(cand):
+            return ctypes.CDLL(cand)
 
-    return ctypes.CDLL(dll_path)
-
-lib = load_hs_library()
-
-# 设置函数原型
-lib.hs_abi_version.restype = c_uint32
-lib.hs_abi_version.argtypes = []
-
-lib.hs_server_start.restype = c_int32
-lib.hs_server_start.argtypes = [c_char_p, c_size_t, POINTER(c_void_p)]
-
-lib.hs_server_stop.restype = c_int32
-lib.hs_server_stop.argtypes = [c_void_p]
-
-lib.hs_server_destroy.restype = None
-lib.hs_server_destroy.argtypes = [c_void_p]
-
-lib.hs_error_copy.restype = c_size_t
-lib.hs_error_copy.argtypes = [c_int32, c_char_p, c_size_t]
+    # 尝试系统 PATH / LD_LIBRARY_PATH 搜索
+    return ctypes.CDLL(dll_name)
 
 class HttpServer:
-    def __init__(self, config: dict):
-        self.config_bytes = json.dumps(config).encode('utf-8')
+    """
+    http-server-mbt 原生服务器 Python 封装，支持 Context Manager (RAII) 自动管理生命周期。
+    """
+    def __init__(self, config: dict, variant: str = "full"):
+        self.lib = load_hs_library(variant)
+        self._bind_ffi()
+        self.config_bytes = json.dumps(config).encode("utf-8")
         self.server_ptr = c_void_p(None)
+
+    def _bind_ffi(self):
+        self.lib.hs_abi_version.restype = c_uint32
+        self.lib.hs_abi_version.argtypes = []
+
+        self.lib.hs_server_start.restype = c_int32
+        self.lib.hs_server_start.argtypes = [c_char_p, c_size_t, POINTER(c_void_p)]
+
+        self.lib.hs_server_stop.restype = c_int32
+        self.lib.hs_server_stop.argtypes = [c_void_p]
+
+        self.lib.hs_server_destroy.restype = None
+        self.lib.hs_server_destroy.argtypes = [c_void_p]
+
+        self.lib.hs_error_copy.restype = c_size_t
+        self.lib.hs_error_copy.argtypes = [c_int32, c_char_p, c_size_t]
+
+    @property
+    def abi_version(self) -> int:
+        return self.lib.hs_abi_version()
+
+    def start(self):
+        if self.server_ptr:
+            return
+        rc = self.lib.hs_server_start(
+            self.config_bytes, len(self.config_bytes), ctypes.byref(self.server_ptr)
+        )
+        if rc != 0 or not self.server_ptr:
+            err_buf = ctypes.create_string_buffer(128)
+            self.lib.hs_error_copy(rc, err_buf, 128)
+            err_msg = err_buf.value.decode("utf-8")
+            raise RuntimeError(f"Server start failed (code {rc}): {err_msg}")
+
+    def stop(self):
+        if self.server_ptr:
+            self.lib.hs_server_stop(self.server_ptr)
+            self.lib.hs_server_destroy(self.server_ptr)
+            self.server_ptr = None
 
     def __enter__(self):
         self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def start(self):
-        rc = lib.hs_server_start(self.config_bytes, len(self.config_bytes), ctypes.byref(self.server_ptr))
-        if rc != 0 or not self.server_ptr:
-            err_buf = ctypes.create_string_buffer(128)
-            lib.hs_error_copy(rc, err_buf, 128)
-            raise RuntimeError(f"Server start failed ({rc}): {err_buf.value.decode('utf-8')}")
-
-    def close(self):
-        if self.server_ptr:
-            lib.hs_server_stop(self.server_ptr)
-            lib.hs_server_destroy(self.server_ptr)
-            self.server_ptr = None
+        self.stop()
 
 if __name__ == "__main__":
-    print(f"ABI Version: 0x{lib.hs_abi_version():08X}")
-    cfg = {"port": 8080, "root": ".", "silent": False}
+    # 配置示例：启用 HTTPS (需 full 档位) 或纯 HTTP 静态服务
+    config = {
+        "port": 8080,
+        "root": ".",
+        "spa": True,
+        "cors": True,
+        "silent": False,
+        # 如需 HTTPS:
+        # "cert_file": "server.crt",
+        # "key_file": "server.key",
+        # 如需反向代理:
+        # "proxy": "http://127.0.0.1:3000"
+    }
 
-    with HttpServer(cfg) as server:
-        print("Server running on http://127.0.0.1:8080. Press Enter to exit...")
-        input()
-    print("Server cleanly closed.")
+    with HttpServer(config, variant="full") as server:
+        print(f"ABI Version: 0x{server.abi_version:08X}")
+        print("Server running on http://127.0.0.1:8080. Press Ctrl+C to stop...")
+        try:
+            signal.pause() if hasattr(signal, "pause") else input()
+        except KeyboardInterrupt:
+            pass
+    print("Server cleanly stopped.")
 ```
 
 ---
@@ -445,58 +484,75 @@ func main() {
 
 ---
 
-### 3.5 Node.js / Bun
+### 3.5 Node.js (Node-API 原生扩展模块)
 
-在 Node.js 中，推荐使用极简高效的 `koffi` 模块调用动态库；若使用 Bun，可直接使用内置的原生 `bun:ffi`。
+项目提供官方的 Node-API (N-API) 原生模块 **`@unmbt/http-server-mbt`**。内部静态集成 `full` 引擎（包含 MbedTLS 4.2.0 传输层与反向代理支持），**自包含单个 `.node` 文件，用户无需安装 Visual Studio、Python 或任何构建工具链，零外部动态库依赖**。
 
-#### Node.js (`koffi`)
+- **ABI 稳定保证**：基于 Node-API Version 8，在 Node.js 16.13.0+、18.x、20.x、22.x、24.x+ 及后续版本上免重新编译即可直接运行。
+- **预编译平台分发**：通过 `optionalDependencies` 自动按系统下载对应预构建二进制（Windows x64、Linux x64 glibc、macOS Apple Silicon arm64）。
+
+#### 安装
 
 ```bash
-npm install koffi
+npm install @unmbt/http-server-mbt
 ```
 
+#### 基本用法 (ESM & CommonJS 双兼容)
+
 ```javascript
-// index.js
-const koffi = require('koffi');
-const path = require('path');
+// ESM (推荐)
+import { createServer, getAbiVersion } from '@unmbt/http-server-mbt';
 
-const libExt = process.platform === 'win32' ? '.dll' : process.platform === 'darwin' ? '.dylib' : '.so';
-const libPrefix = process.platform === 'win32' ? '' : 'lib';
-const libPath = path.resolve(__dirname, 'lib', `${libPrefix}hs_min${libExt}`);
+// CommonJS (同样兼容支持)
+// const { createServer, getAbiVersion } = require('@unmbt/http-server-mbt');
 
-const lib = koffi.load(libPath);
+console.log(`ABI Version: 0x${getAbiVersion().toString(16)}`);
 
-const hs_server_t = koffi.opaque();
-const hs_abi_version = lib.func('uint32_t hs_abi_version()');
-const hs_server_start = lib.func('int32_t hs_server_start(const char* json_config, size_t config_len, _Out_ hs_server_t** out_server)');
-const hs_server_stop = lib.func('int32_t hs_server_stop(hs_server_t* server)');
-const hs_server_destroy = lib.func('void hs_server_destroy(hs_server_t* server)');
-const hs_error_copy = lib.func('size_t hs_error_copy(int32_t code, _Out_ uint8_t* buf, size_t cap)');
+// 启动静态/HTTPS/反向代理服务
+const server = createServer({
+  port: 8080,
+  root: './public',
+  spa: true,
+  cors: true,
+  silent: false,
+  cache_seconds: 3600,
+  // HTTPS 示例 (full 版本内置支持)
+  // cert_file: 'server.crt',
+  // key_file: 'server.key',
+  // 反向代理示例
+  // proxy: 'http://127.0.0.1:3000'
+});
 
-console.log(`ABI Version: 0x${hs_abi_version().toString(16).padStart(8, '0')}`);
+console.log('Server is running on http://127.0.0.1:8080');
 
-const config = JSON.stringify({ port: 8080, root: '.', silent: false });
-const outServer = [null];
-
-const rc = hs_server_start(config, Buffer.byteLength(config), outServer);
-if (rc !== 0) {
-  const errBuf = Buffer.alloc(128);
-  hs_error_copy(rc, errBuf, 128);
-  console.error(`Failed to start server: ${errBuf.toString()}`);
-  process.exit(1);
-}
-
-const serverHandle = outServer[0];
-console.log('Server running on http://127.0.0.1:8080. Press Ctrl+C to exit.');
-
+// 优雅停机
 process.on('SIGINT', () => {
-  console.log('\nStopping server...');
-  hs_server_stop(serverHandle);
-  hs_server_destroy(serverHandle);
-  console.log('Server destroyed cleanly.');
+  console.log('\nShutting down server...');
+  server.stop();
+  console.log('Server stopped cleanly.');
   process.exit(0);
 });
 ```
+
+#### TypeScript 支持
+
+主包自带完整的 TypeScript 类型声明（`index.d.ts`），开箱即用：
+
+```typescript
+import { createServer, ServerConfig, HttpServer } from '@unmbt/http-server-mbt';
+
+const config: ServerConfig = {
+  port: 8080,
+  root: './dist',
+  spa: true
+};
+
+const server: HttpServer = createServer(config);
+```
+
+#### Bun 支持
+
+在 Bun 环境下，既可直接使用该 Node-API 模块（`import { createServer } from '@unmbt/http-server-mbt'`），也可利用 Bun 内置的 `bun:ffi` 直接动态链接 `libhs_full.so` / `libhs_full.dylib`。
 
 ---
 

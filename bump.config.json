@@ -1,4 +1,11 @@
 {
   "execute": "moon check",
-  "all": true
+  "all": true,
+  "files": [
+    "moon.mod",
+    "npm/http-server/package.json",
+    "npm/win32-x64-msvc/package.json",
+    "npm/linux-x64-gnu/package.json",
+    "npm/darwin-arm64/package.json"
+  ]
 }

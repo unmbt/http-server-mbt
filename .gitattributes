@@ -10,3 +10,6 @@
 # HTTP fixtures are Content-Length / Range / ETag sensitive.
 # Treat the whole tree as raw bytes so Windows autocrlf cannot rewrite them.
 testdata/** -text -diff -merge !eol
+
+# Vendored MbedTLS sources (scripts/vendor_tls.mbtx): never EOL-convert or diff-rewrite.
+tls/mbedtls-4.2.0/** -text -diff -merge !eol

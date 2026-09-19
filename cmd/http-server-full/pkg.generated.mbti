@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/cmd/http-server-full"
+
+import {
+  "moonbitlang/core/argparse",
+  "moonbitlang/core/debug",
+  "unmbt/http-server-mbt/core",
+}
+
+// Values
+pub fn build_command() -> @argparse.Command
+
+pub fn parse_auth(String) -> Result[(String, String), String]
+
+pub fn parse_cache(String) -> Result[(Int, String?), String]
+
+pub fn parse_cli(ArrayView[String]) -> Result[CliAction, String]
+
+pub fn parse_integer(String) -> Int?
+
+pub fn parse_port(String) -> Int?
+
+// Errors
+
+// Types and methods
+pub enum CliAction {
+  Help(String)
+  Version(String)
+  Run(@core.Config, Int)
+} derive(@debug.Debug)
+pub fn CliAction::to_string(Self) -> String
+pub impl Show for CliAction
+
+// Type aliases
+
+// Traits

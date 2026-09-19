@@ -1,0 +1,12 @@
+import {
+  "unmbt/http-server-mbt/full" @full_server,
+  "unmbt/http-server-mbt/core",
+  "moonbitlang/async",
+}
+
+pkgtype(kind: "foreign_library")
+
+options(
+  "native-stub": [ "bridge.c" ],
+  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
+)

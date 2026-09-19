@@ -7,12 +7,14 @@ import {
   "moonbitlang/async/io",
   "moonbitlang/async/types",
   "moonbitlang/async/websocket",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
 }
 
 import {
-  "moonbitlang/async/fs",
   "moonbitlang/async/websocket",
+  "moonbitlang/async/fs",
 } for "test"
 
 options(
@@ -21,5 +23,6 @@ options(
     "transmit_file_linux.c",
     "transmit_file_darwin.c",
   ],
+  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
   targets: { "*.mbt": [ "native" ] },
 )

@@ -1,0 +1,8 @@
+((Ptop_funcdef
+  ((name ((binder_name hs_abi_version))) (decl_params (())) (quantifiers ())
+   (return_type ((Ptype_name ((lid Int)) ()))) (error_type No_error_typ)
+   (vis (Vis_pub ()))
+   (attrs
+    (((Apply (func export_name)
+       (args ((Expr (String (lit hs_abi_version))))))))))
+  (Decl_body (Pexpr_constant 1))))

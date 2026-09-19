@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/full"
+
+import {
+  "moonbitlang/async/socket",
+  "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/server",
+  "unmbt/http-server-mbt/tls",
+}
+
+// Values
+pub async fn build_tls_acceptor(@core.Config) -> @tls.TlsAcceptor raise @core.ConfigError
+
+pub async fn new_tls_acceptor(@core.Config) -> &@server.Acceptor raise @core.ConfigError
+
+pub async fn with_server(@core.Config, async (@server.Server) -> Unit) -> Unit
+
+pub async fn with_server_at(@core.Config, Int, async (@server.Server) -> Unit) -> Unit
+
+// Errors
+
+// Types and methods
+pub struct TlsServerAcceptor {
+  tls_acceptor : @tls.TlsAcceptor
+}
+pub fn TlsServerAcceptor::new(@tls.TlsAcceptor) -> Self
+pub impl @server.Acceptor for TlsServerAcceptor
+
+// Type aliases
+
+// Traits

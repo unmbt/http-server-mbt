@@ -1,20 +1,23 @@
 param (
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [switch]$Min
 )
 
 $Repo = "unmbt/http-server-mbt"
 $InstallDir = "$env:USERPROFILE\.unmbt"
 $BinName = "http-server-mbt.exe"
 $BinPath = Join-Path $InstallDir $BinName
+$MinBinPath = Join-Path $InstallDir "http-server-min.exe"
 
 if ($Uninstall) {
     Write-Host "Uninstalling $BinName..." -ForegroundColor Cyan
     if (Test-Path $BinPath) {
         Remove-Item -Path $BinPath -Force
-        Write-Host "Uninstalled successfully." -ForegroundColor Green
-    } else {
-        Write-Host "Not installed." -ForegroundColor Yellow
     }
+    if (Test-Path $MinBinPath) {
+        Remove-Item -Path $MinBinPath -Force
+    }
+    Write-Host "Uninstalled successfully." -ForegroundColor Green
     return
 }
 
@@ -26,7 +29,9 @@ if ($Arch -eq "amd64") {
     return
 }
 
-$AssetName = "http-server-mbt-windows-$AssetArch.exe"
+$AssetPrefix = if ($Min) { "http-server-min" } else { "http-server-mbt" }
+$VariantDesc = if ($Min) { " (min variant)" } else { "" }
+$AssetName = "$AssetPrefix-windows-$AssetArch.exe"
 
 Write-Host "Fetching latest version info from GitHub..." -ForegroundColor Cyan
 try {
@@ -39,7 +44,7 @@ try {
 }
 
 if (-not $LatestVersion -or -not $DownloadUrl) {
-    Write-Host "Failed to find the asset for Windows in the latest release." -ForegroundColor Red
+    Write-Host "Failed to find the asset $AssetName for Windows in the latest release." -ForegroundColor Red
     return
 }
 
@@ -47,13 +52,16 @@ if (Test-Path $BinPath) {
     # Execute to get version
     $CurrentVersion = & $BinPath -v
     if ($CurrentVersion -eq $LatestVersion) {
-        Write-Host "✨ You already have the latest version ($LatestVersion) installed at $BinPath." -ForegroundColor Green
+        Write-Host "✨ You already have the latest version ($LatestVersion$VariantDesc) installed at $BinPath." -ForegroundColor Green
+        if ($Min -and -not (Test-Path $MinBinPath)) {
+            Copy-Item -Path $BinPath -Destination $MinBinPath -Force -ErrorAction SilentlyContinue
+        }
         return
     } else {
-        Write-Host "🚀 Updating from $CurrentVersion to $LatestVersion..." -ForegroundColor Cyan
+        Write-Host "🚀 Updating from $CurrentVersion to $LatestVersion$VariantDesc..." -ForegroundColor Cyan
     }
 } else {
-    Write-Host "🚀 Installing version $LatestVersion..." -ForegroundColor Cyan
+    Write-Host "🚀 Installing version $LatestVersion$VariantDesc..." -ForegroundColor Cyan
 }
 
 if (-not (Test-Path $InstallDir)) {
@@ -69,13 +77,21 @@ try {
         throw "The downloaded file is empty."
     }
     Move-Item -Path $TempPath -Destination $BinPath -Force -ErrorAction Stop
+    if ($Min) {
+        Copy-Item -Path $BinPath -Destination $MinBinPath -Force -ErrorAction SilentlyContinue
+    }
 } catch {
     Remove-Item -Path $TempPath -Force -ErrorAction SilentlyContinue
     Write-Host "Failed to download $AssetName. The existing installation was not changed." -ForegroundColor Red
     throw
 }
 
-Write-Host "`n✅ Installed http-server-mbt v$LatestVersion successfully to $BinPath" -ForegroundColor Green
+if ($Min) {
+    Write-Host "`n✅ Installed http-server-mbt (min) v$LatestVersion successfully to $BinPath" -ForegroundColor Green
+    Write-Host "   (also available as http-server-min.exe)" -ForegroundColor Cyan
+} else {
+    Write-Host "`n✅ Installed http-server-mbt v$LatestVersion successfully to $BinPath" -ForegroundColor Green
+}
 
 $UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($UserPath -notmatch [regex]::Escape($InstallDir)) {

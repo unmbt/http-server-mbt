@@ -180,3 +180,42 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 > 3. 后续 Milestone 7 将首先由 T-032 建立 GitHub Actions 真实 Runner 矩阵（Linux x86_64、macOS arm64、Windows x86_64），确保三平台在同一规范、同一接口和同一测试套件下持续验证与发行。
 
 
+
+---
+
+## 8. MbedTLS 4.2 TLS 支持（T-012 Windows 分项，2026-09-13）
+
+按 design 版本 5（D-08 修订：TLS 后端由静态 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0，经用户确认）完成 TLS 的 Windows Native 分项交付。
+
+### 交付物
+
+| 组件 | 位置 | 说明 |
+| :--- | :--- | :--- |
+| vendored MbedTLS | `tls/mbedtls-4.2.0/` | 官方 `mbedtls-4.2.0.tar.bz2`（SHA-256 `2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），108 个 .c（含 TF-PSA-Crypto 1.2.0 core/platform/utilities/extras/builtin 驱动），排除 `net_sockets.c`；许可证 Apache-2.0/GPL-2.0 双许可取 Apache-2.0，LICENSE 随树入库 |
+| 可复现引入脚本 | `scripts/vendor_tls.mbtx` | 下载/校验 SHA-256 → 提取 → 托管 `#undef` 覆盖（NET/TIMING/FS_IO/ITS/STORAGE/NV-seed；保留 `MBEDTLS_HAVE_TIME_DATE` 供证书过期校验）→ 再生 `tls/moon.pkg`（native-stub 清单 + `-I` 模块根相对路径）；幂等（两次运行产物逐字节一致） |
+| C 桥 | `tls/tls_bridge.c` | `psa_crypto_init` 幂等全局初始化；`mbedtls_ssl_set_bio` 自定义 BIO + 双有界环形缓冲（16KB record + 余量）；句柄 + GC finalizer 双重释放保障（magic 防护）；对象计数探针；WANT_READ/WANT_WRITE → `-1/-2` 控制码约定 |
+| MoonBit TLS 包 | `tls/` | `TlsAcceptor::new_server/new_client`（证书链/私钥/passphrase/CA/insecure）、`TlsConn` 实现 `@io.Reader`/`@io.Writer`、异步握手/读写/`shutdown`（close_notify 排空）、`TlsUnexpectedEof`（截断流拒绝，RFC 8446 §6.1） |
+| 泛化 HTTP 解析器 | `server/http_parser.mbt` | 复制 `moonbitlang/async@0.21.3` parser.mbt（Apache-2.0 保留版权头），泛化到任意 `@io.Reader`，构造 `@http.Request`；裁剪 gzip/响应/Passthrough；上游泛化 `ServerConnection` 后可回切 |
+| server 集成 | `server/server.mbt` | `Transport` 抽象（Plain/Encrypted）；TLS 握手失败即回收关闭；`transmit_file` 仅明文，TLS 走 64KB 有界缓冲降级（D-05/T-017）；D-01 监听前预检（acceptor 建立失败不监听） |
+| CLI | `cmd/http-server-mbt/cli.mbt` | 新增 `--cert`、`--key`、`--key-passphrase`（支持 `TLS_KEY_PASSPHRASE` 环境变量）；配置校验含 cert/key 配对（D-01） |
+| 测试 | `tls/loopback_test.mbt` + fixtures | 管道回环完整 TLS 1.3 握手/数据交换/双向 close_notify；错误口令/正确口令；主机名不匹配拒绝（真实 TCP）；insecure 显式例外；泄漏探针（min-3 基线 + 静默等待，沿用 handle_leak_assert 模式） |
+
+### 验证证据（Windows x86_64，clang-cl 22.1.3，Moon 0.1.20260904）
+
+1. `moon check --target native`：0 错误（6 个既有 unused/internal 类告警，含 server 包历史 unused_package）。
+2. `moon test --target native`：**183/183 通过**（既有 169 项零回归 + 新增 14 项），连续 3 轮稳定；tls 包单独 20 轮压力无崩溃。
+   - 交付中发现并修复一个 UAF：显式 close 先释放 C 对象、GC finalizer 随后再按句柄销毁时会对已释放内存做 magic 读取；若地址被并行新建的连接复用会误释放存活对象（偶发 0xc0000005）。修复为所有权槽位设计——外部对象的槽位是唯一所有权 token，显式 close 与 finalizer 都经 `hs_tls_*_close_obj` 先清零再销毁，保证恰好一次释放；MoonBit 侧对已 close 连接的读写直接拒绝。
+3. `moon info`：`core/server/tls` 三个 `.mbti` 纯新增 API，根包零变化；`moon fmt` 无实质差异。
+4. 真实 HTTPS E2E（release CLI + 系统 curl/OpenSSL 互操作）：
+   - TLSv1.3 / TLS_AES_256_GCM_SHA384 协商成功，CN=localhost 证书校验；
+   - `--cacert` 强校验客户端（显式信任根 + 主机名验证）200；`--tlsv1.2` 强制旧版本 200；
+   - GET/HEAD 200、Range 206（bytes=0-4 字节精确）、keep-alive 双请求、3MB 二进制文件字节一致（有界缓冲路径完整性）；
+   - 300 连续请求压力：进程句柄数 **143 → 143 零增长**，工作集 ~10.9→11.6MB 稳定；
+   - 预检失败路径：cert 无 key → `InvalidTls: cert_file requires key_file`；错误口令 → `key passphrase mismatch`；缺口令 → `key is encrypted: --key-passphrase is required`；均不监听（exit 1）。
+5. 平台事实（T-002 补充）：moon `native-stub` 支持包内子目录源码（包相对路径），`stub-cc-flags` 以模块根为 cwd（`-I` 全平台通用）；`mbedtls_pk_parse_key` 要求缓冲区 NUL 结尾；TF-PSA-Crypto 需同时编译 core/platform/utilities/extras/builtin。
+
+### 覆盖缺口（如实记录）
+
+- ASan/UBSan：Windows 本机 moon 工具链（MSVC 风格链接）+ 缺少 Python 运行时，`run-asan.py` 不可用；ASan 接入列入 T-032 Linux/macOS runner（clang/gcc `-fsanitize=address`）与 T-012 后续分项。补偿证据：C 侧对象计数探针 + 300 请求句柄零增长 + magic 防双重释放。
+- Linux/macOS TLS 分项：vendored 树与桥均为可移植 C，`moon test` 三平台矩阵自动编译验证（T-032 现有 ci.yml 无需改动即覆盖）；musl 完全静态验证归 T-022。
+- 信任根内嵌 bundle、SNI 多证书路由、ALPN、mTLS：未在本分项（D-08 信任根为独立分项；ALPN 规范未规划；mTLS 未规划）。

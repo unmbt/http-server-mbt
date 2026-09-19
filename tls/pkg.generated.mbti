@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/tls"
+
+import {
+  "moonbitlang/async/io",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn tls_acceptor_count() -> Int
+
+pub fn tls_conn_count() -> Int
+
+pub fn tls_global_init() -> Unit raise TlsError
+
+// Errors
+pub suberror TlsError {
+  TlsError(code~ : Int, message~ : String)
+  TlsUnexpectedEof
+} derive(@debug.Debug)
+
+// Types and methods
+type AcceptorObj
+
+type ConnObj
+
+pub struct TlsAcceptor {
+  handle : Int64
+  obj : AcceptorObj
+  mut closed : Bool
+}
+pub async fn TlsAcceptor::accept(Self, reader~ : &@io.Reader, writer~ : &@io.Writer) -> TlsConn
+pub fn TlsAcceptor::close(Self) -> Unit
+pub async fn TlsAcceptor::connect(Self, String, reader~ : &@io.Reader, writer~ : &@io.Writer) -> TlsConn
+pub fn TlsAcceptor::new_client(ca? : Bytes, insecure? : Bool) -> Self raise TlsError
+pub fn TlsAcceptor::new_server(Bytes, Bytes, passphrase? : Bytes) -> Self raise TlsError
+
+pub struct TlsConn {
+  handle : Int64
+  obj : ConnObj
+  reader : &@io.Reader
+  writer : &@io.Writer
+  rb : @io.ReaderBuffer
+  in_scratch : FixedArray[Byte]
+  out_scratch : FixedArray[Byte]
+  mut closed : Bool
+}
+pub fn TlsConn::close(Self) -> Unit
+pub fn TlsConn::is_closed(Self) -> Bool
+pub async fn TlsConn::shutdown(Self) -> Bool
+pub impl @io.Reader for TlsConn
+pub impl @io.Writer for TlsConn
+
+// Type aliases
+
+// Traits

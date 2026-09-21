@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.codegraph
+.mooncakes
+node_modules
+target
+*.log
+*.tmp
+_build/**/*.o
+_build/**/*.core
+_build/**/*.mi
+_build/**/*.c
+_build/**/*.ast
+_build/**/*.mbti

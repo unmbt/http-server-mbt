@@ -75,7 +75,43 @@ jobs:
         run: moon test --target native
 
       - name: Build Release (native)
-        run: moon build cmd/http-server-mbt cmd/http-server-mbt-thin --target native --release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            # Enable static linking for Linux ELF to run cleanly in distroless/static (D-08, D-15)
+            sed -i 's/"stub-cc-flags": "-fPIC"/"stub-cc-flags": "-fPIC", "cc-link-flags": "-static"/g' cmd/http-server-mbt/moon.pkg cmd/http-server-mbt-thin/moon.pkg
+            grep -q '"cc-link-flags": "-static"' cmd/http-server-mbt/moon.pkg || { echo "ERROR: failed to inject static link flag in cmd/http-server-mbt/moon.pkg"; exit 1; }
+            grep -q '"cc-link-flags": "-static"' cmd/http-server-mbt-thin/moon.pkg || { echo "ERROR: failed to inject static link flag in cmd/http-server-mbt-thin/moon.pkg"; exit 1; }
+          fi
+          moon build cmd/http-server-mbt cmd/http-server-mbt-thin --target native --release
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            git checkout cmd/http-server-mbt/moon.pkg cmd/http-server-mbt-thin/moon.pkg
+          fi
+
+      - name: Assert Linux Binaries are Statically Linked (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FULL_BIN="_build/native/release/build/cmd/http-server-mbt/http-server-mbt.exe"
+          THIN_BIN="_build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin.exe"
+
+          # 1. Assert binaries report "statically linked"
+          file "$FULL_BIN" | grep -q "statically linked" || { echo "FATAL: $FULL_BIN is not statically linked!"; exit 1; }
+          file "$THIN_BIN" | grep -q "statically linked" || { echo "FATAL: $THIN_BIN is not statically linked!"; exit 1; }
+
+          # 2. Assert no dynamic program interpreter (PT_INTERP) is requested
+          if readelf -l "$FULL_BIN" | grep -q "program interpreter"; then
+            echo "FATAL: $FULL_BIN has dynamic interpreter PT_INTERP header!"
+            exit 1
+          fi
+          if readelf -l "$THIN_BIN" | grep -q "program interpreter"; then
+            echo "FATAL: $THIN_BIN has dynamic interpreter PT_INTERP header!"
+            exit 1
+          fi
+
+          echo "PASS: Confirmed Linux binaries are 100% statically linked ELF (zero dynamic dependencies)."
 
       - name: Smoke-test CLI variants
         shell: bash
@@ -153,6 +189,32 @@ jobs:
           cp "$FULL_SRC" "release-cli/http-server-mbt-${PLATFORM}${EXE_EXT}"
           cp "$THIN_SRC" "release-cli/http-server-mbt-thin-${PLATFORM}${EXE_EXT}"
           chmod +x release-cli/* || true
+
+      - name: Build and Test Distroless Docker Images (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FULL_BIN="release-cli/http-server-mbt-linux-amd64"
+          THIN_BIN="release-cli/http-server-mbt-thin-linux-amd64"
+
+          # 1. Build Full and Thin images
+          docker build -t http-server-mbt:full --build-arg BINARY_PATH="${FULL_BIN}" -f Dockerfile .
+          docker build -t http-server-mbt:thin --build-arg BINARY_PATH="${THIN_BIN}" -f Dockerfile.thin .
+
+          # 2. Test Thin container
+          docker run -d --name test-thin -p 18081:8080 -v "$(pwd)/testdata/public:/data:ro" http-server-mbt:thin
+          sleep 1
+          curl -sSf http://127.0.0.1:18081/hello.txt | grep -q "Hello, World!"
+          docker stop test-thin && docker rm test-thin
+
+          # 3. Test Full container
+          docker run -d --name test-full -p 18082:8080 -v "$(pwd)/testdata/public:/data:ro" http-server-mbt:full
+          sleep 1
+          curl -sSf http://127.0.0.1:18082/hello.txt | grep -q "Hello, World!"
+          docker stop test-full && docker rm test-full
+
+          echo "Distroless Docker images (full & thin) verified successfully!"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7

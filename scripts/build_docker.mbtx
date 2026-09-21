@@ -1,0 +1,342 @@
+// Build and test script for Docker images (D-15, R-N12, T-022).
+//
+// Packages pre-compiled full and thin binaries into Google Distroless static
+// nonroot containers, and verifies container lifecycle, static file serving,
+// and port binding.
+//
+// Usage:
+//   moon run scripts/build_docker.mbtx
+//   moon run scripts/build_docker.mbtx -- --skip-test
+//   moon run scripts/build_docker.mbtx -- --build-static
+//
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs" @fs,
+  "moonbitlang/async/shell" @shell,
+  "moonbitlang/core/env" @env,
+}
+
+///|
+async fn find_container_engine() -> String {
+  match @env.get_env_var("CONTAINER_ENGINE") {
+    Some(e) => return e
+    None => ()
+  }
+  let d_res = try {
+    @shell.Cmd("which", ["docker"]).output()
+  } catch {
+    _ => return "podman"
+  }
+  if d_res.exit_code() == 0 {
+    return "docker"
+  }
+  let p_res = try {
+    @shell.Cmd("which", ["podman"]).output()
+  } catch {
+    _ => abort("container engine not found")
+  }
+  if p_res.exit_code() == 0 {
+    return "podman"
+  }
+  println("ERROR: neither docker nor podman found in PATH.")
+  abort("container engine not found")
+}
+
+///|
+async fn file_exists(path : String) -> Bool {
+  @fs.exists(path) catch { _ => false }
+}
+
+///|
+async fn enable_static_linking(pkg_path : String) -> String {
+  let content = try {
+    @fs.read_file(pkg_path).text()
+  } catch {
+    _ => return ""
+  }
+  if !content.contains("\"cc-link-flags\": \"-static\"") {
+    let replaced = content.replace_all(
+      old="\"stub-cc-flags\": \"-fPIC\"",
+      new="\"stub-cc-flags\": \"-fPIC\", \"cc-link-flags\": \"-static\"",
+    )
+    try {
+      @fs.write_file(pkg_path, replaced)
+    } catch {
+      _ => ()
+    }
+  }
+  content
+}
+
+///|
+async fn restore_pkg_file(pkg_path : String, original : String) -> Unit {
+  if original != "" {
+    try {
+      @fs.write_file(pkg_path, original)
+    } catch {
+      _ => ()
+    }
+  }
+}
+
+///|
+async fn resolve_binary(name : String) -> String {
+  let candidates = [
+    "release-cli/\{name}-linux-amd64",
+    "release-cli/\{name}",
+    "release-cli/\{name}.exe",
+    "_build/native/release/build/cmd/\{name}/\{name}.exe",
+    "_build/native/release/build/cmd/\{name}/\{name}",
+    "_build/native/debug/build/cmd/\{name}/\{name}.exe",
+    "_build/native/debug/build/cmd/\{name}/\{name}",
+  ]
+  for cand in candidates {
+    if file_exists(cand) {
+      return cand
+    }
+  }
+  ""
+}
+
+///|
+async fn run_cmd_checked(engine : String, args : Array[String], desc : String) -> Unit {
+  let mut cmd_str = engine
+  for a in args {
+    cmd_str = cmd_str + " " + a
+  }
+  println("[EXEC] \{cmd_str}")
+  let res = @shell.Cmd(engine, args).output() catch {
+    err => {
+      println("ERROR: failed to execute \{desc}: \{err}")
+      abort("command failed")
+    }
+  }
+  if res.exit_code() != 0 {
+    println("ERROR: \{desc} exited with code \{res.exit_code()}")
+    let stdout = res.stdout()
+    let stderr = res.stderr()
+    if stdout != "" {
+      println("STDOUT:\n\{stdout}")
+    }
+    if stderr != "" {
+      println("STDERR:\n\{stderr}")
+    }
+    abort("command failed")
+  }
+}
+
+///|
+async fn test_container(
+  engine : String,
+  tag : String,
+  container_name : String,
+  host_port : String
+) -> Bool {
+  println("\n--- Testing container \{tag} on port \{host_port} ---")
+  
+  // Clean up any stale container with same name
+  try {
+    let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
+  } catch {
+    _ => ()
+  }
+
+  // 1. Run container in background with SELinux-compatible volume flag (:ro,z)
+  let pwd = match @env.get_env_var("PWD") {
+    Some(p) => p
+    None => "."
+  }
+  let abs_mount = pwd + "/testdata/public"
+  let run_args = [
+    "run", "-d",
+    "--name", container_name,
+    "-p", "\{host_port}:8080",
+    "-v", "\{abs_mount}:/data:ro,z",
+    tag,
+  ]
+  println("[TEST] Starting container \{container_name}...")
+  let run_res = try {
+    @shell.Cmd(engine, run_args).output()
+  } catch {
+    _ => return false
+  }
+  if run_res.exit_code() != 0 {
+    println("FAILED to start container:")
+    println(run_res.stderr())
+    return false
+  }
+
+  // 2. Wait briefly for server ready
+  try {
+    let _ = @shell.Cmd("sleep", ["1"]).output()
+  } catch {
+    _ => ()
+  }
+
+  // 3. Test HTTP GET with curl
+  let test_url = "http://127.0.0.1:\{host_port}/hello.txt"
+  println("[TEST] Fetching \{test_url}...")
+  let curl_res = try {
+    @shell.Cmd("curl", ["-sS", "-f", test_url]).output()
+  } catch {
+    _ => {
+      println("[FAIL] curl execution failed")
+      try {
+        let _ = @shell.Cmd(engine, ["stop", container_name]).output()
+        let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
+      } catch {
+        _ => ()
+      }
+      return false
+    }
+  }
+  
+  let success = if curl_res.exit_code() == 0 {
+    let out = curl_res.stdout()
+    if out.contains("Hello, World!") || out.contains("hello") {
+      println("[PASS] Successfully received expected file content!")
+      true
+    } else {
+      println("[FAIL] Unexpected response: \{out}")
+      false
+    }
+  } else {
+    println("[FAIL] curl request failed with code \{curl_res.exit_code()}")
+    println(curl_res.stderr())
+    // Print container logs for debugging
+    try {
+      let logs = @shell.Cmd(engine, ["logs", container_name]).output()
+      println("[CONTAINER LOGS]:\n\{logs.stdout()}\{logs.stderr()}")
+    } catch {
+      _ => ()
+    }
+    false
+  }
+
+  // 4. Cleanup container
+  println("[TEST] Stopping and removing container \{container_name}...")
+  try {
+    let _ = @shell.Cmd(engine, ["stop", container_name]).output()
+    let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
+  } catch {
+    _ => ()
+  }
+  
+  success
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let mut run_tests = true
+  let mut build_static = false
+  for a in args {
+    if a == "--skip-test" {
+      run_tests = false
+    }
+    if a == "--build-static" {
+      build_static = true
+    }
+  }
+
+  println("=== Docker Image Packaging (D-15 Distroless static) ===")
+
+  // 0. Optional: trigger static native compilation if requested
+  if build_static {
+    println("\n>>> Injecting static link options for Linux build...")
+    let full_pkg = "cmd/http-server-mbt/moon.pkg"
+    let thin_pkg = "cmd/http-server-mbt-thin/moon.pkg"
+    let orig_full = enable_static_linking(full_pkg)
+    let orig_thin = enable_static_linking(thin_pkg)
+
+    println("Compiling static release binaries...")
+    let build_res = try {
+      @shell.Cmd("moon", ["build", "cmd/http-server-mbt", "cmd/http-server-mbt-thin", "--target", "native", "--release"]).output()
+    } catch {
+      err => {
+        restore_pkg_file(full_pkg, orig_full)
+        restore_pkg_file(thin_pkg, orig_thin)
+        abort("moon build failed: \{err}")
+      }
+    }
+    restore_pkg_file(full_pkg, orig_full)
+    restore_pkg_file(thin_pkg, orig_thin)
+
+    if build_res.exit_code() != 0 {
+      let stderr = build_res.stderr()
+      println("ERROR: static build failed with exit code \{build_res.exit_code()}")
+      if stderr != "" {
+        println(stderr)
+      }
+      if stderr.contains("找不到 -lc") || stderr.contains("cannot find -lc") || stderr.contains("have you installed the static version") {
+        println("\n=======================================================")
+        println("【诊断提示】：系统缺少静态 C 运行时库 (libc.a / libm.a)。")
+        println("由于 gcr.io/distroless/static 是无 glibc 的纯静态镜像，程序必须完全静态链接。")
+        println("请在当前系统安装静态 C 运行时库后重新运行：")
+        println("  • Fedora / RHEL / CentOS: sudo dnf install -y glibc-static")
+        println("  • Ubuntu / Debian:       sudo apt-get install -y build-essential libc6-dev")
+        println("  • Alpine Linux:          apk add gcc musl-dev")
+        println("=======================================================\n")
+      }
+      return
+    }
+    println("Static compilation succeeded!")
+  }
+
+  let engine = find_container_engine()
+  println("Container Engine: \{engine}")
+
+  // 1. Locate binaries
+  let full_bin = resolve_binary("http-server-mbt")
+  let thin_bin = resolve_binary("http-server-mbt-thin")
+
+  if full_bin == "" {
+    println("ERROR: full binary (http-server-mbt) not found!")
+    println("Please run: moon build cmd/http-server-mbt --target native --release")
+    abort("full binary missing")
+  }
+  if thin_bin == "" {
+    println("ERROR: thin binary (http-server-mbt-thin) not found!")
+    println("Please run: moon build cmd/http-server-mbt-thin --target native --release")
+    abort("thin binary missing")
+  }
+
+  println("Full Binary: \{full_bin}")
+  println("Thin Binary: \{thin_bin}")
+
+  // 2. Build full image
+  println("\n>>> Building full image: http-server-mbt:full ...")
+  run_cmd_checked(
+    engine,
+    ["build", "-t", "http-server-mbt:full", "--build-arg", "BINARY_PATH=\{full_bin}", "-f", "Dockerfile", "."],
+    "Build full image",
+  )
+
+  // 3. Build thin image
+  println("\n>>> Building thin image: http-server-mbt:thin ...")
+  run_cmd_checked(
+    engine,
+    ["build", "-t", "http-server-mbt:thin", "--build-arg", "BINARY_PATH=\{thin_bin}", "-f", "Dockerfile.thin", "."],
+    "Build thin image",
+  )
+
+  println("\n>>> Docker Images Built Successfully!")
+
+  // 4. Run tests if requested
+  if run_tests {
+    println("\n=== Testing Built Images ===")
+    let thin_ok = test_container(engine, "http-server-mbt:thin", "test-hs-thin", "18081")
+    let full_ok = test_container(engine, "http-server-mbt:full", "test-hs-full", "18082")
+
+    println("\n=== Test Results Summary ===")
+    let thin_msg = if thin_ok { "PASSED" } else { "FAILED (requires static linked binary for distroless/static)" }
+    let full_msg = if full_ok { "PASSED" } else { "FAILED (requires static linked binary for distroless/static)" }
+    println("Thin Image (http-server-mbt:thin): \{thin_msg}")
+    println("Full Image (http-server-mbt:full): \{full_msg}")
+    if !thin_ok || !full_ok {
+      println("\nNOTE: In Distroless static base, Linux binaries must be statically linked (without glibc dynamic linker).")
+      println("In CI (Ubuntu), compile with cc-link-flags: \"-static\" to produce full static ELF.")
+    }
+  }
+}

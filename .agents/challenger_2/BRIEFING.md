@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:58:30Z
 
 ## Mission
-Adversarially challenge and stress-test symbol purity, linking mechanics, and library compatibility for C ABI exports (hs_min and hs_full DLL/static libraries).
+Adversarially challenge and stress-test symbol purity, linking mechanics, and library compatibility for C ABI exports (hs_thin and hs_full DLL/static libraries).
 
 ## 🔒 My Identity
 - Archetype: challenger
@@ -23,9 +23,9 @@ Adversarially challenge and stress-test symbol purity, linking mechanics, and li
 
 ## Review Scope
 - **Files to review**:
-  - `target/cabi/hs_min.dll`, `target/cabi/hs_full.dll`
-  - `target/cabi/hs_min.lib`, `target/cabi/hs_full.lib`
-  - `target/cabi/hs_min_static.lib`, `target/cabi/hs_full_static.lib`
+  - `target/cabi/hs_thin.dll`, `target/cabi/hs_full.dll`
+  - `target/cabi/hs_thin.lib`, `target/cabi/hs_full.lib`
+  - `target/cabi/hs_thin_static.lib`, `target/cabi/hs_full_static.lib`
   - `include/http_server.h`
   - `.agents/worker_impl_1/handoff.md`
 - **Interface contracts**: `docs/design.md` (D-14), `ORIGINAL_REQUEST.md`

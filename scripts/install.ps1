@@ -1,7 +1,6 @@
 param (
     [switch]$Uninstall,
-    [switch]$Thin,
-    [switch]$Min
+    [switch]$Thin
 )
 
 $Repo = "unmbt/http-server-mbt"
@@ -9,8 +8,6 @@ $InstallDir = "$env:USERPROFILE\.unmbt"
 $BinName = "http-server-mbt.exe"
 $BinPath = Join-Path $InstallDir $BinName
 $ThinBinPath = Join-Path $InstallDir "http-server-mbt-thin.exe"
-
-$IsThin = $Thin -or $Min
 
 if ($Uninstall) {
     Write-Host "Uninstalling $BinName..." -ForegroundColor Cyan
@@ -35,8 +32,8 @@ if ($Arch -eq "amd64") {
     return
 }
 
-$AssetPrefix = if ($IsThin) { "http-server-mbt-thin" } else { "http-server-mbt" }
-$VariantDesc = if ($IsThin) { " (thin variant)" } else { "" }
+$AssetPrefix = if ($Thin) { "http-server-mbt-thin" } else { "http-server-mbt" }
+$VariantDesc = if ($Thin) { " (thin variant)" } else { "" }
 $AssetName = "$AssetPrefix-windows-$AssetArch.exe"
 
 Write-Host "Fetching latest version info from GitHub..." -ForegroundColor Cyan
@@ -59,7 +56,7 @@ if (Test-Path $BinPath) {
     $CurrentVersion = & $BinPath -v
     if ($CurrentVersion -eq $LatestVersion) {
         Write-Host "✨ You already have the latest version ($LatestVersion$VariantDesc) installed at $BinPath." -ForegroundColor Green
-        if ($IsThin -and -not (Test-Path $ThinBinPath)) {
+        if ($Thin -and -not (Test-Path $ThinBinPath)) {
             Copy-Item -Path $BinPath -Destination $ThinBinPath -Force -ErrorAction SilentlyContinue
         }
         return
@@ -83,7 +80,7 @@ try {
         throw "The downloaded file is empty."
     }
     Move-Item -Path $TempPath -Destination $BinPath -Force -ErrorAction Stop
-    if ($IsThin) {
+    if ($Thin) {
         Copy-Item -Path $BinPath -Destination $ThinBinPath -Force -ErrorAction SilentlyContinue
     }
 } catch {
@@ -92,7 +89,7 @@ try {
     throw
 }
 
-if ($IsThin) {
+if ($Thin) {
     Write-Host "`n✅ Installed http-server-mbt (thin) v$LatestVersion successfully to $BinPath" -ForegroundColor Green
     Write-Host "   (also available as http-server-mbt-thin.exe)" -ForegroundColor Cyan
 } else {

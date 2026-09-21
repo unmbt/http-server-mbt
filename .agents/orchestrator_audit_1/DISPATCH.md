@@ -32,8 +32,8 @@
   - 服务器重复启动（double start）、重复停止（double stop）、未启动即销毁、停止后重复销毁。
   - 验证在任何非法调用顺序下，C ABI 接口均不发生段错误（Segmentation fault）、空指针解引用或不可恢复 panic。
 - **符号隔离与纯净度对抗审计**：
-  - 使用 `dumpbin /EXPORTS` 严格检查 `target/cabi/hs_min.dll` 与 `target/cabi/hs_full.dll`，确认仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或任何 MoonBit 编译器运行时符号。
-  - 使用 `dumpbin /SYMBOLS` 严格审计 `target/cabi/hs_min_static.lib`，确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
+  - 使用 `dumpbin /EXPORTS` 严格检查 `target/cabi/hs_thin.dll` 与 `target/cabi/hs_full.dll`，确认仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或任何 MoonBit 编译器运行时符号。
+  - 使用 `dumpbin /SYMBOLS` 严格审计 `target/cabi/hs_thin_static.lib`，确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
 - **CLI 拦截与退出码挑战**：
   - 向 `http-server-mbt-thin` 传入 `--cert`、`--key`、`--proxy` 等高级参数，确认严格退出状态码 1，标准错误输出可操作指引，且系统上无残留端口监听。
 

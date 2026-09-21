@@ -29,7 +29,7 @@ Independently audit and verify the claimed completion of Milestones 1~3 (commits
 - **Phase**: reporting
 - **Checks completed**:
   - Phase A: Timeline & Commit Verification (git log, commits 9cabfb9 & a5c3edf, remote push status verified ahead 2, 0 pushes)
-  - Phase B: Integrity & Contract Compliance (server/moon.pkg zero tls/crypto, full/ DI, C ABI 5 hs_* APIs with opaque handles, DLL 5 exports 0 main, hs_min_static.lib 0 mbedtls/psa symbols, CLI exit code 1 rejection for --cert/--key/--proxy)
+  - Phase B: Integrity & Contract Compliance (server/moon.pkg zero tls/crypto, full/ DI, C ABI 5 hs_* APIs with opaque handles, DLL 5 exports 0 main, hs_thin_static.lib 0 mbedtls/psa symbols, CLI exit code 1 rejection for --cert/--key/--proxy)
   - Phase C: Independent Test Execution (moon check 0 errors/0 warnings, moon test 230/230 pass 100%, build_cabi.mbtx 6 artifacts + 4 C consumers pass 100%, adversarial harness 51/51 pass)
 - **Checks remaining**: []
 - **Findings so far**: CLEAN — ALL CHECKS PASSED, VICTORY CONFIRMED

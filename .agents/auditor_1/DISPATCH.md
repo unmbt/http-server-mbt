@@ -17,7 +17,7 @@ Perform a strict forensic integrity verification across all newly created and mo
    - Verify that `hs_server_start` parses genuine JSON, binds an actual socket, and starts an actual server.
    - Verify that `hs_server_stop` and `hs_server_destroy` genuinely manage server lifecycle and resources.
    - Verify that `scripts/build_cabi.mbtx` genuinely invokes compiler and linker tools to produce the libraries, rather than copying pre-made binary blobs.
-   - Verify that `hs_min` genuinely excludes `tls` packages at compilation time.
+   - Verify that `hs_thin` genuinely excludes `tls` packages at compilation time.
    - Verify that all reported test runs (230 MoonBit tests, 4 C consumer tests) correspond to genuine executions.
 2. Confirm whether there is any integrity violation, test fabrication, or shortcut taken.
 3. Output: Write your detailed forensic evidence and explicit verdict (`CLEAN` or `INTEGRITY VIOLATION`) into `E:/project/moonbit/unmbt/http-server-mbt/.agents/auditor_1/handoff.md`.

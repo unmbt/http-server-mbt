@@ -1,7 +1,7 @@
-# Forensic Audit Report — Milestone 1~3 C ABI & Min/Full Packaging
+# Forensic Audit Report — Milestone 1~3 C ABI & Thin/Full Packaging
 
 - **Auditor**: `auditor_audit_1` (Independent SDD & Forensic Auditor)
-- **Target**: `http-server-mbt` (Milestone 1~3: Core Decoupling, Min/Full CLI Packaging, C ABI Dynamic & Static Export Pipeline)
+- **Target**: `http-server-mbt` (Milestone 1~3: Core Decoupling, Thin/Full CLI Packaging, C ABI Dynamic & Static Export Pipeline)
 - **Working Directory**: `E:/project/moonbit/unmbt/http-server-mbt/.agents/auditor_audit_1`
 - **Execution Date**: 2026-09-19
 - **Integrity Mode**: development (with strict anti-cheating, symbol isolation, and license compliance audits per ORIGINAL_REQUEST.md line 538)
@@ -19,7 +19,7 @@ As an independent forensic auditor, an exhaustive verification of the work produ
    - `moon test --target native`: All 230 tests passed (0 failures, 0 regressions).
 3. **Forensic Integrity & Anti-Cheating**:
    - Analyzed C ABI bridges and MoonBit wrappers for genuine implementations (no facade returns, no hardcoded mocks).
-   - Audited symbol isolation using MSVC `dumpbin`: confirmed dynamic libraries export strictly the 5 specified `hs_*` symbols with zero runtime or `main` symbol leaks; confirmed `hs_min_static.lib` contains zero `mbedtls` or `psa` symbols.
+   - Audited symbol isolation using MSVC `dumpbin`: confirmed dynamic libraries export strictly the 5 specified `hs_*` symbols with zero runtime or `main` symbol leaks; confirmed `hs_thin_static.lib` contains zero `mbedtls` or `psa` symbols.
    - Verified open-source license compliance (MIT, Apache-2.0).
    - Audited Git repository status: confirmed strictly NO `git push` has been executed (branch is ahead of remote by 2 local commits).
 
@@ -29,12 +29,12 @@ As an independent forensic auditor, an exhaustive verification of the work produ
 
 ### 2.1 Specification Alignment (`proposal.md` & `design.md`)
 - **`docs/proposal.md`**:
-  - Section 2 defines the delivery matrix including Windows `.dll`, MSVC `.lib` static libraries, and Min/Full CLI packaging.
+  - Section 2 defines the delivery matrix including Windows `.dll`, MSVC `.lib` static libraries, and Thin/Full CLI packaging.
   - Section 3 maps R-N06 (C ABI dynamic library), R-N08 (C ABI static library), R-N02 (standalone CLI thin/full), and R-N14 (library-managed lifecycle).
 - **`docs/design.md`**:
   - **D-07 (MoonBit API & C ABI v1)**: Specifies the `hs_*` C calling convention, versioning (`hs_abi_version`), opaque handles, declarative JSON configuration, error copying (`hs_error_copy`), and library-managed lifecycle (`hs_server_start`, `hs_server_stop`, `hs_server_destroy`).
   - **D-08 (Build, TLS & Distribution)**: Defines the dual-tier product architecture:
-    - Min: zero crypto dependencies, static HTTP/Range/caching/SPA/directory listing.
+    - Thin: zero crypto dependencies, static HTTP/Range/caching/SPA/directory listing.
     - Full: MbedTLS 4.2.0 (Apache-2.0) integrated for TLS and proxy forwarding.
   - **D-11 (Static Libraries & Native Export Preconditions)**:
     - Specifies the `.mbtx` driver pipeline (`scripts/build_cabi.mbtx`).
@@ -46,11 +46,11 @@ As an independent forensic auditor, an exhaustive verification of the work produ
 ### 2.2 Task Registry & Windows Delivery Evidence (`tasks.md`)
 - **T-020 (C ABI v1 托管异步动态库)**:
   - **Status**: `- [ ] 进行中（Windows 分项交付，2026-09-18）`.
-  - **Evidence Recorded**: Windows x86_64, MSVC 14.42, Moon 0.1.20260904; `c_abi/include/http_server.h` 5 C APIs; `target/cabi/hs_min.dll` and `target/cabi/hs_full.dll`; `.def` export whitelisting; C consumers `test_dynamic_min.c` and `test_dynamic_full.c` 100% PASS.
+  - **Evidence Recorded**: Windows x86_64, MSVC 14.42, Moon 0.1.20260904; `c_abi/include/http_server.h` 5 C APIs; `target/cabi/hs_thin.dll` and `target/cabi/hs_full.dll`; `.def` export whitelisting; C consumers `test_dynamic_thin.c` and `test_dynamic_full.c` 100% PASS.
   - **Audit Note**: The task remains unchecked `- [ ]` because Linux/macOS variants are awaiting CI integration. This strictly conforms to `AGENTS.md` guidelines that tasks spanning multiple platforms must not be falsely marked as completed (`- [x]`) before all platforms are satisfied.
 - **T-027 (静态库打包与 C/Rust 消费)**:
   - **Status**: `- [ ] 进行中（Windows 分项交付，2026-09-18）`.
-  - **Evidence Recorded**: Generation of `target/cabi/hs_min_static.lib` and `target/cabi/hs_full_static.lib`; dumpbin verification of zero MbedTLS symbols in thin static archive; standalone C static consumers `test_static_min.c` and `test_static_full.c` 100% PASS.
+  - **Evidence Recorded**: Generation of `target/cabi/hs_thin_static.lib` and `target/cabi/hs_full_static.lib`; dumpbin verification of zero MbedTLS symbols in thin static archive; standalone C static consumers `test_static_thin.c` and `test_static_full.c` 100% PASS.
   - **Audit Note**: Accurately marked as in-progress with Windows delivery evidence.
 
 ### 2.3 Handover Documentation (`cli-thin-full-and-cabi-handover.md`)
@@ -81,26 +81,26 @@ http-server-mbt C ABI Build Pipeline (D-07, D-11, T-020, T-027)
 3. Preparing target/cabi/ directories...
 4. Building thin variant (zero crypto, static HTTP server)...
 Staging 35 objects into target/cabi/_staging_min...
-Linking hs_min.dll...
-Creating static archive hs_min_static.lib...
+Linking hs_thin.dll...
+Creating static archive hs_thin_static.lib...
 5. Building full variant (integrated TLS & proxy)...
 Staging 144 objects into target/cabi/_staging_full...
 Linking hs_full.dll...
 Creating static archive hs_full_static.lib...
 6. Verifying symbols and export isolation...
-Verifying exports for target/cabi/hs_min.dll...
+Verifying exports for target/cabi/hs_thin.dll...
   -> Verified: strictly 5 hs_* exports, zero symbol leaks.
 Verifying exports for target/cabi/hs_full.dll...
   -> Verified: strictly 5 hs_* exports, zero symbol leaks.
-Verifying absence of MbedTLS symbols in target/cabi/hs_min_static.lib...
+Verifying absence of MbedTLS symbols in target/cabi/hs_thin_static.lib...
   -> Verified: zero mbedtls/psa symbols in thin static archive.
 7. Compiling and running standalone C consumer tests...
-Compiling consumer test test_dynamic_min...
-Running consumer test test_dynamic_min...
-  -> PASS: test_dynamic_min
-Compiling consumer test test_static_min...
-Running consumer test test_static_min...
-  -> PASS: test_static_min
+Compiling consumer test test_dynamic_thin...
+Running consumer test test_dynamic_thin...
+  -> PASS: test_dynamic_thin
+Compiling consumer test test_static_thin...
+Running consumer test test_static_thin...
+  -> PASS: test_static_thin
 Compiling consumer test test_dynamic_full...
 Running consumer test test_dynamic_full...
   -> PASS: test_dynamic_full
@@ -111,9 +111,9 @@ Running consumer test test_static_full...
 C ABI Build and Verification SUCCEEDED!
 Artifacts in target/cabi/:
   - target/cabi/include/http_server.h (1151 bytes)
-  - target/cabi/hs_min.dll (1344000 bytes)
-  - target/cabi/hs_min.lib (2514 bytes)
-  - target/cabi/hs_min_static.lib (4460708 bytes)
+  - target/cabi/hs_thin.dll (1344000 bytes)
+  - target/cabi/hs_thin.lib (2514 bytes)
+  - target/cabi/hs_thin_static.lib (4460708 bytes)
   - target/cabi/hs_full.dll (2678784 bytes)
   - target/cabi/hs_full.lib (2528 bytes)
   - target/cabi/hs_full_static.lib (6916216 bytes)
@@ -124,9 +124,9 @@ Artifacts in target/cabi/:
 | Artifact Path | Size (Bytes) | Verification Status |
 |---|---|---|
 | `target/cabi/include/http_server.h` | 1,151 | Present, C ABI header matching D-07 / D-11 |
-| `target/cabi/hs_min.dll` | 1,344,000 | Present, PE x64 Dynamic Library |
-| `target/cabi/hs_min.lib` | 2,514 | Present, PE x64 Import Library |
-| `target/cabi/hs_min_static.lib` | 4,460,708 | Present, COFF Archive (Static Library) |
+| `target/cabi/hs_thin.dll` | 1,344,000 | Present, PE x64 Dynamic Library |
+| `target/cabi/hs_thin.lib` | 2,514 | Present, PE x64 Import Library |
+| `target/cabi/hs_thin_static.lib` | 4,460,708 | Present, COFF Archive (Static Library) |
 | `target/cabi/hs_full.dll` | 2,678,784 | Present, PE x64 Dynamic Library |
 | `target/cabi/hs_full.lib` | 2,528 | Present, PE x64 Import Library |
 | `target/cabi/hs_full_static.lib` | 6,916,216 | Present, COFF Archive (Static Library) |
@@ -134,8 +134,8 @@ Artifacts in target/cabi/:
 **Standalone C Consumer Verification**:
 | Test Executable | Linkage Mode | Tested Capabilities | Result |
 |---|---|---|---|
-| `test_dynamic_min.exe` | Dynamic (`hs_min.dll`) | `hs_abi_version`, `hs_error_copy` (buffer & query), preflight checks (NULL, bad JSON, port 99999, unsupported TLS), lifecycle (`start`/`stop`/`destroy`, idempotent stop, safe NULL destroy) | **PASS** |
-| `test_static_min.exe` | Static (`hs_min_static.lib`) | `hs_abi_version`, `hs_error_copy`, server start on dynamic port 0, stop, destroy | **PASS** |
+| `test_dynamic_thin.exe` | Dynamic (`hs_thin.dll`) | `hs_abi_version`, `hs_error_copy` (buffer & query), preflight checks (NULL, bad JSON, port 99999, unsupported TLS), lifecycle (`start`/`stop`/`destroy`, idempotent stop, safe NULL destroy) | **PASS** |
+| `test_static_thin.exe` | Static (`hs_thin_static.lib`) | `hs_abi_version`, `hs_error_copy`, server start on dynamic port 0, stop, destroy | **PASS** |
 | `test_dynamic_full.exe` | Dynamic (`hs_full.dll`) | `hs_abi_version`, `hs_error_copy`, TLS preflight (cert without key), spa+proxy conflict check, server lifecycle | **PASS** |
 | `test_static_full.exe` | Static (`hs_full_static.lib`) | `hs_abi_version`, `hs_error_copy`, TLS preflight, spa+proxy conflict, server lifecycle | **PASS** |
 
@@ -199,7 +199,7 @@ Total tests: 230, passed: 230, failed: 0.
   - Manages Windows thread creation (`CreateThread`), synchronization events (`ready_event`, `stop_event`), and runtime initialization (`ensure_runtime_init`).
   - Correctly copies error descriptions with buffer length boundary checks in `hs_error_copy`.
 - **MoonBit Bridge (`c_abi/thin/abi.mbt` & `c_abi/full/abi.mbt`)**:
-  - `hs_min_run_server` launches the MoonBit async event loop using `@server.with_server_at(config, port, ...)`.
+  - `hs_thin_run_server` launches the MoonBit async event loop using `@server.with_server_at(config, port, ...)`.
   - `hs_full_run_server` launches `@full_server.with_server_at(config, port, ...)`.
   - Handles server readiness notification via `hs_bridge_notify_ready` and polls stop flag via `hs_bridge_is_stopped`.
   - **Verdict**: Real, operational implementation; zero facade functions, zero fake test mocks.
@@ -207,7 +207,7 @@ Total tests: 230, passed: 230, failed: 0.
 ### 4.2 Symbol Isolation & Absence of Contamination
 MSVC `dumpbin.exe` was used to perform independent symbol inspection on the generated binaries:
 
-1. **`target/cabi/hs_min.dll` Export Audit**:
+1. **`target/cabi/hs_thin.dll` Export Audit**:
    ```text
        ordinal hint RVA      name
              1    0 000FCD40 hs_abi_version
@@ -230,15 +230,15 @@ MSVC `dumpbin.exe` was used to perform independent symbol inspection on the gene
    ```
    - Verified: Exactly 5 exported functions. Zero leaks.
 
-3. **`target/cabi/hs_min_static.lib` Archive Symbol Audit**:
+3. **`target/cabi/hs_thin_static.lib` Archive Symbol Audit**:
    - Tested for `mbedtls` or `psa_` symbols:
      ```powershell
-     dumpbin /SYMBOLS target/cabi/hs_min_static.lib | Select-String "mbedtls|psa_"
+     dumpbin /SYMBOLS target/cabi/hs_thin_static.lib | Select-String "mbedtls|psa_"
      ```
      Result: **0 matches**. Complete absence of crypto symbols.
    - Tested for `main` entry point:
      ```powershell
-     dumpbin /SYMBOLS target/cabi/hs_min_static.lib | Select-String "\| main$"
+     dumpbin /SYMBOLS target/cabi/hs_thin_static.lib | Select-String "\| main$"
      ```
      Result: **0 matches**. No entry point collision hazard.
 

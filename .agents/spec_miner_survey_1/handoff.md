@@ -19,7 +19,7 @@ Direct observations from authoritative specifications and local environment prob
     > "分别支持 `thin`（纯静态 HTTP 服务器，零加密 C 依赖）与 `full`（集成 TLS 传输层与代理能力）两组导出实现。"
     > "建立导出符号隔离控制机制（Windows 使用 `.def` 文件或显式导出标记）：确保动态库与静态库中严禁包含 CLI `main` 入口符号，严禁泄露未授权内部符号；`thin` 库中绝对不包含任何 MbedTLS / PSA-Crypto 符号。"
   - **R2. Build Pipeline**:
-    > "编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器... 构建导出 `thin` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）... 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。"
+    > "编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器... 构建导出 `thin` 版本的动态库（Windows `hs_thin.dll` + `hs_thin.lib`）与静态库（Windows `hs_thin_static.lib`）... 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。"
   - **R3. C Consumer Smoke Tests**:
     > "在 `testdata/c_consumer/` 创建独立的 C 测试程序... 验证调用 `hs_abi_version()` 正确返回预期版本号，验证服务配置与生命周期调度无崩溃、无内存访问违规... 全仓既有 228 项 MoonBit 测试持续保持 100% 通过（0 回归、0 警告）。"
 
@@ -118,9 +118,9 @@ Direct observations from authoritative specifications and local environment prob
 2. **Main Symbol Isolation**:
    If an object file containing `main` is included in a static library (`.lib`) or dynamic library export, any external C consumer program defining `int main(void)` will fail to link with `multiple definition of 'main'`. Therefore:
    - C ABI bridge packages (`c_abi` / `c_abi_min` / `c_abi_full`) must NOT define a MoonBit `fn main()`.
-   - Windows `.def` module definition file (e.g. `hs_min.def`) must be supplied during DLL linking:
+   - Windows `.def` module definition file (e.g. `hs_thin.def`) must be supplied during DLL linking:
      ```def
-     LIBRARY hs_min
+     LIBRARY hs_thin
      EXPORTS
          hs_abi_version
          hs_server_start
@@ -141,9 +141,9 @@ Direct observations from authoritative specifications and local environment prob
    - Calling `hs_server_destroy` releases the handle and any OS resources. Passing `NULL` is a safe no-op.
 5. **Static Library vs DLL Import Library Distinction (D-11 Contract)**:
    - On Windows MSVC/MinGW:
-     - `hs_min.dll` is the runtime dynamic library.
-     - `hs_min.lib` (or `libhs_min.dll.a`) is the DLL import library (linking against it requires `hs_min.dll` at runtime).
-     - `hs_min_static.lib` (or `libhs_min.a`) is the self-contained static archive (linking against it embeds all object code into the consumer executable).
+     - `hs_thin.dll` is the runtime dynamic library.
+     - `hs_thin.lib` (or `libhs_thin.dll.a`) is the DLL import library (linking against it requires `hs_thin.dll` at runtime).
+     - `hs_thin_static.lib` (or `libhs_thin.a`) is the self-contained static archive (linking against it embeds all object code into the consumer executable).
    - This prevents misidentifying import libraries as static archives.
 
 ---
@@ -162,10 +162,10 @@ Direct observations from authoritative specifications and local environment prob
 | 8 | Error Taxonomy | `enum hs_error_code` | Enumeration of error codes: `HS_OK=0`, `HS_ERR_CONFIG=1`, `HS_ERR_INVALID_ARG=2`, `HS_ERR_IO=3`, `HS_ERR_CLOSED=4`, `HS_ERR_UNSUPPORTED=5`. | `int32_t` code | Enum integer | Stable numerical constants; future compatible extensions append positive values. | `docs/cli-thin-full-and-cabi-handover.md` L110-117, D-07 |
 | 9 | ABI Header | `http_server.h` | Unified C header providing declarations, macros, calling conventions, and version constants. | Standard C99 / C++ compiler | Header file | Defines `HS_EXPORT`, include guards, `extern "C"`. | `docs/cli-thin-full-and-cabi-handover.md` L83-130 |
 | 10 | ABI Macro | `HS_EXPORT` | Windows `__declspec(dllexport)` / `__declspec(dllimport)` and POSIX `__attribute__((visibility("default")))`. | Compiler preprocessor | Macro expansion | Controlled by `HS_BUILD_DLL` and `HS_STATIC`. | `docs/cli-thin-full-and-cabi-handover.md` L90-96 |
-| 11 | Symbol Isolation | Windows `.def` export control | Module definition file enumerating exactly the 5 exported `hs_*` functions. | Linker `/DEF:hs_min.def` | Filtered PE export table | Bans `main` and internal runtime symbols from appearing in `.dll` exports. | `docs/cli-thin-full-and-cabi-handover.md` L142, D-11 |
+| 11 | Symbol Isolation | Windows `.def` export control | Module definition file enumerating exactly the 5 exported `hs_*` functions. | Linker `/DEF:hs_thin.def` | Filtered PE export table | Bans `main` and internal runtime symbols from appearing in `.dll` exports. | `docs/cli-thin-full-and-cabi-handover.md` L142, D-11 |
 | 12 | Symbol Isolation | CLI `main` Prohibition | Ensuring C ABI library packages do not contain `main()` entrypoint. | Source package layout | Clean object files | Eliminates "multiple definition of 'main'" when linking into C consumers. | `ORIGINAL_REQUEST.md` L9, D-11, local nm probe |
 | 13 | Build Pipeline | `scripts/build_cabi.mbtx` | Automated build driver producing 6 distinct artifacts: 2 `.dll`, 2 import `.lib`, 2 static `.lib`. | Toolchain (`moon`, `gcc`/`clang`, `ar`/`lib`) | `target/cabi/` binaries | Logs step-by-step progress, audits exported symbols, verifies 0 crypto symbols in thin. | `ORIGINAL_REQUEST.md` L82-87, Handover L145-160 |
-| 14 | C Smoke Test | `testdata/c_consumer/` | Standalone C program linking both dynamic and static variants of `hs_min`. | `http_server.h`, `hs_min.lib` / `hs_min_static.lib` | Executable returning 0 | Asserts `hs_abi_version() == 0x00010000`, tests start/stop/destroy lifecycle. | `ORIGINAL_REQUEST.md` L89-93, Handover L162-178 |
+| 14 | C Smoke Test | `testdata/c_consumer/` | Standalone C program linking both dynamic and static variants of `hs_thin`. | `http_server.h`, `hs_thin.lib` / `hs_thin_static.lib` | Executable returning 0 | Asserts `hs_abi_version() == 0x00010000`, tests start/stop/destroy lifecycle. | `ORIGINAL_REQUEST.md` L89-93, Handover L162-178 |
 
 ---
 
@@ -201,7 +201,7 @@ Direct observations from authoritative specifications and local environment prob
 2. **Read-Only Scope**:
    In strict accordance with the Specification Miner role, no production code, scripts, or headers have been modified or created outside `.agents/spec_miner_survey_1/`.
 3. **MbedTLS Symbol Isolation**:
-   In `thin` build, `server` package is completely decoupled from `tls`. However, during link time, `scripts/build_cabi.mbtx` must verify via `nm` that no `mbedtls_*` or `psa_*` symbols are linked into `hs_min.dll` or `hs_min_static.lib`.
+   In `thin` build, `server` package is completely decoupled from `tls`. However, during link time, `scripts/build_cabi.mbtx` must verify via `nm` that no `mbedtls_*` or `psa_*` symbols are linked into `hs_thin.dll` or `hs_thin_static.lib`.
 
 ---
 
@@ -221,7 +221,7 @@ The specification for Milestone 3 (C ABI Dynamic/Static Export Pipeline, Symbol 
 3. **Symbol Isolation & Safety**:
    - Windows `.def` module definition file prevents leak of internal MoonBit runtime symbols.
    - Exclusion of CLI `main` entrypoint from library packages prevents linker symbol collision.
-   - Automated symbol audit with `nm` verifies 0 crypto symbols in `hs_min`.
+   - Automated symbol audit with `nm` verifies 0 crypto symbols in `hs_thin`.
 4. **Server Lifecycle**:
    - Managed background event loop with preflight configuration validation, asynchronous socket binding, graceful draining on stop, and safe destruction.
 

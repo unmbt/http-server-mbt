@@ -29,7 +29,7 @@ Investigate CLI packaging and C ABI library export pipeline for thin/full layere
   4. MoonBit native does not directly emit `.dll` or `.lib` for `foreign_library`; build automation requires `.mbtx`.
   5. `main` entry point pollution solved via `/Dmain=moonbit_internal_unused_main` and public `hs_init()`.
   6. Internal runtime symbol leakage solved via `/FIclean_exports.h` and `.def` file, producing 100% clean DLL exports.
-  7. Min C library excludes all MbedTLS objects, achieving ~150 KB static archive and ~10 KB DLL.
+  7. Thin C library excludes all MbedTLS objects, achieving ~150 KB static archive and ~10 KB DLL.
   8. Standalone C programs verified both dynamic and static linking on Windows with exit code 0.
 - **Unexplored areas**: None for this survey milestone.
 

@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:42:00Z
 
 ## Mission
-Orchestrate the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`. Focus on completing Milestone 1 (Server & TLS decoupling) and Milestone 2 (Min & Full CLI packaging & verification). PAUSE before starting Milestone 3 (C ABI dynamic/static library export) to document completed work and author the continuation guide.
+Orchestrate the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`. Focus on completing Milestone 1 (Server & TLS decoupling) and Milestone 2 (Thin & Full CLI packaging & verification). PAUSE before starting Milestone 3 (C ABI dynamic/static library export) to document completed work and author the continuation guide.
 
 ## 🔒 My Identity
 - Archetype: orchestrator
@@ -16,14 +16,14 @@ Orchestrate the `thin` & `full` layered packaging, TLS decoupling, and Proxy arc
 1. **Decompose**: Survey codebase & specs -> PROJECT.md -> Decompose into modular milestones.
 2. **Dispatch & Execute**:
    - Milestone 1: Server & Core Decoupling from TLS [in gate evaluation]
-   - Milestone 2: Min & Full CLI Packaging & Distribution [pending]
+   - Milestone 2: Thin & Full CLI Packaging & Distribution [pending]
    - **CRITICAL PAUSE POINT**: Before starting Milestone 3, document completed work, author C ABI continuation guide, pause execution, and submit stage report to Sentinel.
 3. **On failure**: Retry -> Replace -> Skip (non-auditor) -> Redistribute -> Redesign.
 4. **Succession**: Spawn successor at 16 spawns if not complete.
 - **Work items**:
   1. Survey & Feature Inventory [done]
   2. M1: Server & Core Decoupling from TLS (Transport Abstraction) [in gate evaluation]
-  3. M2: Min & Full CLI Packages & Distribution [pending]
+  3. M2: Thin & Full CLI Packages & Distribution [pending]
   4. Documentation of Completed Work & C ABI Continuation Guide [pending - before M3]
   5. M3: C ABI Dynamic & Static Library Export Pipeline (.mbtx) [PAUSED per user directive]
   6. M4: Reverse Proxy Architecture & Interface Readiness [ready for next phase]

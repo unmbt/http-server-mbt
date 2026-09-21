@@ -17,9 +17,9 @@
 
 | 平台 | 动态库 | 导入库 (Import Lib) | 静态库 (Static Archive) | C 头文件 |
 |---|---|---|---|---|
-| **Windows (x86_64)** | `hs_min.dll`<br>`hs_full.dll` | `hs_min.lib`<br>`hs_full.lib` | `hs_min_static.lib`<br>`hs_full_static.lib` | `include/http_server.h` |
-| **Linux (x86_64)** | `libhs_min.so`<br>`libhs_full.so` | *(不需要)* | `libhs_min.a`<br>`libhs_full.a` | `include/http_server.h` |
-| **macOS (arm64)** | `libhs_min.dylib`<br>`libhs_full.dylib` | *(不需要)* | `libhs_min.a`<br>`libhs_full.a` | `include/http_server.h` |
+| **Windows (x86_64)** | `hs_thin.dll`<br>`hs_full.dll` | `hs_thin.lib`<br>`hs_full.lib` | `hs_thin_static.lib`<br>`hs_full_static.lib` | `include/http_server.h` |
+| **Linux (x86_64)** | `libhs_thin.so`<br>`libhs_full.so` | *(不需要)* | `libhs_thin.a`<br>`libhs_full.a` | `include/http_server.h` |
+| **macOS (arm64)** | `libhs_thin.dylib`<br>`libhs_full.dylib` | *(不需要)* | `libhs_thin.a`<br>`libhs_full.a` | `include/http_server.h` |
 
 > [!NOTE]
 > **符号隔离与安全性保障**：
@@ -158,17 +158,17 @@ int main(void) {
 **编译与链接命令**：
 - **Linux (GCC / Clang)**:
   ```bash
-  clang main.c -Iinclude -Llib -lhs_min -Wl,-rpath,'$ORIGIN/lib' -o server_demo
+  clang main.c -Iinclude -Llib -lhs_thin -Wl,-rpath,'$ORIGIN/lib' -o server_demo
   ./server_demo
   ```
 - **macOS (Clang)**:
   ```bash
-  clang main.c -Iinclude -Llib -lhs_min -Wl,-rpath,'@executable_path/lib' -o server_demo
+  clang main.c -Iinclude -Llib -lhs_thin -Wl,-rpath,'@executable_path/lib' -o server_demo
   ./server_demo
   ```
 - **Windows (MSVC)**:
   ```cmd
-  cl.exe /Iinclude main.c /link /LIBPATH:lib hs_min.lib /OUT:server_demo.exe
+  cl.exe /Iinclude main.c /link /LIBPATH:lib hs_thin.lib /OUT:server_demo.exe
   server_demo.exe
   ```
 
@@ -178,15 +178,15 @@ int main(void) {
 
 - **Linux**:
   ```bash
-  clang -DHS_STATIC main.c -Iinclude lib/libhs_min.a -lpthread -lm -ldl -o server_demo_static
+  clang -DHS_STATIC main.c -Iinclude lib/libhs_thin.a -lpthread -lm -ldl -o server_demo_static
   ```
 - **macOS**:
   ```bash
-  clang -DHS_STATIC main.c -Iinclude lib/libhs_min.a -lpthread -lm -o server_demo_static
+  clang -DHS_STATIC main.c -Iinclude lib/libhs_thin.a -lpthread -lm -o server_demo_static
   ```
 - **Windows (MSVC)**:
   ```cmd
-  cl.exe /DHS_STATIC /Iinclude main.c /link /LIBPATH:lib hs_min_static.lib kernel32.lib libcmt.lib crypt32.lib secur32.lib iphlpapi.lib ws2_32.lib mswsock.lib userenv.lib advapi32.lib synchronization.lib dbghelp.lib bcrypt.lib shell32.lib /NODEFAULTLIB:msvcrt.lib /OUT:server_demo_static.exe
+  cl.exe /DHS_STATIC /Iinclude main.c /link /LIBPATH:lib hs_thin_static.lib kernel32.lib libcmt.lib crypt32.lib secur32.lib iphlpapi.lib ws2_32.lib mswsock.lib userenv.lib advapi32.lib synchronization.lib dbghelp.lib bcrypt.lib shell32.lib /NODEFAULTLIB:msvcrt.lib /OUT:server_demo_static.exe
   ```
 
 ---
@@ -203,10 +203,10 @@ fn main() {
     println!("cargo:rustc-link-search=native=lib");
     
     // 动态链接 thin 库:
-    println!("cargo:rustc-link-lib=hs_min");
+    println!("cargo:rustc-link-lib=hs_thin");
     
     // 若使用静态链接，则改为:
-    // println!("cargo:rustc-link-lib=static=hs_min_static");
+    // println!("cargo:rustc-link-lib=static=hs_thin_static");
     // #[cfg(target_os = "linux")] {
     //     println!("cargo:rustc-link-lib=pthread");
     //     println!("cargo:rustc-link-lib=m");
@@ -298,7 +298,7 @@ fn main() {
 
 ### 3.3 Python
 
-借助 Python 标准库的 `ctypes`，**无需安装任何额外三方库（0 pip 依赖）**，即可直接调用动态库。支持 `hs_min`（纯静态 HTTP）与 `hs_full`（含 HTTPS/TLS 与反向代理）。
+借助 Python 标准库的 `ctypes`，**无需安装任何额外三方库（0 pip 依赖）**，即可直接调用动态库。支持 `hs_thin`（纯静态 HTTP）与 `hs_full`（含 HTTPS/TLS 与反向代理）。
 
 #### 动态库加载与面向对象封装
 
@@ -430,7 +430,7 @@ package main
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include
-#cgo LDFLAGS: -L${SRCDIR}/lib -lhs_min
+#cgo LDFLAGS: -L${SRCDIR}/lib -lhs_thin
 #include "http_server.h"
 #include <stdlib.h>
 */
@@ -573,7 +573,7 @@ const server: HttpServer = createServer(config);
 1. **动态库路径加载失败（`cannot open shared object file` / `DLL not found`）**：
    - **Linux**: 编译调用程序时加上 `-Wl,-rpath,'$ORIGIN/lib'`，或运行时设置 `export LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH`。
    - **macOS**: 加上 `-Wl,-rpath,'@executable_path/lib'`，或设置 `DYLD_LIBRARY_PATH`。
-   - **Windows**: 确保 `hs_min.dll` 放置在与可执行文件同目录下，或加入系统 `PATH`。
+   - **Windows**: 确保 `hs_thin.dll` 放置在与可执行文件同目录下，或加入系统 `PATH`。
 2. **`hs_server_start` 返回 `HS_ERR_UNSUPPORTED`（错误码 5）**：
    - 在 `thin` 版本库中配置了 `cert_file`（TLS 证书）或 `proxy`（代理转发）。请切换到 `full` 版本动态库/静态库（`hs_full`）。
 3. **优雅停机与内存回收**：

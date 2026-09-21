@@ -25,14 +25,14 @@
 4. **C ABI Public Contract & Symbol Isolation**:
    - `c_abi/include/http_server.h` (lines 23–45): Declares strictly 5 public APIs: `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`. Exposes 6 error codes and opaque pointer `hs_server_t*`. Zero MoonBit managed types are exposed.
    - `c_abi/thin/bridge.c` & `c_abi/full/bridge.c`: Memory allocation (`calloc`), handle synchronization (`ready_event`, `stop_event`), and thread termination (`WaitForSingleObject`) strictly managed. `hs_error_copy` safely handles `buf == NULL`, `cap == 0`, `cap == 1`, truncation, and always null-terminates.
-   - `scripts/build_cabi.mbtx`: Strips `.drectve`, `.voltbl`, `.gfids` via `llvm-objcopy` and links using `.def` files (`c_abi/thin/hs_min.def`, `c_abi/full/hs_full.def`).
-   - `dumpbin.exe /EXPORTS target/cabi/hs_min.dll` directly outputs:
+   - `scripts/build_cabi.mbtx`: Strips `.drectve`, `.voltbl`, `.gfids` via `llvm-objcopy` and links using `.def` files (`c_abi/thin/hs_thin.def`, `c_abi/full/hs_full.def`).
+   - `dumpbin.exe /EXPORTS target/cabi/hs_thin.dll` directly outputs:
      `5 number of functions`, `5 number of names`: `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`.
-   - `dumpbin.exe /SYMBOLS target/cabi/hs_min_static.lib` matched against `"mbedtls"` and `"psa_"` returns 0 results.
+   - `dumpbin.exe /SYMBOLS target/cabi/hs_thin_static.lib` matched against `"mbedtls"` and `"psa_"` returns 0 results.
 5. **Toolchain Execution & Test Results**:
    - `moon check --target native`: exits with code 0 (`no work to do`, 0 errors, 0 warnings).
    - `moon test --target native`: exits with code 0 (`Total tests: 230, passed: 230, failed: 0`).
-   - `moon run scripts/build_cabi.mbtx`: exits with code 0; all 4 C consumers (`test_dynamic_min`, `test_static_min`, `test_dynamic_full`, `test_static_full`) PASS.
+   - `moon run scripts/build_cabi.mbtx`: exits with code 0; all 4 C consumers (`test_dynamic_thin`, `test_static_thin`, `test_dynamic_full`, `test_static_full`) PASS.
    - `moon fmt`: exits with code 0 (`no work to do`).
 
 ---
@@ -54,7 +54,7 @@
 
 3. **Requirement 3 (Build Pipeline & Symbol Isolation)**:
    - Observation 4 & 5 confirm `scripts/build_cabi.mbtx` is a 100% pure MoonBit script without shell/Python wrappers.
-   - Observation 4 proves `.drectve` section stripping coupled with MSVC `.def` files completely prevents symbol pollution, verified by `dumpbin` exporting strictly 5 `hs_*` functions with 0 `main` and 0 `mbedtls` symbols in `hs_min_static.lib`.
+   - Observation 4 proves `.drectve` section stripping coupled with MSVC `.def` files completely prevents symbol pollution, verified by `dumpbin` exporting strictly 5 `hs_*` functions with 0 `main` and 0 `mbedtls` symbols in `hs_thin_static.lib`.
    - Observation 5 confirms all 4 independent C test programs compile and run successfully against the generated dynamic and static libraries.
    - **Inference**: Build pipeline and symbol isolation are robust and fully functional.
 
@@ -99,14 +99,14 @@ To independently reproduce and verify this review:
    ```pwsh
    moon run scripts/build_cabi.mbtx
    ```
-   *Expected*: Produces all 6 library artifacts in `target/cabi/` and reports `PASS` on `test_dynamic_min`, `test_static_min`, `test_dynamic_full`, and `test_static_full`.
+   *Expected*: Produces all 6 library artifacts in `target/cabi/` and reports `PASS` on `test_dynamic_thin`, `test_static_thin`, `test_dynamic_full`, and `test_static_full`.
 4. **Export Table Verification**:
    ```pwsh
-   & "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/dumpbin.exe" /EXPORTS target/cabi/hs_min.dll
+   & "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/dumpbin.exe" /EXPORTS target/cabi/hs_thin.dll
    ```
    *Expected*: Exactly 5 exports: `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`. No `main` symbol.
 5. **Static Symbol Isolation Verification**:
    ```pwsh
-   & "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/dumpbin.exe" /SYMBOLS target/cabi/hs_min_static.lib | Select-String -Pattern "mbedtls","psa_"
+   & "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/dumpbin.exe" /SYMBOLS target/cabi/hs_thin_static.lib | Select-String -Pattern "mbedtls","psa_"
    ```
    *Expected*: 0 matches.

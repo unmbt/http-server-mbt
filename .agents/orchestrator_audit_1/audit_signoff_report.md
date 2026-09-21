@@ -14,7 +14,7 @@
 
 所有验收指标均达到 100% 满分标准：
 1. **架构彻底解耦 (R1)**：`server/` 完全剥离加密依赖（0 MbedTLS C 桩代码、0 `tls` 依赖）；`full/` 纯粹通过 `TlsServerAcceptor` 依赖注入；`http-server-mbt-thin` 编译体积降低 ~29%，非法配置在监听前拦截并退出码 1。
-2. **对抗边界坚固 (R2)**：51 项高强度对抗测试用例全部通过，NULL 指针、25 类畸形 JSON、溢出端口、非法 TLS 组合均精准安全返回错误码，**0 崩溃、0 段错误、0 panic、0 内存越界**；生命周期操作具备完全幂等性；`dumpbin /EXPORTS` 确认 DLL 严格仅暴露 5 项 `hs_*` 导出符号且 0 `main` 泄漏；`dumpbin /SYMBOLS` 严格确认 `hs_min_static.lib` 包含 0 `mbedtls_*` / 0 `psa_*` 符号。
+2. **对抗边界坚固 (R2)**：51 项高强度对抗测试用例全部通过，NULL 指针、25 类畸形 JSON、溢出端口、非法 TLS 组合均精准安全返回错误码，**0 崩溃、0 段错误、0 panic、0 内存越界**；生命周期操作具备完全幂等性；`dumpbin /EXPORTS` 确认 DLL 严格仅暴露 5 项 `hs_*` 导出符号且 0 `main` 泄漏；`dumpbin /SYMBOLS` 严格确认 `hs_thin_static.lib` 包含 0 `mbedtls_*` / 0 `psa_*` 符号。
 3. **SDD 规范与门禁合规 (R3)**：`docs/proposal.md`、`docs/design.md`（D-07, D-08, D-11）与 `docs/tasks.md`（T-020, T-027）严格保持一致性；`moon check --target native` 保持 **0 errors, 0 warnings**；`moon test --target native` 全仓 **230 / 230 测试 100% PASS**；`scripts/build_cabi.mbtx` 自动化生成全部 6 项产物且 4 组独立 C 消费者测试 100% PASS；真实实现无桩代码，严格无 `git push`。
 
 **最终决议：Milestone 1~3 质量门禁正式关闭，同意签署通过，建议 Sentinel 唤醒独立 Victory Auditor 进行终审归档。**
@@ -57,8 +57,8 @@
 - **生命周期与状态机重入**：
   - 测试重复停止（double stop）、三重停止（triple stop）均安全返回 `HS_OK` (0)；未调用 stop 直接 destroy 能够正常等待并释放后台线程；连续执行 5 轮 start/destroy 循环无句柄残留或挂起。
 - **符号隔离与纯净度审计 (dumpbin)**：
-  - `dumpbin /EXPORTS target/cabi/hs_min.dll` 与 `hs_full.dll`：导出函数数量严格为 5，仅包含 5 个公共 `hs_*` 符号，**无 `main` 符号、无 `moonbit_*` 运行时符号**。
-  - `dumpbin /SYMBOLS target/cabi/hs_min_static.lib`：扫描全部 37,067 行符号表，`mbedtls` 与 `psa_` 匹配数为 **0**。
+  - `dumpbin /EXPORTS target/cabi/hs_thin.dll` 与 `hs_full.dll`：导出函数数量严格为 5，仅包含 5 个公共 `hs_*` 符号，**无 `main` 符号、无 `moonbit_*` 运行时符号**。
+  - `dumpbin /SYMBOLS target/cabi/hs_thin_static.lib`：扫描全部 37,067 行符号表，`mbedtls` 与 `psa_` 匹配数为 **0**。
 - **CLI 参数拦截验证**：
   - 向 `cmd/http-server-mbt-thin` 传入 `--cert`、`--key`、`--key-passphrase`、`--proxy`、`-P`、`--proxy-all`、`--proxy-config`，全部以**退出码 1** 立即终止，标准错误输出清晰的操作提示（如 `error: TLS is not supported in thin build; use full build`），无任何端口残留。
 
@@ -68,7 +68,7 @@
   - `docs/proposal.md`、`docs/design.md`（D-07, D-08, D-11）与 `docs/tasks.md`（T-020, T-027）严格闭环。
   - T-020 与 T-027 准确记录了 Windows 分项交付证据，且恪守多平台规则保持 `- [ ] 进行中（Windows 分项交付）`，杜绝在缺少 Linux/macOS 证据时提前虚假勾选。
 - **全流程质量门禁**：
-  - `moon run scripts/build_cabi.mbtx`：生成 6 项动静态库产物，4 个独立 C 消费者测试（`test_dynamic_min`, `test_static_min`, `test_dynamic_full`, `test_static_full`）**100% PASS**。
+  - `moon run scripts/build_cabi.mbtx`：生成 6 项动静态库产物，4 个独立 C 消费者测试（`test_dynamic_thin`, `test_static_thin`, `test_dynamic_full`, `test_static_full`）**100% PASS**。
   - `moon check --target native --deny-warn`：**0 errors, 0 warnings**。
   - `moon test --target native`：全仓 230 项测试 **100% 全部通过**（230 passed, 0 failed）。
 - **真实性取证与无 push 审计**：

@@ -15,8 +15,8 @@ Perform an objective and rigorous review of the deliverables:
 2. Verify:
    - Compliance with D-07, D-11, R1, R2, R3 specifications.
    - Exact signature conformance for `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`.
-   - Windows `.def` module definition files (`hs_min.def`, `hs_full.def`) and export restriction.
-   - Zero MbedTLS / PSA-Crypto symbols in `hs_min` artifacts.
+   - Windows `.def` module definition files (`hs_thin.def`, `hs_full.def`) and export restriction.
+   - Zero MbedTLS / PSA-Crypto symbols in `hs_thin` artifacts.
    - Pure `.mbtx` build driver implementation.
 3. Run verification commands on Windows:
    - `moon check --target native` (verify 0 errors, 0 warnings).

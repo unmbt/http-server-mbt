@@ -173,7 +173,7 @@ pub fn parse_cli_tiered(
     return Ok(CliAction::Version("\{server_version}"))
   }
 
-  // --- Enforce Tier Restrictions for Min ---
+  // --- Enforce Tier Restrictions for Thin ---
   match tier {
     MinTier => {
       if matches.values.contains("cert") {

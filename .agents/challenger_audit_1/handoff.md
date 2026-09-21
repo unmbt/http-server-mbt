@@ -11,15 +11,15 @@
 ## 1. Observation
 
 1. **Symbol Isolation via `dumpbin`**:
-   - `dumpbin /EXPORTS target\cabi\hs_min.dll` and `dumpbin /EXPORTS target\cabi\hs_full.dll` output:
+   - `dumpbin /EXPORTS target\cabi\hs_thin.dll` and `dumpbin /EXPORTS target\cabi\hs_full.dll` output:
      `5 number of functions`, `5 number of names`, exporting strictly:
      `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`.
      Zero `main` symbol present; zero `moonbit_*` runtime symbols exported.
-   - `dumpbin /SYMBOLS target\cabi\hs_min_static.lib` scanned 37,067 symbol lines:
+   - `dumpbin /SYMBOLS target\cabi\hs_thin_static.lib` scanned 37,067 symbol lines:
      `Select-String -Pattern "mbedtls", "psa_"` returned **0 matches**.
      In contrast, `dumpbin /SYMBOLS target\cabi\hs_full_static.lib` matched 5,606 `mbedtls` symbols.
 2. **C ABI Robustness Harness (`target/adversarial_challenge.c` -> `target/cabi/adversarial_challenge.exe`)**:
-   - Executed dynamic loading of `hs_min.dll` and `hs_full.dll`.
+   - Executed dynamic loading of `hs_thin.dll` and `hs_full.dll`.
    - Tested 7 test suites comprising 51 test cases:
      - NULL inputs: `hs_server_start(NULL, 0, NULL)` returned `HS_ERR_INVALID_ARG` (2).
      - `hs_server_stop(NULL)` returned `HS_ERR_INVALID_ARG` (2).
@@ -27,7 +27,7 @@
      - `hs_error_copy` with NULL buffer returned accurate message length without dereferencing NULL; tiny buffers (cap=1) correctly null-terminated.
      - 25 distinct malformed/fuzzed JSON inputs (including bare strings, arrays, trailing garbage, type mismatches, unclosed braces) safely rejected with `HS_ERR_CONFIG` (1) and `*out_server == NULL`.
      - Extreme ports (-1, -65535, 65536, 99999, overflow integer) safely rejected with `HS_ERR_CONFIG` (1).
-     - 8 thin-build unsupported features (`cert_file`, `key_file`, `key_passphrase`, `ca_file`, `proxy`, `proxy_all`, `proxy_options`, `websocket`) strictly rejected on `hs_min.dll` with `HS_ERR_UNSUPPORTED` (5).
+     - 8 thin-build unsupported features (`cert_file`, `key_file`, `key_passphrase`, `ca_file`, `proxy`, `proxy_all`, `proxy_options`, `websocket`) strictly rejected on `hs_thin.dll` with `HS_ERR_UNSUPPORTED` (5).
      - Full build negative TLS combinations (cert without key, key without cert, non-existent cert, corrupted cert/key files) safely returned `HS_ERR_CONFIG` (1) or `HS_ERR_IO` (3) before listening.
      - Single-thread port conflict (externally bound socket) returned `HS_ERR_IO` (3) safely without crash.
      - Double and triple `hs_server_stop` returned `HS_OK` (0).
@@ -52,8 +52,8 @@
 ## 2. Logic Chain
 
 1. **Symbol Isolation**:
-   - Observation 1 proves that `hs_min.dll` and `hs_full.dll` export only the 5 public `hs_*` APIs declared in `c_abi/include/http_server.h`.
-   - Observation 1 proves that `hs_min_static.lib` has 0 occurrences of `mbedtls` or `psa_` symbols across 37,067 inspected symbols.
+   - Observation 1 proves that `hs_thin.dll` and `hs_full.dll` export only the 5 public `hs_*` APIs declared in `c_abi/include/http_server.h`.
+   - Observation 1 proves that `hs_thin_static.lib` has 0 occurrences of `mbedtls` or `psa_` symbols across 37,067 inspected symbols.
    - Therefore, R3 and Acceptance Criteria on symbol isolation and cryptographic decoupling for thin are completely satisfied.
 2. **C ABI Robustness & Crash Immunity**:
    - Observation 2 proves that every NULL pointer parameter, unclosed JSON token, type violation, extreme port, invalid TLS combination, and single-thread port conflict returns an explicit, safe error code (`HS_ERR_INVALID_ARG`, `HS_ERR_CONFIG`, `HS_ERR_IO`, `HS_ERR_UNSUPPORTED`).
@@ -92,9 +92,9 @@ To independently verify these findings on Windows Native:
 
 1. **Verify Symbol Isolation**:
    ```powershell
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_min.dll
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_thin.dll
    & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_full.dll
-   (& "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_min_static.lib | Select-String -Pattern "mbedtls", "psa_").Count # Output: 0
+   (& "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_thin_static.lib | Select-String -Pattern "mbedtls", "psa_").Count # Output: 0
    ```
 2. **Verify CLI Rejections**:
    ```powershell

@@ -193,9 +193,9 @@
     dst
   ]).output()
   ```
-  Followed by linking with `/DEF:c_abi/thin/hs_min.def`.
+  Followed by linking with `/DEF:c_abi/thin/hs_thin.def`.
 - **Independent Verification**:
-  - `dumpbin.exe /EXPORTS target/cabi/hs_min.dll` confirms:
+  - `dumpbin.exe /EXPORTS target/cabi/hs_thin.dll` confirms:
     ```
     5 number of functions
     5 number of names
@@ -206,7 +206,7 @@
     5 hs_server_stop
     ```
     **Zero** internal MoonBit symbols, **zero** `main` symbol!
-  - `dumpbin.exe /SYMBOLS target/cabi/hs_min_static.lib` confirms:
+  - `dumpbin.exe /SYMBOLS target/cabi/hs_thin_static.lib` confirms:
     **Zero** matches for `mbedtls` or `psa_`.
 
 ---
@@ -249,11 +249,11 @@
 | `moon check --target native` | Ran command directly | **0 errors, 0 warnings** | Up to date, no warnings |
 | `moon test --target native` | Ran full test suite | **230/230 PASS** | 100% pass rate across all packages |
 | `build_cabi.mbtx` pipeline | Ran `moon run scripts/build_cabi.mbtx` | **All 7 steps PASS** | Produced 6 library artifacts + 4 C tests pass |
-| DLL export count | Ran `dumpbin /EXPORTS hs_min.dll` | **Exactly 5 exports** | `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy` |
+| DLL export count | Ran `dumpbin /EXPORTS hs_thin.dll` | **Exactly 5 exports** | `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy` |
 | DLL export count (full) | Ran `dumpbin /EXPORTS hs_full.dll` | **Exactly 5 exports** | Clean export table, no `main` |
-| Static symbol isolation | Ran `dumpbin /SYMBOLS hs_min_static.lib` | **0 mbedtls/psa symbols** | Zero crypto symbols in thin static archive |
-| C consumer tests (dynamic thin) | `test_dynamic_min.exe` execution | **PASS** | Validated ABI version, config error, lifecycle |
-| C consumer tests (static thin) | `test_static_min.exe` execution | **PASS** | Static link, lifecycle, 0 handle leaks |
+| Static symbol isolation | Ran `dumpbin /SYMBOLS hs_thin_static.lib` | **0 mbedtls/psa symbols** | Zero crypto symbols in thin static archive |
+| C consumer tests (dynamic thin) | `test_dynamic_thin.exe` execution | **PASS** | Validated ABI version, config error, lifecycle |
+| C consumer tests (static thin) | `test_static_thin.exe` execution | **PASS** | Static link, lifecycle, 0 handle leaks |
 | C consumer tests (dynamic full) | `test_dynamic_full.exe` execution | **PASS** | TLS preflight checks, lifecycle |
 | C consumer tests (static full) | `test_static_full.exe` execution | **PASS** | Static link, TLS preflight, lifecycle |
 | Code formatting | Ran `moon fmt` | **Clean** | No formatting changes needed |

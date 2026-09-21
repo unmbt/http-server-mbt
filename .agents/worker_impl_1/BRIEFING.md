@@ -31,10 +31,10 @@ Implement C ABI export pipeline (thin & full), .mbtx build driver script, and st
 ## Change Tracker
 - **Files modified**:
   - `c_abi/include/http_server.h`: C header declaring the 5 hs_* APIs, hs_error_code enum, opaque pointers.
-  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_min.def`, `c_abi/thin/abi_test.mbt`: thin C ABI implementation.
+  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_thin.def`, `c_abi/thin/abi_test.mbt`: thin C ABI implementation.
   - `c_abi/full/moon.pkg`, `c_abi/full/abi.mbt`, `c_abi/full/bridge.c`, `c_abi/full/hs_full.def`, `c_abi/full/abi_test.mbt`: full C ABI implementation.
   - `scripts/build_cabi.mbtx`: Automated pure .mbtx build driver for Windows Native.
-  - `testdata/c_consumer/test_dynamic_min.c`, `testdata/c_consumer/test_static_min.c`, `testdata/c_consumer/test_dynamic_full.c`, `testdata/c_consumer/test_static_full.c`: standalone C consumer smoke tests.
+  - `testdata/c_consumer/test_dynamic_thin.c`, `testdata/c_consumer/test_static_thin.c`, `testdata/c_consumer/test_dynamic_full.c`, `testdata/c_consumer/test_static_full.c`: standalone C consumer smoke tests.
   - `docs/tasks.md`: updated T-020 and T-027 with Windows delivery evidence.
 - **Build status**: PASS (0 errors, 0 warnings). Full test suite 230/230 passed.
 - **Pending issues**: None.
@@ -57,9 +57,9 @@ Implement C ABI export pipeline (thin & full), .mbtx build driver script, and st
 - `BRIEFING.md` — working memory
 - `handoff.md` — handoff report
 - `target/cabi/include/http_server.h` — exported C header
-- `target/cabi/hs_min.dll` — thin dynamic library
-- `target/cabi/hs_min.lib` — thin import library
-- `target/cabi/hs_min_static.lib` — thin static library
+- `target/cabi/hs_thin.dll` — thin dynamic library
+- `target/cabi/hs_thin.lib` — thin import library
+- `target/cabi/hs_thin_static.lib` — thin static library
 - `target/cabi/hs_full.dll` — full dynamic library
 - `target/cabi/hs_full.lib` — full import library
 - `target/cabi/hs_full_static.lib` — full static library

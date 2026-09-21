@@ -84,28 +84,28 @@ When executing `moon build cmd/http-server-mbt-thin --target native --dry-run -v
 
 ### 1.4 Windows DLL & Import Library Linking Verification
 
-1. A test bridge `test_bridge.c` and `.def` file `test_hs_min.def` were compiled and linked:
+1. A test bridge `test_bridge.c` and `.def` file `test_hs_thin.def` were compiled and linked:
    - Compiler: MSVC `cl.exe /c /Z7 /std:c11 /utf-8`
-   - Linker: `link.exe /NOLOGO /DLL /DEF:test_hs_min.def /OUT:test_hs_min.dll /IMPLIB:test_hs_min.lib test_bridge.obj`
-2. `dumpbin /EXPORTS test_hs_min.dll` verified that only the declared `hs_*` symbols are exported:
+   - Linker: `link.exe /NOLOGO /DLL /DEF:test_hs_thin.def /OUT:test_hs_thin.dll /IMPLIB:test_hs_thin.lib test_bridge.obj`
+2. `dumpbin /EXPORTS test_hs_thin.dll` verified that only the declared `hs_*` symbols are exported:
    - `hs_abi_version`
    - `hs_server_start`
    - `hs_server_stop`
    - `hs_server_destroy`
    - `hs_error_copy`
    - Total exports: exactly 5. Zero internal symbols, zero `main` symbol.
-3. `nm -g test_hs_min.lib` verified import library thunks for each `hs_*` function matching the exact C ABI signature.
+3. `nm -g test_hs_thin.lib` verified import library thunks for each `hs_*` function matching the exact C ABI signature.
 
 ### 1.5 Windows Static Library Creation Verification
 
 1. Tested with MSVC `lib.exe`:
-   - `lib.exe /NOLOGO /OUT:test_hs_min_static.lib test_bridge.obj`
+   - `lib.exe /NOLOGO /OUT:test_hs_thin_static.lib test_bridge.obj`
    - Result: successfully created valid COFF static archive.
 2. Tested with GNU `ar.exe` (in PATH):
-   - `ar rcs test_libhs_min.a test_bridge.obj`
+   - `ar rcs test_libhs_thin.a test_bridge.obj`
    - Result: successfully created valid archive.
 3. Tested with `llvm-ar.exe`:
-   - `llvm-ar rcs test_libhs_min_llvm.lib test_bridge.obj`
+   - `llvm-ar rcs test_libhs_thin_llvm.lib test_bridge.obj`
    - Result: successfully created archive.
 
 ### 1.6 Resolving `main` Collision in Static Libraries
@@ -115,9 +115,9 @@ When executing `moon build cmd/http-server-mbt-thin --target native --dry-run -v
 3. We experimentally verified that compiling the generated C file with preprocessor macro remapping `/Dmain=moonbit_unused_main` (or `-Dmain=moonbit_unused_main`):
    - Renames the generated entry point to `moonbit_unused_main`.
    - `dumpbin /SYMBOLS` confirmed `main` was completely eliminated from the object file.
-4. An independent consumer C program (`test_consumer.c`) was compiled and statically linked against `test_hs_min_static.lib`:
+4. An independent consumer C program (`test_consumer.c`) was compiled and statically linked against `test_hs_thin_static.lib`:
    - Executed successfully, printed `Consumer success: hs_abi_version = 0x00010000`, assert passed, exit code 0.
-5. The same consumer C program was compiled and dynamically linked against `test_hs_min.lib` with `hs_min.dll`:
+5. The same consumer C program was compiled and dynamically linked against `test_hs_thin.lib` with `hs_thin.dll`:
    - Executed successfully, printed `Consumer success: hs_abi_version = 0x00010000`, assert passed, exit code 0.
 
 ---
@@ -130,12 +130,12 @@ When executing `moon build cmd/http-server-mbt-thin --target native --dry-run -v
 4. **Observation Reference**: Both MSVC 14.42 (`cl.exe`, `link.exe`, `lib.exe`, `dumpbin.exe`) and MinGW/GCC 12.2 (`gcc.exe`, `ar.exe`, `nm.exe`) are installed and functional on the Windows host. Furthermore, `moon` itself uses MSVC 14.42 by default for all native compilation tasks on this machine.
 5. **Observation Reference**: `moon build` compiles MoonBit packages into `.core` IR and emits stub libraries (`libserver.lib`, `libfs.lib`, etc.) and the runtime library `libruntime.lib` under `_build/native/debug/build/` (or `release/`). For an export package, `moonc link-core` outputs the combined C source.
 6. **Reasoning**:
-   - For **DLL Export** (`hs_min.dll` + `hs_min.lib`):
-     - Compiling the C bridge and MoonBit generated C source, then linking via `link.exe /DLL /DEF:hs_min.def /OUT:target/cabi/hs_min.dll /IMPLIB:target/cabi/hs_min.lib ...` with Windows system libraries (`ws2_32.lib mswsock.lib userenv.lib advapi32.lib synchronization.lib dbghelp.lib bcrypt.lib`) and runtime `.lib` files produces a DLL that exports *only* `hs_*` APIs.
-   - For **Static Library** (`hs_min_static.lib`):
-     - Compiling the generated C file with `/Dmain=moonbit_unused_main` eliminates any duplicate `main` symbol. Packaging the resulting object files, C bridge object, and runtime objects via `lib.exe /OUT:target/cabi/hs_min_static.lib` creates a static library that can be linked by standard C/Rust consumers without symbol collisions.
+   - For **DLL Export** (`hs_thin.dll` + `hs_thin.lib`):
+     - Compiling the C bridge and MoonBit generated C source, then linking via `link.exe /DLL /DEF:hs_thin.def /OUT:target/cabi/hs_thin.dll /IMPLIB:target/cabi/hs_thin.lib ...` with Windows system libraries (`ws2_32.lib mswsock.lib userenv.lib advapi32.lib synchronization.lib dbghelp.lib bcrypt.lib`) and runtime `.lib` files produces a DLL that exports *only* `hs_*` APIs.
+   - For **Static Library** (`hs_thin_static.lib`):
+     - Compiling the generated C file with `/Dmain=moonbit_unused_main` eliminates any duplicate `main` symbol. Packaging the resulting object files, C bridge object, and runtime objects via `lib.exe /OUT:target/cabi/hs_thin_static.lib` creates a static library that can be linked by standard C/Rust consumers without symbol collisions.
    - For **Symbol Purity Verification**:
-     - `dumpbin /EXPORTS target/cabi/hs_min.dll` verifies that only `hs_*` symbols appear in the export table.
+     - `dumpbin /EXPORTS target/cabi/hs_thin.dll` verifies that only `hs_*` symbols appear in the export table.
      - `dumpbin /SYMBOLS` or `nm -g` or `llvm-strings` verifies that no `mbedtls_*` or `psa_*` symbols exist in `thin` artifacts, and no `main` symbol exists.
 
 ---

@@ -14,7 +14,7 @@ $client = New-Object System.Net.WebClient
 try {
     $resp = $client.DownloadString("http://127.0.0.1:$port/moon.mod")
     Write-Host "HTTP GET successful, received bytes: $($resp.Length)"
-    Write-Host "Response preview: $($resp.Substring(0, [Math]::Min(50, $resp.Length)))"
+    Write-Host "Response preview: $($resp.Substring(0, [Math]::Thin(50, $resp.Length)))"
 } catch {
     Write-Host "HTTP request failed: $_"
 }

@@ -9,7 +9,7 @@ The authoritative user request is recorded in: `E:\project\moonbit\unmbt\http-se
 
 Please read the latest section of `ORIGINAL_REQUEST.md` (timestamp `2026-09-18T12:00:00Z`) for complete requirements:
 1. R1: Decouple Server from TLS (abstract transport / connection handling so static server does not hard-depend on `tls` package or MbedTLS C stubs; dependency injection for TLS in `full` build; zero regression on all 183 existing tests).
-2. R2: Min & Full CLI build & distribution (`thin` CLI errors out with code 1 if `--cert`, `--key`, `--proxy` are given; `full` CLI supports TLS and future proxy args; separate entry points or build scripts).
+2. R2: Thin & Full CLI build & distribution (`thin` CLI errors out with code 1 if `--cert`, `--key`, `--proxy` are given; `full` CLI supports TLS and future proxy args; separate entry points or build scripts).
 3. R3: C ABI dynamic & static library export pipeline (`.mbtx` script-driven export of `.dll`/`.so`/`.dylib` and `.lib`/`.a`; strictly `hs_*` exports with no CLI main pollution; `thin` library completely free of MbedTLS symbols; minimal C verification program).
 4. R4: Reverse Proxy architecture design & interface readiness (align with original C037~C039, C041, T-013, state machine Resolving -> Proxying -> Idle, config data structures, streaming forward interface).
 5. Strict SDD workflow: update `docs/design.md`, `docs/tasks.md` / ADRs.
@@ -25,7 +25,7 @@ Please read the latest section of `ORIGINAL_REQUEST.md` (timestamp `2026-09-18T1
 用户指令：“继续做完当前的cli部分min/full打包，但是准备开始做动态库静态库导出前记录已完成的工作内容后停下来，以便后面能根据记录的文档继续完成动静态库导出的实现”
 
 请 Project Orchestrator 严格执行：
-1. 继续完成 Milestone 1（Server 与 TLS 依赖解耦）与 Milestone 2（Min/Full 双版本 CLI 打包、验证与全量测试保护）。
+1. 继续完成 Milestone 1（Server 与 TLS 依赖解耦）与 Milestone 2（Thin/Full 双版本 CLI 打包、验证与全量测试保护）。
 2. 在进入 Milestone 3（动静态库导出）之前：
    - 详细记录已完成的工作内容；
    - 编写动静态库导出的接续指南文档；

@@ -8,9 +8,9 @@
 - **C ABI Packages**:
   - `c_abi/thin/`:
     - `moon.pkg`: Configured with `pkgtype(kind: "foreign_library")`, imports `unmbt/http-server-mbt/server`, `unmbt/http-server-mbt/core`, `moonbitlang/async`, with native stub `bridge.c`.
-    - `abi.mbt`: Implements `#export_name("hs_abi_version")` and `#export_name("hs_min_run_server")`, invoking `@async.run_async_main` and `@server.with_server_at`.
+    - `abi.mbt`: Implements `#export_name("hs_abi_version")` and `#export_name("hs_thin_run_server")`, invoking `@async.run_async_main` and `@server.with_server_at`.
     - `bridge.c`: Genuine JSON parser for server config, preflight checks (invalid port, mutual exclusion between spa and try_files, rejection of unsupported features like TLS/proxy with `HS_ERR_CONFIG`), OS thread creation via Win32 `CreateThread`, event synchronization via Win32 `CreateEvent` / `WaitForSingleObject`, graceful shutdown via `stop_flag`, and `hs_error_copy`.
-    - `hs_min.def`: Module definition file restricting DLL exports to the 5 `hs_*` functions.
+    - `hs_thin.def`: Module definition file restricting DLL exports to the 5 `hs_*` functions.
     - `abi_test.mbt`: Unit smoke test checking `hs_abi_version() == 65536`.
   - `c_abi/full/`:
     - `moon.pkg`: Configured with `pkgtype(kind: "foreign_library")`, imports `"unmbt/http-server-mbt/full" @full_server`, `core`, `async`.
@@ -19,10 +19,10 @@
     - `hs_full.def`: Module definition file restricting DLL exports to the 5 `hs_*` functions.
     - `abi_test.mbt`: Unit smoke test checking `hs_abi_version() == 65536`.
 - **Pure `.mbtx` Build Pipeline Driver**:
-  - `scripts/build_cabi.mbtx`: Automates toolchain discovery (MSVC `cl.exe`, `link.exe`, `lib.exe`, `dumpbin.exe`, Windows Kits UCRT/UM lib/includes, `llvm-objcopy`), compiles MoonBit packages in release mode, stages objects, executes section stripping via `llvm-objcopy` (`--remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids`), links `hs_min.dll` and `hs_full.dll` with `/DEF`, archives `hs_min_static.lib` and `hs_full_static.lib`, verifies DLL exports and absence of MbedTLS symbols in thin, compiles and executes the 4 C consumer smoke tests, and reports an artifact table.
+  - `scripts/build_cabi.mbtx`: Automates toolchain discovery (MSVC `cl.exe`, `link.exe`, `lib.exe`, `dumpbin.exe`, Windows Kits UCRT/UM lib/includes, `llvm-objcopy`), compiles MoonBit packages in release mode, stages objects, executes section stripping via `llvm-objcopy` (`--remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids`), links `hs_thin.dll` and `hs_full.dll` with `/DEF`, archives `hs_thin_static.lib` and `hs_full_static.lib`, verifies DLL exports and absence of MbedTLS symbols in thin, compiles and executes the 4 C consumer smoke tests, and reports an artifact table.
 - **Standalone C Consumer Smoke Tests**:
-  - `testdata/c_consumer/test_dynamic_min.c`: Verifies dynamic linking to `hs_min.lib` + loading `hs_min.dll`, `hs_abi_version() == 0x00010000`, `hs_error_copy`, preflight checks, and full start/stop/destroy lifecycle.
-  - `testdata/c_consumer/test_static_min.c`: Verifies static linking to `hs_min_static.lib`.
+  - `testdata/c_consumer/test_dynamic_thin.c`: Verifies dynamic linking to `hs_thin.lib` + loading `hs_thin.dll`, `hs_abi_version() == 0x00010000`, `hs_error_copy`, preflight checks, and full start/stop/destroy lifecycle.
+  - `testdata/c_consumer/test_static_thin.c`: Verifies static linking to `hs_thin_static.lib`.
   - `testdata/c_consumer/test_dynamic_full.c`: Verifies dynamic linking to `hs_full.lib` + `hs_full.dll`, TLS preflight error validation (`cert_file` without `key_file` returns `HS_ERR_CONFIG`), and full lifecycle.
   - `testdata/c_consumer/test_static_full.c`: Verifies static linking to `hs_full_static.lib`.
 - **Specification Documentation**:
@@ -57,26 +57,26 @@
    3. Preparing target/cabi/ directories...
    4. Building thin variant (zero crypto, static HTTP server)...
    Staging 35 objects into target/cabi/_staging_min...
-   Linking hs_min.dll...
-   Creating static archive hs_min_static.lib...
+   Linking hs_thin.dll...
+   Creating static archive hs_thin_static.lib...
    5. Building full variant (integrated TLS & proxy)...
    Staging 144 objects into target/cabi/_staging_full...
    Linking hs_full.dll...
    Creating static archive hs_full_static.lib...
    6. Verifying symbols and export isolation...
-   Verifying exports for target/cabi/hs_min.dll...
+   Verifying exports for target/cabi/hs_thin.dll...
      -> Verified: strictly 5 hs_* exports, zero symbol leaks.
    Verifying exports for target/cabi/hs_full.dll...
      -> Verified: strictly 5 hs_* exports, zero symbol leaks.
-   Verifying absence of MbedTLS symbols in target/cabi/hs_min_static.lib...
+   Verifying absence of MbedTLS symbols in target/cabi/hs_thin_static.lib...
      -> Verified: zero mbedtls/psa symbols in thin static archive.
    7. Compiling and running standalone C consumer tests...
-   Compiling consumer test test_dynamic_min...
-   Running consumer test test_dynamic_min...
-     -> PASS: test_dynamic_min
-   Compiling consumer test test_static_min...
-   Running consumer test test_static_min...
-     -> PASS: test_static_min
+   Compiling consumer test test_dynamic_thin...
+   Running consumer test test_dynamic_thin...
+     -> PASS: test_dynamic_thin
+   Compiling consumer test test_static_thin...
+   Running consumer test test_static_thin...
+     -> PASS: test_static_thin
    Compiling consumer test test_dynamic_full...
    Running consumer test test_dynamic_full...
      -> PASS: test_dynamic_full
@@ -87,9 +87,9 @@
    C ABI Build and Verification SUCCEEDED!
    Artifacts in target/cabi/:
      - target/cabi/include/http_server.h (1151 bytes)
-     - target/cabi/hs_min.dll (1344000 bytes)
-     - target/cabi/hs_min.lib (2514 bytes)
-     - target/cabi/hs_min_static.lib (4460708 bytes)
+     - target/cabi/hs_thin.dll (1344000 bytes)
+     - target/cabi/hs_thin.lib (2514 bytes)
+     - target/cabi/hs_thin_static.lib (4460708 bytes)
      - target/cabi/hs_full.dll (2678784 bytes)
      - target/cabi/hs_full.lib (2528 bytes)
      - target/cabi/hs_full_static.lib (6916216 bytes)
@@ -97,13 +97,13 @@
    ```
 
 3. **Symbol Isolation Verifications**:
-   - `dumpbin /EXPORTS target/cabi/hs_min.dll`:
+   - `dumpbin /EXPORTS target/cabi/hs_thin.dll`:
      Exports count: 5. Names: `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`. Zero `main`, zero `moonbit_*`.
    - `dumpbin /EXPORTS target/cabi/hs_full.dll`:
      Exports count: 5. Names: `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`. Zero `main`, zero `moonbit_*`.
-   - `dumpbin /SYMBOLS target/cabi/hs_min_static.lib`:
+   - `dumpbin /SYMBOLS target/cabi/hs_thin_static.lib`:
      Contains 0 occurrences of `mbedtls` or `psa_` symbols.
-   - `dumpbin /SYMBOLS target/cabi/hs_min.dll`:
+   - `dumpbin /SYMBOLS target/cabi/hs_thin.dll`:
      Contains 0 occurrences of `mbedtls` or `psa_` symbols.
 
 ## 2. Logic Chain
@@ -117,7 +117,7 @@
 3. **Symbol Isolation**:
    - MoonBit native code generation injects linker directives (`#pragma comment(linker, "/EXPORT:...")`) into the `.drectve` COFF section of compiled objects. If unhandled, this causes all internal runtime functions (`moonbit_*`) to be automatically exported from the DLL.
    - Using `llvm-objcopy --remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids`, compiler directives were stripped on all staged objects before invoking `link.exe` with `/DLL /DEF:...`.
-   - As a result, the export directory of both `hs_min.dll` and `hs_full.dll` exports strictly the 5 approved public functions.
+   - As a result, the export directory of both `hs_thin.dll` and `hs_full.dll` exports strictly the 5 approved public functions.
 4. **Build Automation**:
    - Per AGENTS.md rule ("Agent 编写的自动化逻辑只使用 `.mbtx`"), the entire build pipeline is written in pure MoonBit (`scripts/build_cabi.mbtx`), utilizing `@shell.Cmd` and `@fs` without external Python or Bash scripts.
 
@@ -127,7 +127,7 @@
 
 ## 4. Conclusion
 - All requirements R1, R2, R3 and all acceptance criteria are completely satisfied.
-- The C ABI libraries (`hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`) and header `http_server.h` are built, isolated, and verified in `target/cabi/`.
+- The C ABI libraries (`hs_thin.dll`, `hs_thin.lib`, `hs_thin_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`) and header `http_server.h` are built, isolated, and verified in `target/cabi/`.
 - Full project checks pass with 0 errors and 0 warnings, and 230/230 tests pass with zero regressions.
 - `docs/tasks.md` was updated with the Windows Native delivery evidence for T-020 and T-027.
 
@@ -146,12 +146,12 @@ To independently verify the implementation:
    Confirm: Exits with code 0, outputs 7 artifacts in `target/cabi/`, and prints `PASS` for all 4 C consumer smoke tests.
 3. Verify symbol isolation independently:
    ```pwsh
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_min.dll
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_thin.dll
    & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_full.dll
    ```
    Confirm: Exactly 5 functions exported, zero internal symbols or `main`.
 4. Verify absence of MbedTLS symbols in thin static archive:
    ```pwsh
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_min_static.lib | Select-String "mbedtls|psa_"
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_thin_static.lib | Select-String "mbedtls|psa_"
    ```
    Confirm: Returns 0 matching lines.

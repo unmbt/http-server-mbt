@@ -11,7 +11,7 @@ worker_impl_1 has implemented the C ABI export pipeline. Read worker_impl_1's ha
 
 Your Objectives:
 Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle robustness:
-1. Verify built artifacts in `target/cabi/`: `hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`.
+1. Verify built artifacts in `target/cabi/`: `hs_thin.dll`, `hs_thin.lib`, `hs_thin_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`.
 2. Write and execute adversarial C test programs (in a temporary test file or scratch folder, e.g. under your `.agents/challenger_1/` workspace) linking against `target/cabi/`:
    - **Rapid lifecycle**: Start and immediately stop/destroy in rapid loops (e.g. 5 consecutive start/stop cycles). Check for socket bind conflicts, race conditions, or crashes.
    - **Boundary & Invalid inputs**: Call `hs_server_start` with `NULL` config, empty string `""`, malformed JSON `"{invalid"`, negative or invalid port numbers (`"port": 999999`), and conflicting options. Verify it returns proper error codes (`HS_ERR_CONFIG` or `HS_ERR_INVALID_ARG`) without crashing or leaking resources.

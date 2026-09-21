@@ -38,8 +38,8 @@ pub fn hs_abi_version() -> UInt {
 }
 
 ///|
-#export_name("hs_min_run_server")
-pub fn hs_min_run_server(server_ptr : Int64) -> Unit {
+#export_name("hs_thin_run_server")
+pub fn hs_thin_run_server(server_ptr : Int64) -> Unit {
   let port = hs_bridge_get_port(server_ptr)
   let root = hs_bridge_get_root(server_ptr)
   let base_config = @core.Config::default(root)

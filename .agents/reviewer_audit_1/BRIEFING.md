@@ -26,7 +26,7 @@ Perform comprehensive, evidence-based code and architecture review and adversari
   - `server/moon.pkg`, `server/server.mbt`, `server/transmit_file.mbt`
   - `full/moon.pkg`, `full/full.mbt`, `full/tls_acceptor.mbt`
   - `c_abi/include/http_server.h`
-  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_min.def`
+  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_thin.def`
   - `c_abi/full/moon.pkg`, `c_abi/full/abi.mbt`, `c_abi/full/bridge.c`, `c_abi/full/hs_full.def`
   - `cmd/http-server-mbt-thin/` and `cmd/http-server-full/`
   - `scripts/build_cabi.mbtx`
@@ -48,7 +48,7 @@ Perform comprehensive, evidence-based code and architecture review and adversari
   - Concurrency window in ensure_runtime_init: noted advisory observation for concurrent multithreaded cold start.
   - Double stop and NULL destroy: verified idempotent and safe.
   - Buffer overrun in hs_error_copy: verified safe bound clamping and null-termination.
-  - Symbol leaks in hs_min.dll / hs_min_static.lib: verified 0 main, 0 mbedtls/psa symbols via dumpbin.
+  - Symbol leaks in hs_thin.dll / hs_thin_static.lib: verified 0 main, 0 mbedtls/psa symbols via dumpbin.
 - **Vulnerabilities found**: No blocking vulnerabilities; 2 advisory observations documented in review report.
 - **Untested angles**: Linux/macOS dynamic/static build execution on non-Windows OS (deferred to CI per T-032).
 

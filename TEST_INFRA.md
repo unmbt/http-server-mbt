@@ -44,13 +44,13 @@ All 16 features from `PROJECT.md` are cataloged below with their milestone, comp
 | 2 | `F02` | TLS Dependency Injection | `full` | M1 | `full/tls_acceptor_test.mbt` | ORIGINAL_REQUEST §R1, D-02, D-08 |
 | 3 | `F03` | Zero Test Regression | Whole Repo | M1 | `moon test --target native` (183 suites) | ORIGINAL_REQUEST §R1, survey |
 | 4 | `F04` | CLI Shared Helpers | `cmd/common` | M2 | `cmd/common/cli_helpers_test.mbt` | ORIGINAL_REQUEST §R2, survey |
-| 5 | `F05` | Min CLI Executable | `cmd/http-server-mbt-thin` | M2 | `cmd/http-server-mbt-thin/min_cli_test.mbt` | ORIGINAL_REQUEST §R2, D-08, D-15 |
-| 6 | `F06` | Min CLI Preflight Rejection | `cmd/http-server-mbt-thin` | M2 | `cmd/http-server-mbt-thin/preflight_reject_test.mbt` | ORIGINAL_REQUEST §R2, D-08, D-15 |
+| 5 | `F05` | Thin CLI Executable | `cmd/http-server-mbt-thin` | M2 | `cmd/http-server-mbt-thin/min_cli_test.mbt` | ORIGINAL_REQUEST §R2, D-08, D-15 |
+| 6 | `F06` | Thin CLI Preflight Rejection | `cmd/http-server-mbt-thin` | M2 | `cmd/http-server-mbt-thin/preflight_reject_test.mbt` | ORIGINAL_REQUEST §R2, D-08, D-15 |
 | 7 | `F07` | Full CLI Executable | `cmd/http-server-full` | M2 | `cmd/http-server-full/full_cli_test.mbt` | ORIGINAL_REQUEST §R2, D-08, D-15 |
 | 8 | `F08` | C ABI Interface Definition | `c_abi` | M3 | `c_abi/c_abi_test.mbt` | ORIGINAL_REQUEST §R3, D-07, D-11 |
 | 9 | `F09` | C ABI `.mbtx` Build Pipeline | `scripts/build_cabi.mbtx` | M3 | `scripts/run_cabi_pipeline_test.mbtx` | ORIGINAL_REQUEST §R3, D-07, D-11 |
 | 10 | `F10` | Clean Symbol Isolation | C ABI DLL/LIB | M3 | `scripts/verify_symbols.mbtx` | ORIGINAL_REQUEST §R3, D-07, D-11 |
-| 11 | `F11` | Min C Library Zero Crypto | C ABI Min Artifacts | M3 | `scripts/verify_zero_crypto.mbtx` | ORIGINAL_REQUEST §R3, D-07, D-11 |
+| 11 | `F11` | Thin C Library Zero Crypto | C ABI Thin Artifacts | M3 | `scripts/verify_zero_crypto.mbtx` | ORIGINAL_REQUEST §R3, D-07, D-11 |
 | 12 | `F12` | C ABI Test Program Verification | Native C Test Programs | M3 | `tests/cabi/test_cabi_dynamic.c`, `test_cabi_static.c` | ORIGINAL_REQUEST §R3, D-07, D-11 |
 | 13 | `F13` | Reverse Proxy Configuration Model | `core` | M4 | `core/proxy_config_test.mbt` | ORIGINAL_REQUEST §R4, D-04, D-21 |
 | 14 | `F14` | Reverse Proxy State Machine & Forwarding | `server` / `core` | M4 | `server/proxy_state_machine_test.mbt` | ORIGINAL_REQUEST §R4, D-05, D-21 |
@@ -64,7 +64,7 @@ All 16 features from `PROJECT.md` are cataloged below with their milestone, comp
 The testing architecture organizes all test cases into 4 rigorous tiers:
 - **Tier 1: Feature Coverage (>=5 tests per feature)**: Validates primary behavior and positive contract (happy path) for every feature.
 - **Tier 2: Boundary & Corner Cases (>=5 tests per feature)**: Stresses limits, invalid inputs, edge conditions, timeouts, resource reclamation, and error paths.
-- **Tier 3: Cross-Feature Combinations (Pairwise & Multi-Feature)**: Tests complex interaction points between features (e.g. Min CLI flag rejection combined with complex static routing; Full CLI TLS combined with SPA fallback; C ABI asynchronous cancellation under proxy load).
+- **Tier 3: Cross-Feature Combinations (Pairwise & Multi-Feature)**: Tests complex interaction points between features (e.g. Thin CLI flag rejection combined with complex static routing; Full CLI TLS combined with SPA fallback; C ABI asynchronous cancellation under proxy load).
 - **Tier 4: Real-World Application Scenarios**: Comprehensive end-to-end integration workflows representing production deployments.
 
 ---
@@ -163,54 +163,54 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Expected Output*: Output string contains `http://127.0.0.1:8080`, `http://192.168.1.5:8080`, and configuration flags.  
   *Authoritative Source*: `cmd/http-server-mbt/banner.mbt`.
 - **`T1-F04-05`**: **Usage & Help Text Generation**  
-  *Input*: Call `print_help(BuildVariant::Min)` vs `print_help(BuildVariant::Full)`.  
-  *Expected Output*: Min help omits TLS/Proxy flags; Full help lists `--cert`, `--key`, `--proxy`, `--proxy-all`.  
+  *Input*: Call `print_help(BuildVariant::Thin)` vs `print_help(BuildVariant::Full)`.  
+  *Expected Output*: Thin help omits TLS/Proxy flags; Full help lists `--cert`, `--key`, `--proxy`, `--proxy-all`.  
   *Authoritative Source*: `docs/design.md` D-08, D-15.
 
-### Feature 5: Min CLI Executable (`F05`)
+### Feature 5: Thin CLI Executable (`F05`)
 *Target: `cmd/http-server-mbt-thin` | Source: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15*
 
-- **`T1-F05-01`**: **Min CLI Compilation & Binary Generation**  
+- **`T1-F05-01`**: **Thin CLI Compilation & Binary Generation**  
   *Input*: Execute `moon build --target native` on `cmd/http-server-mbt-thin`.  
   *Expected Output*: Builds successfully producing `http-server-mbt-thin.exe` with exit code 0.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2.
-- **`T1-F05-02`**: **Min CLI Static File Server Startup**  
+- **`T1-F05-02`**: **Thin CLI Static File Server Startup**  
   *Input*: Launch `http-server-mbt-thin -p 0 testdata/public`, capture bound port from stdout banner.  
   *Expected Output*: Process stays alive; stdout outputs banner; bound port is accessible via HTTP.  
   *Authoritative Source*: `docs/design.md` D-08.
-- **`T1-F05-03`**: **Min CLI HTTP Static Serving Functionality**  
+- **`T1-F05-03`**: **Thin CLI HTTP Static Serving Functionality**  
   *Input*: Send HTTP GET request to running `http-server-mbt-thin` for `/hello.txt`.  
   *Expected Output*: Receives 200 OK with exact contents of `hello.txt`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2.
-- **`T1-F05-04`**: **Min CLI `--help` Flag Execution**  
+- **`T1-F05-04`**: **Thin CLI `--help` Flag Execution**  
   *Input*: Execute `http-server-mbt-thin --help`.  
   *Expected Output*: Exits with code 0; stdout displays standard options; stderr is empty.  
   *Authoritative Source*: `test/cli.test.js`.
-- **`T1-F05-05`**: **Min CLI `--version` Flag Execution**  
+- **`T1-F05-05`**: **Thin CLI `--version` Flag Execution**  
   *Input*: Execute `http-server-mbt-thin --version`.  
   *Expected Output*: Exits with code 0; stdout outputs semantic version string (e.g. `0.1.0-thin`).  
   *Authoritative Source*: `test/cli.test.js`.
 
-### Feature 6: Min CLI Preflight Rejection (`F06`)
+### Feature 6: Thin CLI Preflight Rejection (`F06`)
 *Target: `cmd/http-server-mbt-thin` | Source: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15*
 
-- **`T1-F06-01`**: **Rejection of `--cert` in Min CLI**  
+- **`T1-F06-01`**: **Rejection of `--cert` in Thin CLI**  
   *Input*: Run `http-server-mbt-thin --cert testdata/tls/server_cert.pem`.  
   *Expected Output*: Immediate process termination with exit code 1; stderr contains `--cert is not supported in this build`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15.
-- **`T1-F06-02`**: **Rejection of `--key` in Min CLI**  
+- **`T1-F06-02`**: **Rejection of `--key` in Thin CLI**  
   *Input*: Run `http-server-mbt-thin --key testdata/tls/server_key.pem`.  
   *Expected Output*: Exit code 1; stderr contains `--key is not supported in this build`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15.
-- **`T1-F06-03`**: **Rejection of `--proxy` in Min CLI**  
+- **`T1-F06-03`**: **Rejection of `--proxy` in Thin CLI**  
   *Input*: Run `http-server-mbt-thin --proxy http://127.0.0.1:3000`.  
   *Expected Output*: Exit code 1; stderr contains `--proxy is not supported in this build`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15.
-- **`T1-F06-04`**: **Rejection of `--proxy-all` in Min CLI**  
+- **`T1-F06-04`**: **Rejection of `--proxy-all` in Thin CLI**  
   *Input*: Run `http-server-mbt-thin --proxy-all`.  
   *Expected Output*: Exit code 1; stderr contains `--proxy-all is not supported in this build`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15.
-- **`T1-F06-05`**: **Rejection of `--proxy-config` in Min CLI**  
+- **`T1-F06-05`**: **Rejection of `--proxy-config` in Thin CLI**  
   *Input*: Run `http-server-mbt-thin --proxy-config proxy.json`.  
   *Expected Output*: Exit code 1; stderr contains `--proxy-config is not supported in this build`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R2, `docs/design.md` D-08, D-15.
@@ -266,11 +266,11 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
 ### Feature 9: C ABI `.mbtx` Build Pipeline (`F09`)
 *Target: `scripts/build_cabi.mbtx` | Source: `ORIGINAL_REQUEST.md` §R3, `docs/design.md` D-07, D-11*
 
-- **`T1-F09-01`**: **Build Min Dynamic Library Artifacts**  
+- **`T1-F09-01`**: **Build Thin Dynamic Library Artifacts**  
   *Input*: Run `moon run scripts/build_cabi.mbtx -- --variant thin --kind dynamic`.  
   *Expected Output*: Generates `target/cabi/http_server_mbt_min.dll` and `http_server_mbt_min.lib`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
-- **`T1-F09-02`**: **Build Min Static Library Artifacts**  
+- **`T1-F09-02`**: **Build Thin Static Library Artifacts**  
   *Input*: Run `moon run scripts/build_cabi.mbtx -- --variant thin --kind static`.  
   *Expected Output*: Generates `target/cabi/http_server_mbt_min_static.lib`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
@@ -311,22 +311,22 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Expected Output*: Only symbols starting with `hs_` appear in the DLL export list.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
 
-### Feature 11: Min C Library Zero Crypto (`F11`)
-*Target: C ABI Min Artifacts | Source: `ORIGINAL_REQUEST.md` §R3, Survey*
+### Feature 11: Thin C Library Zero Crypto (`F11`)
+*Target: C ABI Thin Artifacts | Source: `ORIGINAL_REQUEST.md` §R3, Survey*
 
-- **`T1-F11-01`**: **Zero `mbedtls_*` Symbols in Min DLL**  
+- **`T1-F11-01`**: **Zero `mbedtls_*` Symbols in Thin DLL**  
   *Input*: Scan symbol table of `target/cabi/http_server_mbt_min.dll`.  
   *Expected Output*: 0 matches for `mbedtls_*`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
-- **`T1-F11-02`**: **Zero `psa_*` Symbols in Min DLL**  
+- **`T1-F11-02`**: **Zero `psa_*` Symbols in Thin DLL**  
   *Input*: Scan symbol table of `target/cabi/http_server_mbt_min.dll`.  
   *Expected Output*: 0 matches for `psa_*`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
-- **`T1-F11-03`**: **Zero `mbedtls_*` Symbols in Min Static Archive**  
+- **`T1-F11-03`**: **Zero `mbedtls_*` Symbols in Thin Static Archive**  
   *Input*: Scan object symbol table of `target/cabi/http_server_mbt_min_static.lib`.  
   *Expected Output*: 0 matches for `mbedtls_*`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
-- **`T1-F11-04`**: **Zero `psa_*` Symbols in Min Static Archive**  
+- **`T1-F11-04`**: **Zero `psa_*` Symbols in Thin Static Archive**  
   *Input*: Scan object symbol table of `target/cabi/http_server_mbt_min_static.lib`.  
   *Expected Output*: 0 matches for `psa_*`.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
@@ -410,7 +410,7 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
 ### Feature 15: SDD Documentation & ADR Update (`F15`)
 *Target: `docs/` | Source: `ORIGINAL_REQUEST.md` §R4, `docs/design.md` D-20, D-21*
 
-- **`T1-F15-01`**: **Design Section D-20 (Layered Min/Full Architecture)**  
+- **`T1-F15-01`**: **Design Section D-20 (Layered Thin/Full Architecture)**  
   *Input*: Verify presence of section `D-20` in `docs/design.md`.  
   *Expected Output*: Contains packaging rationale, dependency boundary, and Transport/Acceptor specification.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R4.
@@ -547,7 +547,7 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Expected Behavior*: Last specified value wins or error returned cleanly without panic.  
   *Authoritative Source*: `bin/http-server`.
 
-### Feature 5: Min CLI Executable (`F05`)
+### Feature 5: Thin CLI Executable (`F05`)
 - **`T2-F05-01`**: **Binary Size Measurement vs Full**  
   *Boundary*: Measure `http-server-mbt-thin.exe` size vs `http-server-full.exe`.  
   *Expected Behavior*: `http-server-mbt-thin.exe` is measurably smaller by at least 500 KB due to 0 MbedTLS C stubs.  
@@ -560,7 +560,7 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Boundary*: Start `http-server-mbt-thin` on a port already bound by another process.  
   *Expected Behavior*: Exits with code 1; stderr informs user that port is already in use.  
   *Authoritative Source*: `docs/design.md` D-08.
-- **`T2-F05-04`**: **Path Traversal Defense in Min CLI**  
+- **`T2-F05-04`**: **Path Traversal Defense in Thin CLI**  
   *Boundary*: Send `GET /../../windows/win.ini HTTP/1.1`.  
   *Expected Behavior*: Intercepted before disk access; returns 403 Forbidden or 404 Not Found.  
   *Authoritative Source*: `docs/design.md` D-01, D-16.
@@ -569,16 +569,16 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Expected Behavior*: Process catches signal, stops listener, drains in-flight requests, and exits 0 with 0 leaks.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R1 (Milestone 5).
 
-### Feature 6: Min CLI Preflight Rejection (`F06`)
-- **`T2-F06-01`**: **Rejection of Short Flags `-S` (SSL) in Min CLI**  
+### Feature 6: Thin CLI Preflight Rejection (`F06`)
+- **`T2-F06-01`**: **Rejection of Short Flags `-S` (SSL) in Thin CLI**  
   *Boundary*: Run `http-server-mbt-thin -S`.  
   *Expected Behavior*: Exit code 1; stderr identifies `-S` as unsupported in thin build.  
   *Authoritative Source*: `docs/design.md` D-08.
-- **`T2-F06-02`**: **Rejection of `--key-passphrase` in Min CLI**  
+- **`T2-F06-02`**: **Rejection of `--key-passphrase` in Thin CLI**  
   *Boundary*: Run `http-server-mbt-thin --key-passphrase secret`.  
   *Expected Behavior*: Exit code 1; stderr states `--key-passphrase is not supported in this build`.  
   *Authoritative Source*: `docs/design.md` D-08.
-- **`T2-F06-03`**: **Rejection of `--websocket` in Min CLI**  
+- **`T2-F06-03`**: **Rejection of `--websocket` in Thin CLI**  
   *Boundary*: Run `http-server-mbt-thin --websocket`.  
   *Expected Behavior*: Exit code 1; stderr states `--websocket is not supported in this build`.  
   *Authoritative Source*: `docs/design.md` D-08.
@@ -679,7 +679,7 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Expected Behavior*: All exports are undecorated C names wrapped in `extern "C"`.  
   *Authoritative Source*: `docs/design.md` D-07.
 
-### Feature 11: Min C Library Zero Crypto (`F11`)
+### Feature 11: Thin C Library Zero Crypto (`F11`)
 - **`T2-F11-01`**: **Absence of TLS Cipher Suite Strings in Binary**  
   *Boundary*: Scan raw strings of `http_server_mbt_min.dll` for `TLS_AES_` or `Mbed TLS`.  
   *Expected Behavior*: Zero occurrences found in binary image.  
@@ -696,7 +696,7 @@ The testing architecture organizes all test cases into 4 rigorous tiers:
   *Boundary*: Measure size of `http_server_mbt_min_static.lib`.  
   *Expected Behavior*: Static library archive size is under 5.0 MB.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
-- **`T2-F11-05`**: **Attempt to Invoke Crypto FFI in Min Build**  
+- **`T2-F11-05`**: **Attempt to Invoke Crypto FFI in Thin Build**  
   *Boundary*: Test invoking an internal crypto symbol if referenced.  
   *Expected Behavior*: Linker error at build time; impossible to build crypto into thin build.  
   *Authoritative Source*: `ORIGINAL_REQUEST.md` §R3.
@@ -819,12 +819,12 @@ Tier 3 tests focus on the boundary surfaces where multiple features intersect:
 
 | Pairwise Combo | Interacting Features | Test Scenario & Verification Objective | Expected Behavior |
 |---|---|---|---|
-| **`C3-01`** | `F05` (Min CLI) × `F06` (Preflight Rejection) | User passes `--proxy` and `--cert` simultaneously to `http-server-mbt-thin`. | Both flags detected; preflight halts before listening with clear diagnostic and exit code 1. |
-| **`C3-02`** | `F05` (Min CLI) × `F04` (CLI Helpers) | User passes complex valid static options (`--port 9090 -a user:pass --spa -c 3600`) to `http-server-mbt-thin`. | Parses completely; starts static SPA server with Basic Auth and caching without errors. |
+| **`C3-01`** | `F05` (Thin CLI) × `F06` (Preflight Rejection) | User passes `--proxy` and `--cert` simultaneously to `http-server-mbt-thin`. | Both flags detected; preflight halts before listening with clear diagnostic and exit code 1. |
+| **`C3-02`** | `F05` (Thin CLI) × `F04` (CLI Helpers) | User passes complex valid static options (`--port 9090 -a user:pass --spa -c 3600`) to `http-server-mbt-thin`. | Parses completely; starts static SPA server with Basic Auth and caching without errors. |
 | **`C3-03`** | `F07` (Full CLI) × `F02` (TLS Injection) × `F13` (Proxy Model) | User launches `http-server-full` with both TLS (`--cert`, `--key`) and proxy fallback (`--proxy http://upstream`). | Starts HTTPS server; serves local files over HTTPS; proxies cache misses to upstream over HTTP/HTTPS. |
 | **`C3-04`** | `F01` (Acceptor Abstraction) × `F03` (Zero Regression) | Run existing 183 tests after decoupling `server` from `tls` via `Acceptor`. | 100% pass; no regressions in TransmitFile, Range requests, or directory listings. |
 | **`C3-05`** | `F08` (C ABI Interface) × `F10` (Symbol Isolation) | Compile C program that declares its own `int main()` and links dynamic library `http_server_mbt_min.dll`. | Compiles and links cleanly with zero symbol collisions; calls `hs_abi_version` successfully. |
-| **`C3-06`** | `F09` (C ABI Build Pipeline) × `F11` (Min Zero Crypto) | Run `build_cabi.mbtx` for `thin` dynamic and static libraries, then immediately run `verify_zero_crypto.mbtx`. | Build succeeds and symbol scan verifies 0 `mbedtls_*` / 0 `psa_*` symbols in both artifacts. |
+| **`C3-06`** | `F09` (C ABI Build Pipeline) × `F11` (Thin Zero Crypto) | Run `build_cabi.mbtx` for `thin` dynamic and static libraries, then immediately run `verify_zero_crypto.mbtx`. | Build succeeds and symbol scan verifies 0 `mbedtls_*` / 0 `psa_*` symbols in both artifacts. |
 | **`C3-07`** | `F13` (Proxy Model) × `F14` (Proxy State Machine) | Run fallback proxy when local directory contains `index.html` but lacks `data.json`. | `GET /index.html` returns 200 from local disk; `GET /data.json` returns 200 from upstream proxy target. |
 | **`C3-08`** | `F13` (Proxy Model) × `F14` (Proxy State Machine) × `F07` (Full CLI) | Run `http-server-full --proxy-all http://upstream` with local `index.html` present. | `GET /index.html` completely bypasses local disk and returns response from upstream. |
 | **`C3-09`** | `F08` (C ABI Interface) × `F14` (Proxy State Machine) | Embedded host starts server via C ABI with JSON config configuring upstream proxy target. | Requests submitted to embedded server are proxied to upstream target with streaming responses. |
@@ -836,7 +836,7 @@ Tier 3 tests focus on the boundary surfaces where multiple features intersect:
 
 Tier 4 exercises complete production workflows end-to-end:
 
-### Scenario 1: Production Static SPA Deployment with Min CLI (`S4-01`)
+### Scenario 1: Production Static SPA Deployment with Thin CLI (`S4-01`)
 - **Use Case**: Embedded device or lightweight container deploying a Single-Page Application (React/Vue/Svelte) using the zero-crypto minimal binary.
 - **Workflow**:
   1. Launch `http-server-mbt-thin -p 0 --spa --cache 86400 --cors testdata/public`.
@@ -926,8 +926,8 @@ http-server-mbt/
 │   │   └── moon.pkg
 │   ├── http-server-mbt-thin/             <-- [NEW] Minimal static CLI package
 │   │   ├── main.mbt
-│   │   ├── min_cli_test.mbt         <-- [NEW] Min CLI positive static tests
-│   │   ├── preflight_reject_test.mbt<-- [NEW] Min CLI preflight rejection tests
+│   │   ├── min_cli_test.mbt         <-- [NEW] Thin CLI positive static tests
+│   │   ├── preflight_reject_test.mbt<-- [NEW] Thin CLI preflight rejection tests
 │   │   └── moon.pkg
 │   ├── http-server-full/            <-- [NEW] Full CLI package
 │   │   ├── main.mbt
@@ -953,7 +953,7 @@ http-server-mbt/
     ├── build_cabi.mbtx              <-- Automated C ABI build pipeline script
     ├── run_e2e.mbtx                 <-- Multi-process E2E test runner script
     ├── verify_symbols.mbtx          <-- Symbol hygiene auditor script
-    └── verify_zero_crypto.mbtx      <-- Min build zero-crypto auditor script
+    └── verify_zero_crypto.mbtx      <-- Thin build zero-crypto auditor script
 ```
 
 ---
@@ -974,7 +974,7 @@ moon check --target native
 ```
 *Expected Result*: 0 errors, 0 warnings.
 
-### 9.3 Min CLI Preflight Rejection Verification
+### 9.3 Thin CLI Preflight Rejection Verification
 To independently verify that `http-server-mbt-thin` rejects unsupported flags with exit code 1:
 ```powershell
 moon build --target native

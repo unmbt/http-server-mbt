@@ -267,8 +267,8 @@ Native C ABI 由库创建并管理内部 owner 线程，同一 runtime 的托管
 |---|---|
 | 精简 CLI | 静态 HTTP、缓存/Range/预压缩、目录、安全策略、BaseURL/回退；裁去 TLS、代理和 WebSocket，相关参数报“此构建不支持”，不能静默忽略 |
 | 完整 CLI | 包含全部兼容能力、TLS/HTTP(S) 代理/WebSocket；完整兼容验收只对该形态声明 |
-| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 thin（零加密依赖，产物 hs_min.dll / libhs_min.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
-| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 thin（零加密依赖，产物 hs_min_static.lib / libhs_min.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
+| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 thin（零加密依赖，产物 hs_thin.dll / libhs_thin.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
+| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 thin（零加密依赖，产物 hs_thin_static.lib / libhs_thin.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
 | Node 包 | `.node` 静态链接引擎，附 JS/TypeScript 适配；按 OS/架构/libc 分发，不要求额外引擎动态库，见 D-12 |
 | wasm-gc | 实验 `.wasm`、宿主接口/适配与运行示例；需要 WasmGC 宿主，不属于无运行时单机 Native 产物 |
 | Mooncakes 模块 | `unmbt/http-server-mbt` 可发布源码与必要资源；静态 API、完整 server、可移植 core 分包，独立模块可引入，见 D-14 |
@@ -343,14 +343,14 @@ T-002 验证路径为：固定支持 C 生成的工具链/编译模式 → 导�
 同一探针还须验证 D-07 的托管启动/关闭：库内部 owner 的创建与初始化、跨线程 C 命令队列、完成通知、自动排空及多实例引用。C ABI 静态/动态库与 MoonBit 直接消费分别验证；不把宿主已有 runtime 的托管值迁到库新建线程。无法实现托管时记录阻塞并修正内部方案，不能改成要求用户手动轮询来通过验收。
 
 正式静态产物与动态库共用 C 头文件（`c_abi/include/http_server.h`）、hs_* 版本、错误码及 D-07 所有权。动态库与静态库均提供 thin 与 full 双版本：
-- **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，零加密与 MbedTLS C 依赖；Windows 产物为动态库 `hs_min.dll`（配套 import library `hs_min.lib`）与静态归档 `hs_min_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。
+- **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，零加密与 MbedTLS C 依赖；Windows 产物为动态库 `hs_thin.dll`（配套 import library `hs_thin.lib`）与静态归档 `hs_thin_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。
 - **full 版本**：基于 `c_abi/full`，集成 MbedTLS TLS 传输层与反向代理能力；Windows 产物为动态库 `hs_full.dll`（配套 import library `hs_full.lib`）与静态归档 `hs_full_static.lib`。
 
 构建流水线通过纯 MoonBit 脚本 `scripts/build_cabi.mbtx` 驱动：
 1. 编译 `c_abi/thin` 与 `c_abi/full` 产出目标 `.obj` 对象文件并按排除规则暂存（过滤测试对象与无关包）。
-2. **符号隔离与导出控制**：MoonBit 编译器会在对象文件的 `.drectve` 段注入 `#pragma comment(linker, "/EXPORT:...")` 指令，导致 `link.exe /DLL` 默认泄露内部运行时函数与 CLI `main`；构建脚本通过 `llvm-objcopy --remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids` 预先清洗对象文件，并配合 MSVC 模块定义文件（`hs_min.def`、`hs_full.def`）白名单强制约束，确保动态库严格仅导出 5 项公共 `hs_*` 符号（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`），严禁暴露任何内部符号或 `main`。
+2. **符号隔离与导出控制**：MoonBit 编译器会在对象文件的 `.drectve` 段注入 `#pragma comment(linker, "/EXPORT:...")` 指令，导致 `link.exe /DLL` 默认泄露内部运行时函数与 CLI `main`；构建脚本通过 `llvm-objcopy --remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids` 预先清洗对象文件，并配合 MSVC 模块定义文件（`hs_thin.def`、`hs_full.def`）白名单强制约束，确保动态库严格仅导出 5 项公共 `hs_*` 符号（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`），严禁暴露任何内部符号或 `main`。
 3. **静态库与导入库隔离**：Windows MSVC 的静态归档命名为 `hs_*_static.lib`，与动态库生成的 import library `hs_*.lib` 明确区分，避免调用方误将导入库当作静态库链接。
-4. **独立消费者验收**：在 `testdata/c_consumer/` 下建立独立的 C 消费者测试程序（`test_dynamic_min.c`, `test_static_min.c`, `test_dynamic_full.c`, `test_static_full.c`），经由 MSVC `cl.exe` 分别独立编译链接并运行，验证 ABI 版本读取、服务启动/停止/销毁与 TLS 预检拦截。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
+4. **独立消费者验收**：在 `testdata/c_consumer/` 下建立独立的 C 消费者测试程序（`test_dynamic_thin.c`, `test_static_thin.c`, `test_dynamic_full.c`, `test_static_full.c`），经由 MSVC `cl.exe` 分别独立编译链接并运行，验证 ABI 版本读取、服务启动/停止/销毁与 TLS 预检拦截。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
 
 静态分发包包含引擎 archive、必要 runtime 对象及随包依赖 archives、同版头文件、target triple/CRT/PIC/构建特性/许可证与传递链接清单。可以是明确清单中的多个 archive，不承诺将一切塞入一个 .a；支持静态链接进 `.node`/其他共享对象的构建须包含适用的 PIC，不能仅把非 PIC 的 CLI 对象归档。D-08 的 MbedTLS/TF-PSA-Crypto 以源码随包编译，其对象随 full 引擎 archive 一并归档，不引入独立的预编译 TLS archive 条目；许可证与源码哈希进传递依赖清单。
 

@@ -4,7 +4,7 @@ package "unmbt/http-server-mbt/c_abi/thin"
 // Values
 pub fn hs_abi_version() -> UInt
 
-pub fn hs_min_run_server(Int64) -> Unit
+pub fn hs_thin_run_server(Int64) -> Unit
 
 // Errors
 

@@ -15,12 +15,12 @@ Key Requirements:
 2. R2. 纯 .mbtx 驱动的动静态库构建流水线（Build Pipeline）:
    - 编写自动化构建驱动脚本（scripts/build_cabi.mbtx），驱动本地编译器与归档器（如 clang / cl / lib.exe / llvm-ar）。
    - 自动化完成 MoonBit 对象文件编译生成与中间目录解析。
-   - 构建导出 thin 版本的动态库（Windows hs_min.dll + hs_min.lib）与静态库（Windows hs_min_static.lib）。
+   - 构建导出 thin 版本的动态库（Windows hs_thin.dll + hs_thin.lib）与静态库（Windows hs_thin_static.lib）。
    - 构建导出 full 版本的动态库（Windows hs_full.dll + hs_full.lib）与静态库（Windows hs_full_static.lib）。
    - 产物输出至固定发行目录（如 target/cabi/），并提供清晰的构建日志与产物清单。
 
 3. R3. 独立 C 语言消费者编译与运行验证（C Consumer Smoke Tests）:
    - 在 testdata/c_consumer/ 创建独立的 C 测试程序。
-   - 编写独立的 C 代码，分别通过动态链接（引用 hs_min.lib / 加载 hs_min.dll）与静态链接（引用 hs_min_static.lib）进行编译。
+   - 编写独立的 C 代码，分别通过动态链接（引用 hs_thin.lib / 加载 hs_thin.dll）与静态链接（引用 hs_thin_static.lib）进行编译。
    - 在 Windows 本机执行 C 测试程序，验证调用 hs_abi_version() 正确返回预期版本号，验证服务配置与生命周期调度无崩溃、无内存访问违规。
    - 确保全仓既有 228 项 MoonBit 测试持续保持 100% 通过（0 回归、0 警告）。

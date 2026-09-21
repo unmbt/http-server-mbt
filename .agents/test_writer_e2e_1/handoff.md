@@ -36,7 +36,7 @@
 1. From **Observation 1 & 2**, all 16 features from `PROJECT.md` require rigorous end-to-end testing across 4 tiers:
    - Tier 1: Feature Coverage (>=5 positive/happy-path tests per feature, totaling 80 tests).
    - Tier 2: Boundary & Corner Cases (>=5 edge/boundary/failure tests per feature, totaling 80 tests).
-   - Tier 3: Cross-Feature Combinations (pairwise interactions, e.g. Min CLI flag rejection with complex routing, Full CLI TLS with SPA).
+   - Tier 3: Cross-Feature Combinations (pairwise interactions, e.g. Thin CLI flag rejection with complex routing, Full CLI TLS with SPA).
    - Tier 4: Real-World Application Scenarios (end-to-end production deployment scenarios).
 2. From **Observation 3**, the existing 183 tests provide the regression baseline (`F03`). Because `server` currently references `tls`, decoupling `server` from `tls` via `Acceptor` (`F01`) and injecting `TlsAcceptor` (`F02`) will allow `cmd/http-server-mbt-thin` to compile with zero MbedTLS C files (`F05`, `F11`), while preserving 100% pass rate on existing tests.
 3. From **Observation 1 & 2**, `TEST_INFRA.md` was established at the project root (`E:\project\moonbit\unmbt\http-server-mbt\TEST_INFRA.md`) mapping every one of the 16 features to:

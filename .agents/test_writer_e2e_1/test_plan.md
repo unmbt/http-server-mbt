@@ -58,8 +58,8 @@ http-server-mbt/
 │   ├── common/
 │   │   └── cli_common_test.mbt            # Tier 1/2: F04 (Shared CLI Parser Helpers)
 │   ├── http-server-mbt-thin/
-│   │   ├── min_cli_test.mbt               # Tier 1/2: F05 (Min CLI Static Server)
-│   │   └── preflight_reject_test.mbt      # Tier 1/2: F06 (Min CLI Exit 1 Preflight)
+│   │   ├── min_cli_test.mbt               # Tier 1/2: F05 (Thin CLI Static Server)
+│   │   └── preflight_reject_test.mbt      # Tier 1/2: F06 (Thin CLI Exit 1 Preflight)
 │   └── http-server-full/
 │       └── full_cli_test.mbt              # Tier 1/2: F07 (Full CLI Feature Parity)
 ├── c_abi/
@@ -73,7 +73,7 @@ http-server-mbt/
 └── scripts/
     ├── build_cabi.mbtx                    # Tier 1/2: F09 (C ABI Build Pipeline)
     ├── verify_symbols.mbtx                # Tier 1/2: F10 (Clean Symbol Isolation)
-    ├── verify_zero_crypto.mbtx            # Tier 1/2: F11 (Min Zero Crypto Audit)
+    ├── verify_zero_crypto.mbtx            # Tier 1/2: F11 (Thin Zero Crypto Audit)
     └── run_e2e.mbtx                       # Tier 3 & Tier 4 E2E Orchestrator
 ```
 
@@ -90,7 +90,7 @@ The implementation follows progressive testability: tests are created and verifi
   - Regression verification suite (Tests `T1-F03-01` ~ `T1-F03-05`, `T2-F03-01` ~ `T2-F03-05`)
 - **Verification**: `moon test --target native` confirms 183 existing tests pass + new decoupling tests pass.
 
-### Milestone 2: Min & Full CLI Packaging
+### Milestone 2: Thin & Full CLI Packaging
 - **Deliverables**:
   - `cmd/common/cli_common_test.mbt` (Tests `T1-F04-01` ~ `T1-F04-05`, `T2-F04-01` ~ `T2-F04-05`)
   - `cmd/http-server-mbt-thin/min_cli_test.mbt` (Tests `T1-F05-01` ~ `T1-F05-05`, `T2-F05-01` ~ `T2-F05-05`)
@@ -148,7 +148,7 @@ As QA / Test Writer, test files MUST NOT attempt to patch implementation defects
 | Requirement | Description | Associated Features | Primary Test Tier | Primary Test Files |
 |---|---|---|---|---|
 | **R1** | Core decoupling & TLS injection | `F01`, `F02`, `F03` | Tier 1, 2, 3 | `server_transport_test.mbt`, `full_test.mbt` |
-| **R2** | Min & Full CLI packaging & preflight | `F04`, `F05`, `F06`, `F07` | Tier 1, 2, 3, 4 | `min_cli_test.mbt`, `preflight_reject_test.mbt`, `full_cli_test.mbt` |
+| **R2** | Thin & Full CLI packaging & preflight | `F04`, `F05`, `F06`, `F07` | Tier 1, 2, 3, 4 | `min_cli_test.mbt`, `preflight_reject_test.mbt`, `full_cli_test.mbt` |
 | **R3** | C ABI export pipeline & zero crypto | `F08`, `F09`, `F10`, `F11`, `F12` | Tier 1, 2, 3, 4 | `c_abi_test.mbt`, `build_cabi.mbtx`, `test_cabi_*.c` |
 | **R4** | Reverse proxy architecture & interface | `F13`, `F14`, `F15` | Tier 1, 2, 3, 4 | `proxy_config_test.mbt`, `proxy_state_machine_test.mbt` |
 | **Quality Gates** | E2E verification & multi-role audit | `F16` | All Tiers | `run_e2e.mbtx`, Challenger/Auditor suites |

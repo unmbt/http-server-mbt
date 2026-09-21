@@ -107,22 +107,22 @@ jobs:
           cp "target/cabi/include/http_server.h" "$SDK_DIR/include/"
 
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp target/cabi/hs_min.dll "$SDK_DIR/lib/"
-            cp target/cabi/hs_min.lib "$SDK_DIR/lib/"
-            cp target/cabi/hs_min_static.lib "$SDK_DIR/lib/"
+            cp target/cabi/hs_thin.dll "$SDK_DIR/lib/"
+            cp target/cabi/hs_thin.lib "$SDK_DIR/lib/"
+            cp target/cabi/hs_thin_static.lib "$SDK_DIR/lib/"
             cp target/cabi/hs_full.dll "$SDK_DIR/lib/"
             cp target/cabi/hs_full.lib "$SDK_DIR/lib/"
             cp target/cabi/hs_full_static.lib "$SDK_DIR/lib/"
             tar -acf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.zip" -C "$SDK_DIR" include lib
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            cp target/cabi/libhs_min.dylib "$SDK_DIR/lib/"
-            cp target/cabi/libhs_min.a "$SDK_DIR/lib/"
+            cp target/cabi/libhs_thin.dylib "$SDK_DIR/lib/"
+            cp target/cabi/libhs_thin.a "$SDK_DIR/lib/"
             cp target/cabi/libhs_full.dylib "$SDK_DIR/lib/"
             cp target/cabi/libhs_full.a "$SDK_DIR/lib/"
             tar -czf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.tar.gz" -C "$SDK_DIR" include lib
           else
-            cp target/cabi/libhs_min.so "$SDK_DIR/lib/"
-            cp target/cabi/libhs_min.a "$SDK_DIR/lib/"
+            cp target/cabi/libhs_thin.so "$SDK_DIR/lib/"
+            cp target/cabi/libhs_thin.a "$SDK_DIR/lib/"
             cp target/cabi/libhs_full.so "$SDK_DIR/lib/"
             cp target/cabi/libhs_full.a "$SDK_DIR/lib/"
             tar -czf "$RELEASE_DIR/http-server-cabi-${PLATFORM}.tar.gz" -C "$SDK_DIR" include lib

@@ -4,7 +4,7 @@ Last visited: 2026-09-19T11:43:50+08:00
 
 ## Status
 Completed adversarial challenge execution across all 4 domains:
-1. Symbol isolation audit via dumpbin (/EXPORTS on hs_min.dll, hs_full.dll; /SYMBOLS on hs_min_static.lib)
+1. Symbol isolation audit via dumpbin (/EXPORTS on hs_thin.dll, hs_full.dll; /SYMBOLS on hs_thin_static.lib)
 2. CLI rejection testing (http-server-mbt-thin with unsupported options)
 3. C ABI attack surface (NULL inputs, malformed JSON, extreme ports, invalid root, TLS combinations)
 4. State machine re-entry & lifecycle (double start, double stop, destroy without start, double destroy, sequential cycles)

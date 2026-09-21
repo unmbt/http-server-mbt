@@ -19,13 +19,13 @@
 | 2 | TLS Dependency Injection | `full` integration package injecting `TlsAcceptor` into server lifecycle | M1 | ORIGINAL_REQUEST §R1, survey |
 | 3 | Zero Test Regression | Maintain 100% pass on all 183 existing test cases across all packages | M1 | ORIGINAL_REQUEST §R1, survey |
 | 4 | CLI Shared Helpers | Extract common CLI parsing, banner, and validation to `cmd/common` | M2 | ORIGINAL_REQUEST §R2, survey |
-| 5 | Min CLI Executable | `cmd/http-server-mbt-thin` building pure static server with 0 MbedTLS C compilation | M2 | ORIGINAL_REQUEST §R2, survey |
-| 6 | Min CLI Preflight Rejection | In `thin` CLI, `--cert`, `--key`, `--proxy`, etc. exit code 1 with diagnostic stderr | M2 | ORIGINAL_REQUEST §R2, survey |
+| 5 | Thin CLI Executable | `cmd/http-server-mbt-thin` building pure static server with 0 MbedTLS C compilation | M2 | ORIGINAL_REQUEST §R2, survey |
+| 6 | Thin CLI Preflight Rejection | In `thin` CLI, `--cert`, `--key`, `--proxy`, etc. exit code 1 with diagnostic stderr | M2 | ORIGINAL_REQUEST §R2, survey |
 | 7 | Full CLI Executable | `cmd/http-server-full` supporting all static, TLS, and proxy arguments | M2 | ORIGINAL_REQUEST §R2, survey |
 | 8 | C ABI Interface Definition | `c_abi` package defining `hs_abi_version`, `hs_init`, `hs_server_*`, `hs_error_*` | M3 | ORIGINAL_REQUEST §R3, survey |
 | 9 | C ABI `.mbtx` Build Pipeline | `scripts/build_cabi.mbtx` driving compilation of dynamic & static libraries | M3 | ORIGINAL_REQUEST §R3, survey |
 | 10 | Clean Symbol Isolation | Pass `/Dmain` & `/FIclean_exports.h` + `.def` ensuring strictly `hs_*` exports (no `main`, no internal leaks) | M3 | ORIGINAL_REQUEST §R3, survey |
-| 11 | Min C Library Zero Crypto | Verify `thin` C library (`.lib`/`.dll`) contains 0 MbedTLS / PSA-Crypto symbols | M3 | ORIGINAL_REQUEST §R3, survey |
+| 11 | Thin C Library Zero Crypto | Verify `thin` C library (`.lib`/`.dll`) contains 0 MbedTLS / PSA-Crypto symbols | M3 | ORIGINAL_REQUEST §R3, survey |
 | 12 | C ABI Test Program Verification | Standalone C test programs verifying dynamic and static linking of `hs_*` | M3 | ORIGINAL_REQUEST §R3, survey |
 | 13 | Reverse Proxy Configuration Model | In `core/config.mbt`, model `proxy`, `proxy_all`, `proxy_config`, `proxy_options`, `websocket` | M4 | ORIGINAL_REQUEST §R4, survey |
 | 14 | Reverse Proxy State Machine & Forward Interface | Define `Resolving -> Proxying -> Tunnel / Idle / Closing` and streaming forward interface | M4 | ORIGINAL_REQUEST §R4, survey |
@@ -36,7 +36,7 @@
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | 1 | Server & Core Decoupling from TLS | Abstract `Transport` & `Acceptor`, decouple `server` from `tls`, ensure 183 tests pass | none | IN_PROGRESS |
-| 2 | Min & Full CLI Packaging & Distribution | `cmd/common`, `cmd/http-server-mbt-thin`, `cmd/http-server-full`, preflight exit code 1 validation | M1 | PLANNED |
+| 2 | Thin & Full CLI Packaging & Distribution | `cmd/common`, `cmd/http-server-mbt-thin`, `cmd/http-server-full`, preflight exit code 1 validation | M1 | PLANNED |
 | 3 | C ABI Dynamic & Static Library Export Pipeline | `c_abi` package, `scripts/build_cabi.mbtx`, symbol hygiene (`hs_*`, no `main`, no MbedTLS in thin), C test verification | M1 | PLANNED |
 | 4 | Reverse Proxy Architecture & Interface Readiness | `core` proxy data structures, state machine & streaming interface, SDD doc updates (D-20, D-21) | M1 | PLANNED |
 | 5 | E2E Testing, Gate Verification & Final Handoff | Full E2E tests across all tiers, review/challenge/forensic audit gates, local git commit, victory report | M1, M2, M3, M4 | PLANNED |
@@ -74,12 +74,12 @@ pub async fn with_server_at(
 ```moonbit
 // In cmd/common:
 pub enum BuildVariant {
-  Min
+  Thin
   Full
 }
 
 pub fn parse_cli_args(args : Array[String], variant : BuildVariant) -> Result[@core.Config, String]
-// When variant is Min and --cert/--key/--proxy options are provided, returns Err("... not supported in thin build")
+// When variant is Thin and --cert/--key/--proxy options are provided, returns Err("... not supported in thin build")
 ```
 
 ### `c_abi` Public C Signatures

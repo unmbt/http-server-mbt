@@ -17,9 +17,9 @@
 - Active Cron 1 (Progress Reporting): task-48 (cancelled on completion)
 - Active Cron 2 (Liveness Check): task-50 (cancelled on completion)
 - Active Victory Auditor (M6 Gen 2): 7b071889-3b51-4e9f-aff3-b67c6451adce
-- Orchestrator (Min/Full Layered Packaging): 4e28988c-0fb8-4c25-808e-968dbd1ae0f2
-- Cron 1 (Progress Reporting - Min/Full): task-26
-- Cron 2 (Liveness Check - Min/Full): task-28
+- Orchestrator (Thin/Full Layered Packaging): 4e28988c-0fb8-4c25-808e-968dbd1ae0f2
+- Cron 1 (Progress Reporting - Thin/Full): task-26
+- Cron 2 (Liveness Check - Thin/Full): task-28
 - Orchestrator (C ABI Pipeline): be14ba26-5f6e-4798-86b0-13c3fed6e4a0
 - Active Cron 1 (Progress Reporting - C ABI): task-40
 - Active Cron 2 (Liveness Check - C ABI): task-42

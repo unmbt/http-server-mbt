@@ -23,8 +23,8 @@
 ### 2. 全流程自动化验证与质量门禁执行
 - 独立重新执行以下构建与测试验证命令，完整记录输出：
   1. `moon run scripts/build_cabi.mbtx`：
-     - 验证 6 项产物完整生成：`target/cabi/hs_min.dll`、`hs_min.lib`、`hs_min_static.lib`、`hs_full.dll`、`hs_full.lib`、`hs_full_static.lib`。
-     - 验证 4 个独立的 C 消费者测试程序（`test_dynamic_min.exe`、`test_static_min.exe`、`test_dynamic_full.exe`、`test_static_full.exe`）100% 编译并通过执行。
+     - 验证 6 项产物完整生成：`target/cabi/hs_thin.dll`、`hs_thin.lib`、`hs_thin_static.lib`、`hs_full.dll`、`hs_full.lib`、`hs_full_static.lib`。
+     - 验证 4 个独立的 C 消费者测试程序（`test_dynamic_thin.exe`、`test_static_thin.exe`、`test_dynamic_full.exe`、`test_static_full.exe`）100% 编译并通过执行。
   2. `moon check --target native`：
      - 全仓类型检查，确认 0 errors, 0 warnings。
   3. `moon test --target native`：

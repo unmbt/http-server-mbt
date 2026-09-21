@@ -22,7 +22,7 @@
 MOONBIT_EXPORT void moonbit_runtime_init(int argc, char **argv);
 MOONBIT_EXPORT void moonbit_init(void);
 
-extern void hs_min_run_server(int64_t server_ptr);
+extern void hs_thin_run_server(int64_t server_ptr);
 
 #if defined(_WIN32) || defined(_WIN64)
 static volatile LONG s_rt_init = 0;
@@ -476,14 +476,14 @@ MOONBIT_FFI_EXPORT int32_t hs_bridge_is_stopped(int64_t server_ptr) {
 static DWORD WINAPI server_thread_proc(LPVOID param) {
     hs_server_t* s = (hs_server_t*)param;
     ensure_runtime_init();
-    hs_min_run_server((int64_t)(uintptr_t)s);
+    hs_thin_run_server((int64_t)(uintptr_t)s);
     return 0;
 }
 #else
 static void* server_thread_proc(void* param) {
     hs_server_t* s = (hs_server_t*)param;
     ensure_runtime_init();
-    hs_min_run_server((int64_t)(uintptr_t)s);
+    hs_thin_run_server((int64_t)(uintptr_t)s);
     return NULL;
 }
 #endif

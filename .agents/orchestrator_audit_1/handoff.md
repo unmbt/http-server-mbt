@@ -17,8 +17,8 @@
 2. **Quality Gates**:
    - `moon check --target native --deny-warn`: 0 errors, 0 warnings.
    - `moon test --target native`: 230/230 tests passed (100% PASS, 0 failures, 0 regressions).
-   - `moon run scripts/build_cabi.mbtx`: Generated 6 artifacts (`hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`), 4/4 C consumer smoke test programs PASS.
-   - Symbol Isolation: `dumpbin /EXPORTS` confirmed exactly 5 `hs_*` exports on DLLs (0 `main`, 0 `moonbit_*`); `dumpbin /SYMBOLS` confirmed 0 `mbedtls_*` / `psa_*` symbols in `hs_min_static.lib`.
+   - `moon run scripts/build_cabi.mbtx`: Generated 6 artifacts (`hs_thin.dll`, `hs_thin.lib`, `hs_thin_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`), 4/4 C consumer smoke test programs PASS.
+   - Symbol Isolation: `dumpbin /EXPORTS` confirmed exactly 5 `hs_*` exports on DLLs (0 `main`, 0 `moonbit_*`); `dumpbin /SYMBOLS` confirmed 0 `mbedtls_*` / `psa_*` symbols in `hs_thin_static.lib`.
    - CLI Preflight Rejection: `cmd/http-server-mbt-thin` exits with code 1 upon `--cert`/`--proxy` options with actionable stderr and zero port lingering.
    - Forensic Integrity: Genuine logic throughout, 100% MIT / Apache-2.0 licenses, 0 `git push` executed.
 
@@ -39,7 +39,7 @@
 | Milestone / Task | Status | Details |
 |---|---|---|
 | Milestone 1: Server / TLS Architecture Decoupling | **DONE** | Zero crypto deps in `server/`, clean DI in `full/` |
-| Milestone 2: Min / Full CLI Dual Packaging | **DONE** | Size reduction ~29%, preflight rejection exit code 1 |
+| Milestone 2: Thin / Full CLI Dual Packaging | **DONE** | Size reduction ~29%, preflight rejection exit code 1 |
 | Milestone 3: C ABI Dynamic/Static Export Pipeline | **DONE** | Pure `.mbtx` driver, 6 library artifacts, 4 C consumers pass |
 | Review & Audit Milestone: R1 Review, R2 Challenge, R3 Audit | **DONE** | Unanimous pass (APPROVE / APPROVE / CLEAN) |
 
@@ -70,5 +70,5 @@
    - `moon check --target native --deny-warn`
    - `moon test --target native`
    - `moon run scripts/build_cabi.mbtx`
-   - `dumpbin /EXPORTS target/cabi/hs_min.dll`
-   - `dumpbin /SYMBOLS target/cabi/hs_min_static.lib`
+   - `dumpbin /EXPORTS target/cabi/hs_thin.dll`
+   - `dumpbin /SYMBOLS target/cabi/hs_thin_static.lib`

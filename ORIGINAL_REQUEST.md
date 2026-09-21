@@ -411,7 +411,7 @@ Integrity mode: development
 - `thin` 版本纯粹基于静态文件服务依赖构建；`full` 版本通过依赖注入接入 TLS 传输层，并预留代理（Proxy）拦截点。
 - 保持项目既有全部 183 项测试（C001～C042 原版迁移、TLS 回环测试等）零回归。
 
-### R2. 双版本 CLI 构建与分发（Min & Full CLI）
+### R2. 双版本 CLI 构建与分发（Thin & Full CLI）
 建立 `thin` 与 `full` 两种构建形态的 CLI 体系：
 - `thin` CLI：精简构建，仅包含静态 HTTP、Range、缓存、预压缩、SPA/try-files、目录列表与 Basic Auth 等主线功能。遇到 `--cert`、`--key`、`--proxy` 等参数时，必须输出明确错误提示并以状态码 1 退出，禁止静默忽略（符合 D-08 / D-15 规范）。
 - `full` CLI：完整构建，包含全部基础功能以及 TLS（`--cert`、`--key`、`--key-passphrase`）及后续代理参数。
@@ -456,7 +456,7 @@ Integrity mode: development
 
 【阶段目标与执行边界调整】：
 1. 目标范围：
-   - 聚焦完成 Milestone 1（核心包架构解耦：server 与 tls 解耦，传输层抽象）与 Milestone 2（Min 与 Full 双版本 CLI 构建、参数校验与隔离、全量 183 项既有测试及新增 CLI 测试保障）。
+   - 聚焦完成 Milestone 1（核心包架构解耦：server 与 tls 解耦，传输层抽象）与 Milestone 2（Thin 与 Full 双版本 CLI 构建、参数校验与隔离、全量 183 项既有测试及新增 CLI 测试保障）。
    - 完成 Proxy 的架构设计与接口预留文档梳理。
 2. 【关键暂停点（PAUSE / STOP）】：
    - 在完成 CLI 部分的 thin/full 构建、测试及验证后，在准备开始做 Milestone 3（动态库与静态库导出流水线）之前，必须：
@@ -497,26 +497,26 @@ Integrity mode: development
 ### R2. 纯 `.mbtx` 驱动的动静态库构建流水线（Build Pipeline）
 编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器（如 clang / cl / lib.exe / llvm-ar）：
 - 自动化完成 MoonBit 对象文件编译生成与中间目录解析。
-- 构建导出 `thin` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）。
+- 构建导出 `thin` 版本的动态库（Windows `hs_thin.dll` + `hs_thin.lib`）与静态库（Windows `hs_thin_static.lib`）。
 - 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。
 - 产物输出至固定发行目录（如 `target/cabi/`），并提供清晰的构建日志与产物清单。
 
 ### R3. 独立 C 语言消费者编译与运行验证（C Consumer Smoke Tests）
 在 `testdata/c_consumer/` 创建独立的 C 测试程序：
-- 编写独立的 C 代码，分别通过动态链接（引用 `hs_min.lib` / 加载 `hs_min.dll`）与静态链接（引用 `hs_min_static.lib`）进行编译。
+- 编写独立的 C 代码，分别通过动态链接（引用 `hs_thin.lib` / 加载 `hs_thin.dll`）与静态链接（引用 `hs_thin_static.lib`）进行编译。
 - 在 Windows 本机执行 C 测试程序，验证调用 `hs_abi_version()` 正确返回预期版本号，验证服务配置与生命周期调度无崩溃、无内存访问违规。
 - 确保全仓既有 228 项 MoonBit 测试持续保持 100% 通过（0 回归、0 警告）。
 
 ## Acceptance Criteria
 
 ### 产物与符号隔离
-- [ ] 运行 `scripts/build_cabi.mbtx` 能够成功在 Windows 本机生成 `hs_min.dll`、`hs_min.lib`、`hs_min_static.lib`、`hs_full.dll`、`hs_full.lib`、`hs_full_static.lib`。
+- [ ] 运行 `scripts/build_cabi.mbtx` 能够成功在 Windows 本机生成 `hs_thin.dll`、`hs_thin.lib`、`hs_thin_static.lib`、`hs_full.dll`、`hs_full.lib`、`hs_full_static.lib`。
 - [ ] 符号检查确认：导出的动态库仅暴露 `hs_*` 导出符号，绝不含 `main` 入口。
-- [ ] 符号检查确认：`hs_min` 动态库与静态库中绝对不包含 `mbedtls_*`、`psa_*` 符号。
+- [ ] 符号检查确认：`hs_thin` 动态库与静态库中绝对不包含 `mbedtls_*`、`psa_*` 符号。
 
 ### C 程序调用验证
-- [ ] 独立 C 测试程序能够成功编译并链接 `hs_min` 动态库，运行无崩溃且正确输出 ABI 版本号。
-- [ ] 独立 C 测试程序能够成功编译并链接 `hs_min_static` 静态库，运行无崩溃且行为一致。
+- [ ] 独立 C 测试程序能够成功编译并链接 `hs_thin` 动态库，运行无崩溃且正确输出 ABI 版本号。
+- [ ] 独立 C 测试程序能够成功编译并链接 `hs_thin_static` 静态库，运行无崩溃且行为一致。
 
 ### 全仓测试与整洁度
 - [ ] `moon check --target native` 全仓保持 0 错误、0 警告。
@@ -562,8 +562,8 @@ Integrity mode: development
   - 服务器重复启动（double start）、重复停止（double stop）、未启动即销毁、停止后重复销毁。
   - 验证在任何非法调用顺序下，C ABI 接口均不发生段错误（Segmentation fault）、空指针解引用或不可恢复 panic。
 - **符号隔离与纯净度对抗审计**：
-  - 使用 `dumpbin /EXPORTS` 严格检查 `target/cabi/hs_min.dll` 与 `target/cabi/hs_full.dll`，确认仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或任何 MoonBit 编译器运行时符号。
-  - 使用 `dumpbin /SYMBOLS` 严格审计 `target/cabi/hs_min_static.lib`，确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
+  - 使用 `dumpbin /EXPORTS` 严格检查 `target/cabi/hs_thin.dll` 与 `target/cabi/hs_full.dll`，确认仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或任何 MoonBit 编译器运行时符号。
+  - 使用 `dumpbin /SYMBOLS` 严格审计 `target/cabi/hs_thin_static.lib`，确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
 - **CLI 拦截与退出码挑战**：
   - 向 `http-server-mbt-thin` 传入 `--cert`、`--key`、`--proxy` 等高级参数，确认严格退出状态码 1，标准错误输出可操作指引，且系统上无残留端口监听。
 

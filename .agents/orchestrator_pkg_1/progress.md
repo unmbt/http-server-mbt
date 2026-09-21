@@ -18,7 +18,7 @@ Last visited: 2026-09-18T12:42:00Z
   - [ ] challenger_m1_1 (M1 Transport Challenger): In progress
   - [ ] challenger_m1_2 (M1 Preflight Challenger): In progress
   - [ ] auditor_m1_1 (M1 Forensic Auditor): In progress
-- [ ] Milestone 2: Min & Full CLI Packages & Distribution
+- [ ] Milestone 2: Thin & Full CLI Packages & Distribution
 - [ ] Critical Checkpoint: Document Completed Work & Author C ABI Continuation Guide
 - [ ] PAUSE / Report to Sentinel (Before starting Milestone 3 per user follow-up directive)
 

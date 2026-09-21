@@ -31,7 +31,7 @@ Investigate existing MoonBit codebase architecture to determine how to cleanly b
 - **Unexplored areas**: None within the scope of this investigation.
 
 ## Key Decisions Made
-- Recommended package structure: `c_abi/` containing `include/http_server.h`, `thin/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`), and `full/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`).
+- Recommended package structure: `c_abi/` containing `include/http_server.h`, `thin/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_thin.def`), and `full/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`).
 - Recommended lifecycle model: Background owner thread per server instance managed by C bridge.
 - Recommended symbol isolation: Strip embedded `/EXPORT` directives from runtime dependencies.
 

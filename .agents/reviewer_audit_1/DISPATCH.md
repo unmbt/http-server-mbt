@@ -14,7 +14,7 @@
   - `server/` (含 `server/moon.pkg`, `server/server.mbt`, `server/transmit_file.mbt`)
   - `full/` (含 `full/moon.pkg`, `full/full.mbt`, `full/tls_acceptor.mbt`)
   - `c_abi/include/http_server.h`
-  - `c_abi/thin/` (含 `c_abi/thin/moon.pkg`, `c_abi/thin/c_abi_min.mbt`, `c_abi/thin/bridge_min.c`, `c_abi/thin/hs_min.def`)
+  - `c_abi/thin/` (含 `c_abi/thin/moon.pkg`, `c_abi/thin/c_abi_min.mbt`, `c_abi/thin/bridge_min.c`, `c_abi/thin/hs_thin.def`)
   - `c_abi/full/` (含 `c_abi/full/moon.pkg`, `c_abi/full/c_abi_full.mbt`, `c_abi/full/bridge_full.c`, `c_abi/full/hs_full.def`)
   - `cmd/http-server-mbt-thin/` 与 `cmd/http-server-full/`
   - `scripts/build_cabi.mbtx`

@@ -25,7 +25,7 @@ Investigate Windows build environment, MoonBit native compilation mechanics, and
   - Host has GCC 12.2, GNU ar, GNU nm in PATH; MSVC 14.42 (cl, link, lib, dumpbin) and LLVM-MinGW (clang, llvm-ar, llvm-nm) fully installed.
   - MoonBit native build uses MSVC `cl.exe` under the hood on Windows, compiling whole-program MoonBit to `.c` and `.obj`.
   - Artifacts are in `_build/native/debug/build/` and `_build/native/release/build/`, including `libruntime.lib` and package stub libraries (`libserver.lib`, etc.).
-  - Windows DLL export tested successfully using `link.exe /DLL /DEF:hs_min.def /OUT:hs_min.dll /IMPLIB:hs_min.lib` yielding pure `hs_*` exports (0 main, 0 mbedtls in thin).
+  - Windows DLL export tested successfully using `link.exe /DLL /DEF:hs_thin.def /OUT:hs_thin.dll /IMPLIB:hs_thin.lib` yielding pure `hs_*` exports (0 main, 0 mbedtls in thin).
   - Windows static library tested successfully with MSVC `lib.exe` and GNU `ar` / `llvm-ar`.
   - Collision with `main` in static lib is eliminated by compiling with `/Dmain=moonbit_unused_main`.
   - Dynamic and static consumer C programs verified successfully executing `hs_abi_version() == 0x00010000`.

@@ -7,7 +7,7 @@ Status: In Progress
 - [x] Step 1: Initialize DISPATCH.md, BRIEFING.md, and progress.md
 - [ ] Step 2: Source Code Analysis & Inspection
   - [ ] Inspect `c_abi/include/http_server.h`
-  - [ ] Inspect `c_abi/thin/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`, `abi_test.mbt`
+  - [ ] Inspect `c_abi/thin/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_thin.def`, `abi_test.mbt`
   - [ ] Inspect `c_abi/full/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`, `abi_test.mbt`
   - [ ] Inspect `scripts/build_cabi.mbtx`
   - [ ] Inspect `testdata/c_consumer/` (all 4 C consumer tests)
@@ -16,7 +16,7 @@ Status: In Progress
   - [ ] Check if `hs_server_start` parses genuine JSON, binds an actual socket, and starts server
   - [ ] Check if `hs_server_stop` and `hs_server_destroy` genuinely manage lifecycle and resources
   - [ ] Check if `scripts/build_cabi.mbtx` genuinely invokes compiler and linker tools vs copying pre-made binary blobs
-  - [ ] Check if `hs_min` genuinely excludes `tls` packages at compilation time
+  - [ ] Check if `hs_thin` genuinely excludes `tls` packages at compilation time
 - [ ] Step 3: Empirical Behavioral Verification
   - [ ] Run `moon check --target native`
   - [ ] Run `moon test --target native` (verify 230 tests pass)

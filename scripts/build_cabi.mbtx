@@ -1,8 +1,8 @@
 // Build script for C ABI dynamic and static libraries (D-07, D-11, T-020, T-027).
 //
 // Drives MoonBit compilation, object staging, symbol isolation stripping,
-// dynamic library linking (hs_min.dll / libhs_min.so / libhs_min.dylib),
-// static library archiving (hs_min_static.lib / libhs_min.a), and
+// dynamic library linking (hs_thin.dll / libhs_thin.so / libhs_thin.dylib),
+// static library archiving (hs_thin_static.lib / libhs_thin.a), and
 // standalone C consumer smoke tests across Windows, Linux, and macOS.
 //
 // Usage:
@@ -1116,9 +1116,9 @@ async fn main {
   )
 
   let (dyn_min, stat_min, dyn_full, stat_full) = match target_os {
-    Windows => ("hs_min.dll", "hs_min_static.lib", "hs_full.dll", "hs_full_static.lib")
-    Linux => ("libhs_min.so", "libhs_min.a", "libhs_full.so", "libhs_full.a")
-    MacOS => ("libhs_min.dylib", "libhs_min.a", "libhs_full.dylib", "libhs_full.a")
+    Windows => ("hs_thin.dll", "hs_thin_static.lib", "hs_full.dll", "hs_full_static.lib")
+    Linux => ("libhs_thin.so", "libhs_thin.a", "libhs_full.so", "libhs_full.a")
+    MacOS => ("libhs_thin.dylib", "libhs_thin.a", "libhs_full.dylib", "libhs_full.a")
   }
 
   println("6. Verifying symbols and export isolation...")
@@ -1128,9 +1128,9 @@ async fn main {
 
   println("7. Compiling and running standalone C consumer tests...")
   let link_dyn_min = match target_os {
-    Windows => "hs_min.lib"
-    Linux => "libhs_min.so"
-    MacOS => "libhs_min.dylib"
+    Windows => "hs_thin.lib"
+    Linux => "libhs_thin.so"
+    MacOS => "libhs_thin.dylib"
   }
   let link_dyn_full = match target_os {
     Windows => "hs_full.lib"
@@ -1138,8 +1138,8 @@ async fn main {
     MacOS => "libhs_full.dylib"
   }
 
-  test_c_consumer(tc, "test_dynamic_min", "testdata/c_consumer/test_dynamic_min.c", link_dyn_min, false)
-  test_c_consumer(tc, "test_static_min", "testdata/c_consumer/test_static_min.c", stat_min, true)
+  test_c_consumer(tc, "test_dynamic_thin", "testdata/c_consumer/test_dynamic_thin.c", link_dyn_min, false)
+  test_c_consumer(tc, "test_static_thin", "testdata/c_consumer/test_static_thin.c", stat_min, true)
   test_c_consumer(tc, "test_dynamic_full", "testdata/c_consumer/test_dynamic_full.c", link_dyn_full, false)
   test_c_consumer(tc, "test_static_full", "testdata/c_consumer/test_static_full.c", stat_full, true)
 
@@ -1149,24 +1149,24 @@ async fn main {
   let artifacts = match target_os {
     Windows => [
       "target/cabi/include/http_server.h",
-      "target/cabi/hs_min.dll",
-      "target/cabi/hs_min.lib",
-      "target/cabi/hs_min_static.lib",
+      "target/cabi/hs_thin.dll",
+      "target/cabi/hs_thin.lib",
+      "target/cabi/hs_thin_static.lib",
       "target/cabi/hs_full.dll",
       "target/cabi/hs_full.lib",
       "target/cabi/hs_full_static.lib",
     ]
     Linux => [
       "target/cabi/include/http_server.h",
-      "target/cabi/libhs_min.so",
-      "target/cabi/libhs_min.a",
+      "target/cabi/libhs_thin.so",
+      "target/cabi/libhs_thin.a",
       "target/cabi/libhs_full.so",
       "target/cabi/libhs_full.a",
     ]
     MacOS => [
       "target/cabi/include/http_server.h",
-      "target/cabi/libhs_min.dylib",
-      "target/cabi/libhs_min.a",
+      "target/cabi/libhs_thin.dylib",
+      "target/cabi/libhs_thin.a",
       "target/cabi/libhs_full.dylib",
       "target/cabi/libhs_full.a",
     ]

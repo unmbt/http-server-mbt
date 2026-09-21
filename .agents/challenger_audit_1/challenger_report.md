@@ -14,7 +14,7 @@ As an independent empirical challenger, 4 critical domains were aggressively str
 
 1. **C ABI Edge Cases & Fuzzing**: Tested NULL pointers (config, out_server, err_buf, handle), 25 distinct malformed JSON inputs, extreme ports (-1, -65535, 65536, 99999, overflow integers), invalid roots, thin unsupported features, and negative TLS combinations (cert without key, key without cert, missing files, corrupted PEM files). **Result**: All inputs safely rejected with designated error codes (`HS_ERR_INVALID_ARG`, `HS_ERR_CONFIG`, `HS_ERR_IO`, `HS_ERR_UNSUPPORTED`), **0 crashes, 0 segfaults, 0 memory corruptions**.
 2. **State Machine Lifecycle & Re-entry**: Tested NULL handle operations, double stop, triple stop, destroy without prior stop, sequential multi-cycle start/stop/destroy. **Result**: Full idempotence and clean handle teardown in sequential operations. Multi-thread concurrency boundary identified and documented.
-3. **Symbol Isolation Audit (dumpbin)**: Inspected `hs_min.dll` and `hs_full.dll` exports and `hs_min_static.lib` symbols. **Result**: Both DLLs export strictly the 5 specified `hs_*` functions with 0 `main` and 0 `moonbit_*` leaks. `hs_min_static.lib` contains **exactly 0** `mbedtls_*` or `psa_*` symbols out of 37,067 total symbols.
+3. **Symbol Isolation Audit (dumpbin)**: Inspected `hs_thin.dll` and `hs_full.dll` exports and `hs_thin_static.lib` symbols. **Result**: Both DLLs export strictly the 5 specified `hs_*` functions with 0 `main` and 0 `moonbit_*` leaks. `hs_thin_static.lib` contains **exactly 0** `mbedtls_*` or `psa_*` symbols out of 37,067 total symbols.
 4. **CLI Unsupported Options Rejection**: Tested `http-server-mbt-thin` against `--cert`, `--key`, `--key-passphrase`, `--proxy`, `-P`, `--proxy-all`, `--proxy-config`, invalid ports, missing root directory, and mutual exclusion (`--spa` + `--try-files`). **Result**: All rejected immediately before TCP binding with exit code 1, actionable stderr messages, and **0 lingering ports**.
 
 ---
@@ -23,15 +23,15 @@ As an independent empirical challenger, 4 critical domains were aggressively str
 
 ### 1. Symbol Isolation Audit (`dumpbin`)
 
-#### 1.1 `target/cabi/hs_min.dll` Exports
-- Command: `dumpbin /EXPORTS target\cabi\hs_min.dll`
+#### 1.1 `target/cabi/hs_thin.dll` Exports
+- Command: `dumpbin /EXPORTS target\cabi\hs_thin.dll`
 - Verbatim Output:
 ```
-Dump of file target\cabi\hs_min.dll
+Dump of file target\cabi\hs_thin.dll
 
 File Type: DLL
 
-  Section contains the following exports for hs_min.dll
+  Section contains the following exports for hs_thin.dll
 
     00000000 characteristics
     FFFFFFFF time date stamp
@@ -80,18 +80,18 @@ File Type: DLL
 ```
 - **Analysis**: Exactly 5 functions exported; identical API signature between thin and full.
 
-#### 1.3 `target/cabi/hs_min_static.lib` Cryptographic Symbol Isolation
+#### 1.3 `target/cabi/hs_thin_static.lib` Cryptographic Symbol Isolation
 - Commands:
-  - Total symbol lines: `dumpbin /SYMBOLS target\cabi\hs_min_static.lib | Measure-Object` -> **37,067 lines**
-  - MbedTLS filter: `dumpbin /SYMBOLS target\cabi\hs_min_static.lib | Select-String -Pattern "mbedtls", "psa_"` -> **0 matches**
+  - Total symbol lines: `dumpbin /SYMBOLS target\cabi\hs_thin_static.lib | Measure-Object` -> **37,067 lines**
+  - MbedTLS filter: `dumpbin /SYMBOLS target\cabi\hs_thin_static.lib | Select-String -Pattern "mbedtls", "psa_"` -> **0 matches**
   - Contrast check on `hs_full_static.lib`: `dumpbin /SYMBOLS target\cabi\hs_full_static.lib | Select-String -Pattern "mbedtls"` -> **5,606 matches**
-- **Analysis**: `hs_min_static.lib` is completely devoid of any MbedTLS or PSA-Crypto symbols, confirming total cryptographic decoupling.
+- **Analysis**: `hs_thin_static.lib` is completely devoid of any MbedTLS or PSA-Crypto symbols, confirming total cryptographic decoupling.
 
 ---
 
 ### 2. C ABI Edge Cases & Fuzzing (`adversarial_challenge.exe`)
 
-Compiled with MSVC 14.42 (x64) and executed dynamically loading `hs_min.dll` and `hs_full.dll`.
+Compiled with MSVC 14.42 (x64) and executed dynamically loading `hs_thin.dll` and `hs_full.dll`.
 
 #### 2.1 Diagnostics: `hs_error_copy`
 | Test Case | Input | Expected Output | Actual Output | Verdict |
@@ -155,8 +155,8 @@ All 25 malformed inputs safely rejected with `HS_ERR_CONFIG` (code 1) and `*out_
 | Cache seconds < -1 | `{"cache_seconds": -2}` | `HS_ERR_CONFIG` (1) | 1 | **PASS** |
 | Cache seconds -1 | `{"cache_seconds": -1}` | `HS_OK` (0) | 0 | **PASS** |
 
-#### 2.5 Min Build Unsupported Feature Rejections
-All 8 TLS and Proxy options strictly rejected on `hs_min.dll` with `HS_ERR_UNSUPPORTED` (code 5):
+#### 2.5 Thin Build Unsupported Feature Rejections
+All 8 TLS and Proxy options strictly rejected on `hs_thin.dll` with `HS_ERR_UNSUPPORTED` (code 5):
 - `cert_file` -> `HS_ERR_UNSUPPORTED`
 - `key_file` -> `HS_ERR_UNSUPPORTED`
 - `key_passphrase` -> `HS_ERR_UNSUPPORTED`
@@ -226,13 +226,13 @@ Executed against `cmd/http-server-mbt-thin`:
 - `moon check --target native`: **0 errors, 0 warnings**
 - `moon test --target native`: **230 passed, 0 failed**
 - `moon run scripts/build_cabi.mbtx`: **6/6 library artifacts created, 4/4 consumer tests PASS**
-  - `target/cabi/hs_min.dll` (1,344,000 bytes)
-  - `target/cabi/hs_min.lib` (2,514 bytes)
-  - `target/cabi/hs_min_static.lib` (4,460,708 bytes)
+  - `target/cabi/hs_thin.dll` (1,344,000 bytes)
+  - `target/cabi/hs_thin.lib` (2,514 bytes)
+  - `target/cabi/hs_thin_static.lib` (4,460,708 bytes)
   - `target/cabi/hs_full.dll` (2,678,784 bytes)
   - `target/cabi/hs_full.lib` (2,528 bytes)
   - `target/cabi/hs_full_static.lib` (6,916,216 bytes)
-  - `test_dynamic_min`: PASS
-  - `test_static_min`: PASS
+  - `test_dynamic_thin`: PASS
+  - `test_static_thin`: PASS
   - `test_dynamic_full`: PASS
   - `test_static_full`: PASS

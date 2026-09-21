@@ -1,4 +1,4 @@
-LIBRARY hs_min
+LIBRARY hs_thin
 EXPORTS
     hs_abi_version
     hs_server_start

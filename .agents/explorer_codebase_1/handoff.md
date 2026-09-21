@@ -133,7 +133,7 @@
    │   ├── moon.pkg               # pkgtype(kind: "foreign_library"), imports "unmbt/http-server-mbt/server", "unmbt/http-server-mbt/core"
    │   ├── abi.mbt                # #export_name declarations for hs_*
    │   ├── bridge.c               # Native stub managing background thread, OS events, and server handle
-   │   └── hs_min.def             # Explicit export list for MSVC link.exe
+   │   └── hs_thin.def             # Explicit export list for MSVC link.exe
    └── full/
        ├── moon.pkg               # pkgtype(kind: "foreign_library"), imports "unmbt/http-server-mbt/full", "unmbt/http-server-mbt/core"
        ├── abi.mbt                # #export_name declarations for hs_* with TLS support
@@ -151,7 +151,7 @@
    * Strip embedded `/EXPORT` directives from runtime dependencies using `objcopy --remove-section=.drectve`.
    * Link dynamic library with MSVC `link.exe /DLL /DEF:hs_<thin|full>.def` and required system libraries (`ws2_32.lib`, `dbghelp.lib`, `userenv.lib`, `ntdll.lib`).
    * Create static library with MSVC `lib.exe /OUT:target/hs_<thin|full>_static.lib`.
-   * Audit exports: Verify dynamic library exports ONLY `hs_*` symbols and 0 `mbedtls_*` symbols in `hs_min`.
+   * Audit exports: Verify dynamic library exports ONLY `hs_*` symbols and 0 `mbedtls_*` symbols in `hs_thin`.
 
 ---
 
@@ -164,15 +164,15 @@
    # 2. Inspect generated C code in _build to ensure no main() exists
    Select-String -Path "_build\native\debug\build\c_abi\thin\*.c" -Pattern "int main\("
    # 3. Build DLL and check exports
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_min.dll
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_thin.dll
    ```
-2. **Verify MbedTLS Symbol Exclusion in `hs_min`**:
+2. **Verify MbedTLS Symbol Exclusion in `hs_thin`**:
    ```powershell
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_min_static.lib | Select-String "mbedtls"
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_thin_static.lib | Select-String "mbedtls"
    # Must return 0 matches
    ```
 3. **Verify C Program Consumption**:
    ```powershell
-   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\cl.exe" /nologo /I c_abi/include testdata/c_consumer/test_min_cabi.c target/cabi/hs_min.lib /Fe:testdata/c_consumer/test_min.exe
+   & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\cl.exe" /nologo /I c_abi/include testdata/c_consumer/test_min_cabi.c target/cabi/hs_thin.lib /Fe:testdata/c_consumer/test_min.exe
    ./testdata/c_consumer/test_min.exe
    ```

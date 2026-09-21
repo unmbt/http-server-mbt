@@ -1,7 +1,7 @@
 # CLI thin/full 双版本打包完成记录与动静态库导出接续指南
 
 > **记录时间**：2026-09-18
-> **当前状态**：已完成 Milestone 1（核心包解耦）与 Milestone 2（Min/Full 双版本 CLI 打包及全量测试保护）；在此节点主动暂停（PAUSE），以便后续无缝接续动静态库导出（Milestone 3）。
+> **当前状态**：已完成 Milestone 1（核心包解耦）与 Milestone 2（Thin/Full 双版本 CLI 打包及全量测试保护）；在此节点主动暂停（PAUSE），以便后续无缝接续动静态库导出（Milestone 3）。
 
 ---
 
@@ -70,8 +70,8 @@
 ### 1. 目标产物定义
 依据设计规范 D-07（托管异步 C ABI）与 D-11（静态库打包与消费），需构建两组库产物：
 1. **`thin` 动静态库**：
-   - 动态库：Windows `hs_min.dll`（配套 import library `hs_min.lib`）/ Linux `libhs_min.so` / macOS `libhs_min.dylib`
-   - 静态库：Windows `hs_min_static.lib` / Linux `libhs_min.a` / macOS `libhs_min.a`
+   - 动态库：Windows `hs_thin.dll`（配套 import library `hs_thin.lib`）/ Linux `libhs_thin.so` / macOS `libhs_thin.dylib`
+   - 静态库：Windows `hs_thin_static.lib` / Linux `libhs_thin.a` / macOS `libhs_thin.a`
    - **核心约束**：完全不包含任何 MbedTLS / TF-PSA-Crypto 符号与对象，极致轻量。
 2. **`full` 动静态库**：
    - 动态库：Windows `hs_full.dll`（配套 `hs_full.lib`）/ Linux `libhs_full.so` / macOS `libhs_full.dylib`
@@ -139,7 +139,7 @@ HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap);
 - **`c_abi/bridge.c`**：
   实现 C ABI 与 MoonBit 内部 `server` / `full` 的参数转换与调度，使用全局线程安全互斥锁与引用计数。
 - **符号隔离控制**：
-  - Windows：使用模块定义文件 `.def`（例如 `hs_min.def`），显式列出需要导出的 `hs_*` 函数列表，杜绝导出 MoonBit 内部运行时符号或 `main`。
+  - Windows：使用模块定义文件 `.def`（例如 `hs_thin.def`），显式列出需要导出的 `hs_*` 函数列表，杜绝导出 MoonBit 内部运行时符号或 `main`。
   - POSIX：使用 `-Wl,--version-script` 或 `-fvisibility=hidden`。
 
 ### 4. 自动化构建驱动脚本（`scripts/build_cabi.mbtx`）
@@ -148,13 +148,13 @@ HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap);
    - 分别调用 `moon build c_abi_min --target native` 与 `moon build c_abi_full --target native`，在 `_build/native/` 下生成各子包的 `.obj` 对象文件。
 2. **动静态库链接与归档**：
    - **动态库生成**：
-     - Windows MSVC 环境：调用 `link.exe /DLL /DEF:hs_min.def ... /OUT:target/hs_min.dll /IMPLIB:target/hs_min.lib`
-     - Clang 环境：调用 `clang -shared -o target/hs_min.dll -Wl,--out-implib,target/hs_min.lib ...`
+     - Windows MSVC 环境：调用 `link.exe /DLL /DEF:hs_thin.def ... /OUT:target/hs_thin.dll /IMPLIB:target/hs_thin.lib`
+     - Clang 环境：调用 `clang -shared -o target/hs_thin.dll -Wl,--out-implib,target/hs_thin.lib ...`
    - **静态库归档**：
-     - Windows MSVC：调用 `lib.exe /OUT:target/hs_min_static.lib ...`
-     - POSIX / MinGW：调用 `llvm-ar rcs target/libhs_min.a ...`
+     - Windows MSVC：调用 `lib.exe /OUT:target/hs_thin_static.lib ...`
+     - POSIX / MinGW：调用 `llvm-ar rcs target/libhs_thin.a ...`
 3. **符号纯洁性校验（Symbol Audit）**：
-   - 检查 `hs_min` 动态/静态库中：
+   - 检查 `hs_thin` 动态/静态库中：
      - 包含且仅包含以 `hs_` 开头的导出符号；
      - 绝对不包含 `mbedtls_*`、`psa_*` 符号；
      - 绝对不包含可执行文件的 `main` 入口符号。

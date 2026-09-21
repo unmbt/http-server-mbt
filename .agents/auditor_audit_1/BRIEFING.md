@@ -8,7 +8,7 @@ Conduct independent SDD consistency audit, full verification gate execution, and
 - Roles: [critic, specialist, auditor]
 - Working directory: E:/project/moonbit/unmbt/http-server-mbt/.agents/auditor_audit_1
 - Original parent: 9ceae8d4-617a-4975-b88f-862fef2841c5
-- Target: Milestone 1~3 C ABI and Min/Full packaging audit
+- Target: Milestone 1~3 C ABI and Thin/Full packaging audit
 
 ## 🔒 Key Constraints
 - Audit-only — do NOT modify implementation code

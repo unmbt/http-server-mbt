@@ -10,7 +10,7 @@ Last visited: 2026-09-19T03:35:00Z
   - [x] 2.3: Execute `moon test --target native` (verify all 230 tests pass) — 230/230 tests passed.
 - [x] Step 3: Forensic Integrity & Anti-Cheating
   - [x] 3.1: Authentic implementation audit (no hardcoded test mocks, genuine JSON parser and server runner) — verified.
-  - [x] 3.2: Export symbol purity and crypto isolation (dumpbin audit of hs_min.dll, hs_full.dll, hs_min_static.lib) — verified strictly 5 exports, zero leaks, zero crypto symbols in thin static.
+  - [x] 3.2: Export symbol purity and crypto isolation (dumpbin audit of hs_thin.dll, hs_full.dll, hs_thin_static.lib) — verified strictly 5 exports, zero leaks, zero crypto symbols in thin static.
   - [x] 3.3: Open-source license compliance audit (MIT / Apache-2.0) — verified.
   - [x] 3.4: Git safety audit (strictly no git push) — verified branch ahead by 2 local commits.
 - [x] Step 4: Generate `audit_report.md` and `handoff.md` (Verdict: CLEAN)

@@ -20,7 +20,7 @@
 
 ## Caveats
 - 审查员（Reviewer）、挑战者（Challenger）与合规审计员（Auditor）必须为独立 subagent，严禁自审自查。
-- 符号纯净度是关键验收门禁：`hs_min.dll` 与 `hs_full.dll` 仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或 MoonBit 运行时符号；`hs_min_static.lib` 绝对不含 `mbedtls_*` / `psa_*` 符号。
+- 符号纯净度是关键验收门禁：`hs_thin.dll` 与 `hs_full.dll` 仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或 MoonBit 运行时符号；`hs_thin_static.lib` 绝对不含 `mbedtls_*` / `psa_*` 符号。
 - 严禁执行 `git push`！仅允许本地 commit。
 - 完工时必须由 Sentinel 调起独立的 `teamwork_preview_victory_auditor` 进行无上下文终审，终审确认后方可最终结项。
 

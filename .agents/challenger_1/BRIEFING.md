@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:58:05Z
 
 ## Mission
-Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle robustness of hs_min and hs_full libraries.
+Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle robustness of hs_thin and hs_full libraries.
 
 ## 🔒 My Identity
 - Archetype: challenger
@@ -26,7 +26,7 @@ Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle
   - `c_abi/include/http_server.h`
   - `c_abi/thin/bridge.c`, `c_abi/thin/abi.mbt`
   - `c_abi/full/bridge.c`, `c_abi/full/abi.mbt`
-  - `target/cabi/*` (`hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`)
+  - `target/cabi/*` (`hs_thin.dll`, `hs_thin.lib`, `hs_thin_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`)
   - `scripts/build_cabi.mbtx`
   - `testdata/c_consumer/*`
 - **Interface contracts**: `docs/design.md` (D-07, D-11), `docs/tasks.md` (T-020, T-027), `c_abi/include/http_server.h`

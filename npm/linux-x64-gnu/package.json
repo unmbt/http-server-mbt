@@ -1,6 +1,6 @@
 {
   "name": "@unmbt/http-server-mbt-linux-x64-gnu",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Linux x86_64 (glibc) prebuilt native binary for @unmbt/http-server-mbt",
   "main": "http_server.linux-x64-gnu.node",
   "files": [

@@ -84,8 +84,15 @@ fn startup_banner(
   ips : Array[String],
   color : Bool,
 ) -> String {
+  let is_tls = config.has_tls()
+  let tls_suffix = if is_tls {
+    yellow(color, " through") + cyan(color, " https")
+  } else {
+    ""
+  }
   let start_line = yellow(color, "Starting up http-server, serving ") +
-    cyan(color, display_root(config.root))
+    cyan(color, display_root(config.root)) +
+    tls_suffix
   let version_line = yellow(color, "\nhttp-server version: ") +
     cyan(color, version)
   let mut settings = yellow(color, "\nhttp-server settings: ") +
@@ -102,11 +109,12 @@ fn startup_banner(
   }
   let port_text = green(color, port.to_string())
   let suffix = available_path_suffix(config.base_url)
+  let protocol = if is_tls { "https://" } else { "http://" }
   let mut available = yellow(color, "\nAvailable on:")
   for ip in ips {
-    available = available + "\n  http://\{ip}:" + port_text + suffix
+    available = available + "\n  \{protocol}\{ip}:" + port_text + suffix
   }
-  available = available + "\n  http://127.0.0.1:" + port_text + suffix
+  available = available + "\n  \{protocol}127.0.0.1:" + port_text + suffix
   "\{start_line}\n\{version_line}\n\{settings}\n\{available}\nHit CTRL-C to stop the server\n"
 }
 

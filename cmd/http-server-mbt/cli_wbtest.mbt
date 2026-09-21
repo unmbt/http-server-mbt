@@ -499,3 +499,21 @@ test "cli: accepts --proxy-config" {
     _ => fail("expected Ok(Run) with proxy-config")
   }
 }
+
+///|
+test "cli: banner displays https protocol and through https when TLS is enabled" {
+  let config = {
+    ..@core.Config::default("."),
+    cert_file: Some("testdata/tls/server_cert.pem"),
+    key_file: Some("testdata/tls/server_key.pem"),
+  }
+  let banner = startup_banner(config, 8443, "0.3.3", ["192.168.1.5"], false)
+  assert_true(
+    banner.contains("Starting up http-server, serving ./ through https"),
+  )
+  assert_true(
+    banner.contains(
+      "Available on:\n  https://192.168.1.5:8443\n  https://127.0.0.1:8443\n",
+    ),
+  )
+}

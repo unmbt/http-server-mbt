@@ -3,7 +3,7 @@
 Last visited: 2026-09-18T13:56:40Z
 
 ## Current Status
-- Completed R1: C ABI interface header `c_abi/include/http_server.h`, `c_abi/min/` package, `c_abi/full/` package, module definition export files (`hs_min.def`, `hs_full.def`).
+- Completed R1: C ABI interface header `c_abi/include/http_server.h`, `c_abi/thin/` package, `c_abi/full/` package, module definition export files (`hs_min.def`, `hs_full.def`).
 - Completed R2: Pure `.mbtx` build driver script `scripts/build_cabi.mbtx`, providing automatic toolchain discovery, object staging, `.drectve` stripping via `llvm-objcopy`, dynamic DLL linking, static library archiving, symbol isolation verification, and smoke testing.
 - Completed R3: Standalone C consumer smoke test programs (`testdata/c_consumer/`):
   - `test_dynamic_min.c` (linked against `hs_min.lib`, running with `hs_min.dll`): PASS (exit code 0)

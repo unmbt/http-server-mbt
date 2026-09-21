@@ -64,11 +64,11 @@
      `Transport { reader : &@io.Reader, writer : &@io.Writer, raw_fd : @types.Fd?, raw_tcp : @socket.Tcp?, close_fn : () -> Unit }`
      and `tls_acceptor` with an `Acceptor { accept : async (@socket.Tcp) -> Transport, close : () -> Unit }`,
      `server` has no requirement to import `tls`.
-   - When `server/moon.pkg` drops `"unmbt/http-server-mbt/tls"`, `server` becomes a pure `min` static server with 0 crypto dependencies.
+   - When `server/moon.pkg` drops `"unmbt/http-server-mbt/tls"`, `server` becomes a pure `thin` static server with 0 crypto dependencies.
 
 2. **Performance and Footprint Impact**:
    - From Observation 3, `libtls.lib` is ~6.17 MB while `libserver.lib` is ~33 KB.
-   - Decoupling removes 109 C files from the build path of `server`, `min` CLI, and all 75 server tests. This achieves a >99% size reduction for the `min` library artifact.
+   - Decoupling removes 109 C files from the build path of `server`, `thin` CLI, and all 75 server tests. This achieves a >99% size reduction for the `thin` library artifact.
 
 3. **Zero Regression Assurance**:
    - From Observation 4, all 75 tests in `server/` test plain HTTP features (ETag, Range, 304, TransmitFile, directory security, etc.). None of them use TLS.
@@ -76,7 +76,7 @@
    - Therefore, removing `tls` from `server/` will not break any of the 75 server tests or the 5 TLS tests. All 183 tests will continue to pass.
 
 4. **Dual CLI & C ABI Pipeline**:
-   - `min` CLI can be built from a package that only imports `server` and `core`. If `--cert`, `--key`, or `--proxy` are given, it exits with error code 1 as required by D-08 and D-15.
+   - `thin` CLI can be built from a package that only imports `server` and `core`. If `--cert`, `--key`, or `--proxy` are given, it exits with error code 1 as required by D-08 and D-15.
    - `full` CLI imports `server` and `tls` (via `full` package), constructing `TlsAcceptor` and injecting it into `@server.with_server_at`.
    - From Observation 5, MinGW GCC and `ar.exe`/`nm.exe` are available. A `.mbtx` build script can link the required `.obj`/`.lib` artifacts into `.dll` and `.lib`/`.a`, verifying symbol hygiene with `nm.exe`.
 
@@ -101,10 +101,10 @@
    - `Acceptor`: encapsulates `accept : async (@socket.Tcp) -> Transport` and `close : () -> Unit`.
    - Injection: `server.with_server_at(config, port, acceptor? : Acceptor, action)`. If `config.has_tls()` is set without an acceptor, preflight immediately raises `ConfigError::InvalidTls`.
 3. **Packaging Strategy**:
-   - `unmbt/http-server-mbt/server`: `min` static HTTP server, 0 crypto.
+   - `unmbt/http-server-mbt/server`: `thin` static HTTP server, 0 crypto.
    - `unmbt/http-server-mbt/tls`: standalone MbedTLS engine.
    - `unmbt/http-server-mbt/full` (or `server_full`): wires TLS acceptor to server.
-   - `cmd/http-server-min` & `cmd/http-server-full`: dual CLI executables.
+   - `cmd/http-server-mbt-thin` & `cmd/http-server-full`: dual CLI executables.
 4. **All 183 Tests Preserved**: 0 regressions guaranteed.
 
 ---
@@ -126,5 +126,5 @@
    - Run full suite: `moon test --target native`: confirm 183 tests pass.
 
 3. **Verify CLI Preflight Rejection (Post-implementation)**:
-   - Execute `min` binary with `--cert test.pem --key test.key`: confirm exit code 1 with diagnostic message.
-   - Execute `min` binary with `--proxy http://127.0.0.1:3000`: confirm exit code 1 with diagnostic message.
+   - Execute `thin` binary with `--cert test.pem --key test.key`: confirm exit code 1 with diagnostic message.
+   - Execute `thin` binary with `--proxy http://127.0.0.1:3000`: confirm exit code 1 with diagnostic message.

@@ -21,7 +21,7 @@
 
 两种使用方式均默认由库托管事件循环：完整服务模式中，宿主传入配置、启动及停止服务；静态库模式中，宿主提交请求并将异步响应接入已有 HTTP 框架，库负责静态解析、缓存/Range、文件读取及异步操作。宿主无需手动推进、等待或唤醒事件循环，公开 pump/run/poll 下沉为内部机制。
 
-最终形态包括：三平台 Native CLI、可通过 Mooncakes 引入的 MoonBit 静态文件库/中间件、Linux 完全静态 ELF、Distroless min/full Docker 镜像及对应 `scratch` 变体、C 头文件和静态/动态库、Node-API `.node` 插件及 npm 适配包，以及实验性 wasm-gc 引擎与宿主适配示例。C 动态库为 Linux `.so`、macOS `.dylib`、Windows `.dll`；静态库为 `.a` 或 MSVC `.lib`，不是 Rust 专用 `.rlib`。
+最终形态包括：三平台 Native CLI、可通过 Mooncakes 引入的 MoonBit 静态文件库/中间件、Linux 完全静态 ELF、Distroless thin/full Docker 镜像及对应 `scratch` 变体、C 头文件和静态/动态库、Node-API `.node` 插件及 npm 适配包，以及实验性 wasm-gc 引擎与宿主适配示例。C 动态库为 Linux `.so`、macOS `.dylib`、Windows `.dll`；静态库为 `.a` 或 MSVC `.lib`，不是 Rust 专用 `.rlib`。
 
 C/Python 动态库示例继续保留，新增 C/Rust 静态链接消费验证和正式 Node 适配。Bun/Deno 的 Node-API 兼容性及 Go/Rust/C++ 的完整 SDK 不自动列入正式支持；Rust 本次提供最小消费示例，ABI 可供后续适配。Node 插件默认静态链接同一引擎，不另行复制静态文件业务实现。
 
@@ -49,7 +49,7 @@ Native 为生产服务器后端；wasm-gc 为需要宿主提供文件/计时/网
 | R-N09 | 必须提供 Node-API 插件及 npm 适配，调用库托管的异步接口、映射背压/取消/关闭并按平台分发，不阻塞 Node 事件循环 | D-07、D-12 | T-002、T-028 |
 | R-N10 | 必须交付可运行的实验 wasm-gc 共享核心、宿主 I/O 适配和示例，明确能力矩阵；不继承 Native 零拷贝/无运行时能力，应用不手动推进引擎 | D-13 | T-002、T-029 |
 | R-N11 | 必须具备可发布的 Mooncakes 模块、公共包入口、文档示例和干净外部消费验证，使其他 MoonBit 模块可作为静态文件库使用 | D-02、D-07、D-14 | T-015、T-030 |
-| R-N12 | 必须提供 min/full Docker 镜像，分别封装精简/完整 CLI；默认支持 Distroless static nonroot，保留相同功能的 scratch 变体，验收功能差异、非 root、只读挂载、退出及体积 | D-08、D-15 | T-022、T-025 |
+| R-N12 | 必须提供 thin/full Docker 镜像，分别封装精简/完整 CLI；默认支持 Distroless static nonroot，保留相同功能的 scratch 变体，验收功能差异、非 root、只读挂载、退出及体积 | D-08、D-15 | T-022、T-025 |
 | R-N13 | 必须实现 GitHub Actions 工作流，覆盖三平台兼容、测试、原生 I/O、库/宿主消费、打包与发布门槛；允许先在 Windows 本机跑通基线和零拷贝，再迁入三平台持续验证 | D-10、D-16 | T-001、T-031、T-032、T-025、T-026 |
 | R-N14 | 默认由库托管事件循环、异步操作和关闭排空；支持配置启动/停止完整服务，以及提交请求/接入框架两种方式；所有公开 API 不要求手动 pump/run/poll | D-05、D-07、D-11～D-14 | T-002、T-015、T-016、T-020、T-021、T-028～T-030 |
 | R-N15 | 下载绑定已打开的文件版本；检测到原地修改/截断立即终止当前响应；支持自动重试的客户端必须丢弃旧响应并从偏移 0 重新请求，不得拼接不同版本；文件写入者无需协调在途下载 | D-03、D-05、D-17 | T-005、T-007、T-008、T-017、T-033 |
@@ -88,7 +88,7 @@ wasm-gc 必须由支持 WasmGC 的宿主运行，文件/网络通过显式导入
 3. 接入 GitHub Actions 三平台基础矩阵，复跑原版基线与已迁移案例，补齐 Linux/macOS 探针，逐步完成 TLS、代理、WebSocket及中间件。
 4. 在三平台工作流完成无栈事件循环、内核文件传输和目录优化的共同验收；Windows 本机继续提供日常快速反馈。
 5. 完成 BaseURL、SPA、自定义回退及参数冲突测试。
-6. 通过 GitHub Actions 完成静态/动态库、C/Python/Rust 消费验证、Node-API、Mooncakes 候选包、独立程序、Distroless/scratch min/full 镜像打包，补齐实验 io_uring/wasm-gc、托管生命周期、文件变更、故障注入/模糊测试及全量兼容工作流。
+6. 通过 GitHub Actions 完成静态/动态库、C/Python/Rust 消费验证、Node-API、Mooncakes 候选包、独立程序、Distroless/scratch thin/full 镜像打包，补齐实验 io_uring/wasm-gc、托管生命周期、文件变更、故障注入/模糊测试及全量兼容工作流。
 
 每阶段交付必须能独立验证，实验实现不能冒充生产后端。完整重构的功能完成条件是三平台 Native 共同能力、全部适用迁移用例、新增契约测试、资源/分发检查、库/Node/Mooncakes 消费验证及实验 wasm-gc 声明范围内的验证均通过，并有对应提交的 GitHub Actions 运行、产物及报告；各形态的适用范围与差异需在报告中可见。实际镜像仓库/registry/npm 发布不是本次文档操作，发布成功与候选包可消费须分开记录。
 

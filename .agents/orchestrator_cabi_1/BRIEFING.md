@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:12:00Z
 
 ## Mission
-Design and implement the dual min/full C ABI dynamic and static library export pipeline in MoonBit project http-server-mbt, with clean hs_* symbol isolation, .mbtx build driver script, and standalone C consumer smoke tests.
+Design and implement the dual thin/full C ABI dynamic and static library export pipeline in MoonBit project http-server-mbt, with clean hs_* symbol isolation, .mbtx build driver script, and standalone C consumer smoke tests.
 
 ## 🔒 My Identity
 - Archetype: Project Orchestrator
@@ -26,7 +26,7 @@ Design and implement the dual min/full C ABI dynamic and static library export p
 4. **Succession**: Spawn successor at 16 spawns after active subagents complete.
 - **Work items**:
   1. Survey and Technical Investigation [in-progress]
-  2. C ABI Interface & Bridge Package (min & full) [pending]
+  2. C ABI Interface & Bridge Package (thin & full) [pending]
   3. Build Driver Script (scripts/build_cabi.mbtx) [pending]
   4. C Consumer Smoke Tests & Symbol Isolation Audit [pending]
   5. Full Regression & Git Commit Gate [pending]
@@ -48,8 +48,8 @@ Design and implement the dual min/full C ABI dynamic and static library export p
 - Updated: 2026-09-18T13:27:00Z
 
 ## Key Decisions Made
-- Dispatched survey phase to 3 explorers (including spec miner) to analyze docs/design.md, docs/tasks.md, docs/cli-min-full-and-cabi-handover.md, MoonBit native toolchain/clang/link.exe capabilities, and object file layout.
-- Adopted package layout: c_abi/include/http_server.h, c_abi/min/, c_abi/full/.
+- Dispatched survey phase to 3 explorers (including spec miner) to analyze docs/design.md, docs/tasks.md, docs/cli-thin-full-and-cabi-handover.md, MoonBit native toolchain/clang/link.exe capabilities, and object file layout.
+- Adopted package layout: c_abi/include/http_server.h, c_abi/thin/, c_abi/full/.
 - Confirmed Windows .def file export isolation strategy to restrict DLL exports strictly to the 5 hs_* APIs.
 - Confirmed /Dmain=moonbit_unused_main preprocessor remapping to avoid main symbol collision in consumer programs linking static libraries.
 

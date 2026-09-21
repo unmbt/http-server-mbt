@@ -31,7 +31,7 @@ Adversarially challenge and stress-test symbol purity, linking mechanics, and li
 - **Interface contracts**: `docs/design.md` (D-14), `ORIGINAL_REQUEST.md`
 - **Review criteria**:
   - PE export directory purity: exactly 5 `hs_*` symbols, no `moonbit_*` or `main`
-  - Static library cryptographic symbol isolation: zero `mbedtls` / `psa_` in `min`
+  - Static library cryptographic symbol isolation: zero `mbedtls` / `psa_` in `thin`
   - Static library consumer compilation & link without `main` collision (LNK2005)
   - Dynamic consumer execution and `hs_abi_version()` check
 

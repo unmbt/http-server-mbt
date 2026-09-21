@@ -9,7 +9,6 @@ $InstallDir = "$env:USERPROFILE\.unmbt"
 $BinName = "http-server-mbt.exe"
 $BinPath = Join-Path $InstallDir $BinName
 $ThinBinPath = Join-Path $InstallDir "http-server-mbt-thin.exe"
-$OldMinBinPath = Join-Path $InstallDir "http-server-min.exe"
 
 $IsThin = $Thin -or $Min
 

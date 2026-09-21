@@ -19,7 +19,7 @@
    - `moon test --target native`: 230/230 tests passed (100% PASS, 0 failures, 0 regressions).
    - `moon run scripts/build_cabi.mbtx`: Generated 6 artifacts (`hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`), 4/4 C consumer smoke test programs PASS.
    - Symbol Isolation: `dumpbin /EXPORTS` confirmed exactly 5 `hs_*` exports on DLLs (0 `main`, 0 `moonbit_*`); `dumpbin /SYMBOLS` confirmed 0 `mbedtls_*` / `psa_*` symbols in `hs_min_static.lib`.
-   - CLI Preflight Rejection: `cmd/http-server-min` exits with code 1 upon `--cert`/`--proxy` options with actionable stderr and zero port lingering.
+   - CLI Preflight Rejection: `cmd/http-server-mbt-thin` exits with code 1 upon `--cert`/`--proxy` options with actionable stderr and zero port lingering.
    - Forensic Integrity: Genuine logic throughout, 100% MIT / Apache-2.0 licenses, 0 `git push` executed.
 
 ---

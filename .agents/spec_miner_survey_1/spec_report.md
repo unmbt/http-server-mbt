@@ -1,4 +1,4 @@
-# Specification Mining Report: `min` / `full` Layering, TLS Decoupling, and Reverse Proxy Readiness
+# Specification Mining Report: `thin` / `full` Layering, TLS Decoupling, and Reverse Proxy Readiness
 
 **Date**: 2026-09-18  
 **Author**: Specification Miner (`spec_miner_survey_1`)  
@@ -16,7 +16,7 @@
 
 This specification mining report establishes the authoritative functional and behavioral contracts for three interrelated architectural pillars of `http-server-mbt`:
 1. **Reverse Proxy Architecture & Test Parity (T-013 / T-014 / C037~C041)**: Complete contracts for static fallback proxy (`--proxy`), unconditional proxy (`--proxy-all`), rule-based rewrite proxy (`--proxy-config`), upstream options (`proxyOptions`), and WebSocket full-duplex tunneling (`--websocket`), along with the connection state machine transitions, streaming backpressure, error isolation, and configuration constraints.
-2. **`min` vs `full` CLI Packaging & Decoupling (R1, R2, D-08, D-15)**: Clear separation of concerns between the zero-crypto lightweight `min` distribution and the full-featured `full` distribution. Specification of CLI argument handling, exit code 1 requirements on unsupported flags in `min`, and decoupling `server` from `tls` via a pluggable `Acceptor` / transport abstraction.
+2. **`thin` vs `full` CLI Packaging & Decoupling (R1, R2, D-08, D-15)**: Clear separation of concerns between the zero-crypto lightweight `thin` distribution and the full-featured `full` distribution. Specification of CLI argument handling, exit code 1 requirements on unsupported flags in `thin`, and decoupling `server` from `tls` via a pluggable `Acceptor` / transport abstraction.
 3. **C ABI Public Export Specification (`hs_*`, D-07, D-11)**: Exact API contracts, lifecycle management, versioning, memory ownership rules, error code enum values, asynchronous completion guarantees, and the strict absence of `main` symbol pollution in static and dynamic library artifacts.
 
 ---
@@ -30,7 +30,7 @@ This specification mining report establishes the authoritative functional and be
 | F-03 | Reverse Proxy | Rule-Based Proxy (`--proxy-config`) | Maps URL glob patterns to specific upstream targets with regex path rewriting | JSON file path or JSON string mapping path globs to `{ target, pathRewrite }` | Rewritten request forwarded to matched target; unmatched falls through to static | File not found or invalid JSON exits 1 before listen; empty ruleset rejected | `test/proxy-config.test.js` (C038), `bin/http-server`:282-301 |
 | F-04 | Reverse Proxy | Upstream Options (`--proxy-options.*`) | Configures upstream proxy client behavior (e.g. `secure: false`, `changeOrigin: true`) | Dotted CLI flags or JSON object | Adjusted upstream request headers, relaxed TLS verification | Specified without a valid proxy target yields `ConfigError` | `test/proxy-options.test.js` (C039), `docs/design.md` D-04, AD-09 |
 | F-05 | Reverse Proxy | WebSocket Proxy (`--websocket`) | Upgrades HTTP connection to WebSocket full-duplex tunnel to upstream | HTTP `Upgrade: websocket` header, requires `--proxy` | 101 Switching Protocols + bidirectional byte pipe | If upstream unreachable, returns 502; main server stays alive; invalid port exits before listen | `test/websocket-proxy.test.js` (C040), `docs/design.md` AD-07 |
-| F-06 | CLI Packaging | `min` CLI Strict Gatekeeping | 精简版 (min) builds with 0 TLS/proxy dependencies; strictly rejects TLS and Proxy flags | `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-config`, `--proxy-options`, `--websocket` | Error message to stderr detailing unsupported feature in min build | Immediate exit with code 1; no listener started | `ORIGINAL_REQUEST.md` R2, `docs/design.md` D-08, D-15 |
+| F-06 | CLI Packaging | `thin` CLI Strict Gatekeeping | 精简版 (thin) builds with 0 TLS/proxy dependencies; strictly rejects TLS and Proxy flags | `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-config`, `--proxy-options`, `--websocket` | Error message to stderr detailing unsupported feature in thin build | Immediate exit with code 1; no listener started | `ORIGINAL_REQUEST.md` R2, `docs/design.md` D-08, D-15 |
 | F-07 | CLI Packaging | `full` CLI Feature Parity | 完整版 (full) supports all static, routing, TLS, and proxy features | All standard flags + TLS + Proxy flags | Complete HTTP/HTTPS/Proxy service | Invalid configs (bad port, missing cert/key, conflicting routing) exit 1 before listen | `ORIGINAL_REQUEST.md` R2, `docs/design.md` D-08, D-15 |
 | F-08 | Architecture | Transport / Acceptor Abstraction | Decouples `server` from `tls` package and MbedTLS C stubs | `Acceptor` interface / trait or pluggable connection wrapper | Plaintext TCP by default; TLS injected in `full` build | Failure during acceptor creation halts before listening | `ORIGINAL_REQUEST.md` R1, `docs/design.md` D-02, D-08 |
 | F-09 | C ABI | Version Query (`hs_abi_version`) | Returns ABI major and minor versions to host application | Pointers to `uint32_t major, uint32_t minor` | `HS_OK` (0) and version numbers written to memory | NULL pointers return `HS_ERR_INVALID_ARGUMENT` (-2) | `docs/design.md` D-07, D-11 |
@@ -62,8 +62,8 @@ This specification mining report establishes the authoritative functional and be
 | E-13 | Reverse Proxy | Request matches local file when `--proxy` is set (fallback mode) | Local file served with 200; upstream proxy is NOT called (`proxy-options.test.js:58-65`, C039.01). |
 | E-14 | Reverse Proxy | Request matches local file when `--proxy-all` is set | Local file is completely IGNORED; request is forwarded upstream; upstream response returned (`proxy-all.test.js:72-75`, C037.02). |
 | E-15 | Reverse Proxy | Upstream connection closes prematurely during response body streaming | Proxy aborts transfer, frees client and upstream sockets; no socket or OS handle leak (0 handle leaks verified via Win32 `GetProcessHandleCount`). |
-| E-16 | `min` CLI | User passes `--cert my.crt` or `--key my.key` | Stderr prints explicit error: `--cert is not supported in this build (min build)`; exit code 1; no listener started (D-08, D-15). |
-| E-17 | `min` CLI | User passes `--proxy http://127.0.0.1:8080` | Stderr prints explicit error: `--proxy is not supported in this build (min build)`; exit code 1; no listener started (D-08, D-15). |
+| E-16 | `thin` CLI | User passes `--cert my.crt` or `--key my.key` | Stderr prints explicit error: `--cert is not supported in this build (thin build)`; exit code 1; no listener started (D-08, D-15). |
+| E-17 | `thin` CLI | User passes `--proxy http://127.0.0.1:8080` | Stderr prints explicit error: `--proxy is not supported in this build (thin build)`; exit code 1; no listener started (D-08, D-15). |
 | E-18 | C ABI | Host calls `hs_server_start_async` with invalid port (> 65535 or < 0) | Request rejected before starting; completion callback invoked with `HS_ERR_CONFIG` (-1); no listening socket opened. |
 | E-19 | C ABI | Host calls `hs_response_read_async` while prior read is still pending | Rejected with `HS_ERR_BUSY` (-10); prevents concurrent out-of-order buffer corruption (D-07 line 247). |
 | E-20 | C ABI | Host invokes `hs_server_stop_async` while requests are in flight | Stop stops accepting new connections; in-flight requests drained within 5000ms grace period; completion callback called exactly once upon drain finish. |
@@ -180,11 +180,11 @@ stateDiagram-v2
 
 ---
 
-## 5. Deep-Dive Specification: CLI Packaging (`min` vs `full`)
+## 5. Deep-Dive Specification: CLI Packaging (`thin` vs `full`)
 
 ### 5.1 Flag Support Matrix
 
-| Flag / Option | Short | Description | `min` CLI Behavior | `full` CLI Behavior |
+| Flag / Option | Short | Description | `thin` CLI Behavior | `full` CLI Behavior |
 |---|---|---|---|---|
 | `--port` | `-p` | TCP listen port | Supported (0..65535) | Supported (0..65535) |
 | `root` | (pos) | Filesystem root dir | Supported (default: `.`) | Supported (default: `.`) |
@@ -210,19 +210,19 @@ stateDiagram-v2
 | `--proxy-options.*` | | Upstream proxy options | **REJECTED**: Exit code 1, stderr error | Supported |
 | `--websocket` | | WebSocket proxy upgrade | **REJECTED**: Exit code 1, stderr error | Supported |
 
-### 5.2 `min` CLI Error Contract
+### 5.2 `thin` CLI Error Contract
 
-When any unsupported flag is supplied to `min` CLI, the execution must terminate immediately before binding any network port:
+When any unsupported flag is supplied to `thin` CLI, the execution must terminate immediately before binding any network port:
 
 ```
-$ http-server-min --cert cert.pem --key key.pem
+$ http-server-mbt-thin --cert cert.pem --key key.pem
 Error: --cert is not supported in this build.
 Use http-server-full for TLS/HTTPS and Proxy features.
 (Exit code: 1)
 ```
 
 ```
-$ http-server-min --proxy http://localhost:3000
+$ http-server-mbt-thin --proxy http://localhost:3000
 Error: --proxy is not supported in this build.
 Use http-server-full for TLS/HTTPS and Proxy features.
 (Exit code: 1)
@@ -230,12 +230,12 @@ Use http-server-full for TLS/HTTPS and Proxy features.
 
 ### 5.3 Decoupling Server from TLS (Pluggable `Acceptor`)
 
-To achieve true decoupling where `min` compiles zero MbedTLS C files:
+To achieve true decoupling where `thin` compiles zero MbedTLS C files:
 1. `server` package must remove its import of `unmbt/http-server-mbt/tls`.
 2. Define a clean connection handler or acceptor trait/type in `server` (e.g. `ServerAcceptor` or connection interceptor).
 3. Plaintext TCP is the default built into `server`.
 4. TLS acceptor is packaged separately (e.g., `server/tls_acceptor` or `tls`) and injected into `server` when building `full`.
-5. `min` CLI executable targets `cmd/http-server-min` (or builds with min feature profile), linking only `server` and `core`.
+5. `thin` CLI executable targets `cmd/http-server-mbt-thin` (or builds with thin feature profile), linking only `server` and `core`.
 6. `full` CLI executable targets `cmd/http-server-full`, linking `server`, `tls`, and proxy modules.
 
 ---
@@ -361,8 +361,8 @@ HS_API void hs_chunk_release(hs_chunk_t *chunk);
 
 | Verification Item | Target Artifact | Tool / Command | Success Criteria |
 |---|---|---|---|
-| Zero Crypto in `min` Build | `cmd/http-server-min` or min lib | `moon build` / compiler inspection | Zero references to MbedTLS C files in compilation log; binary size drastically smaller than full |
-| `min` CLI Flag Rejection | `http-server-min.exe` | Execute with `--cert`, `--key`, `--proxy` | Stderr shows clear rejection message; exit code is exactly 1; no listener started |
+| Zero Crypto in `thin` Build | `cmd/http-server-mbt-thin` or thin lib | `moon build` / compiler inspection | Zero references to MbedTLS C files in compilation log; binary size drastically smaller than full |
+| `thin` CLI Flag Rejection | `http-server-mbt-thin.exe` | Execute with `--cert`, `--key`, `--proxy` | Stderr shows clear rejection message; exit code is exactly 1; no listener started |
 | `full` CLI Feature Parity | `http-server-full.exe` | Execute with TLS and Proxy flags | Successfully boots with TLS / Proxy; handles requests |
 | Existing Suite Regression | Whole Repo | `moon test --target native` | 183 / 183 tests pass (100% PASS, 0 FAIL) |
 | C037 Proxy-all Verification | Server / Proxy Module | Native test suite | All 3 subcases (.01 require target, .02 ignore local files, .03 proxy 404) pass |

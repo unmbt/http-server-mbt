@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:42:30Z
 
 ## Mission
-Perform exhaustive forensic integrity audit on Milestone 1 (`min` & `full` layered packaging, TLS decoupling, and Proxy readiness).
+Perform exhaustive forensic integrity audit on Milestone 1 (`thin` & `full` layered packaging, TLS decoupling, and Proxy readiness).
 
 ## 🔒 My Identity
 - Archetype: forensic_auditor

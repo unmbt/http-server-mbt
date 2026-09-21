@@ -61,7 +61,7 @@ R 编号属于需求，D 编号属于设计，T 编号属于任务；C 编号属
 - 纯文档修改核对相对链接、稳定编号、42 文件迁移覆盖及跨文件契约，不运行会改写接口或源码的 `moon info` / `moon fmt`，不把“无源码可运行”记录为测试通过。
 - 库/包变更补充外部 C/Rust 静态链接、Node 生命周期及 Mooncakes 干净消费验证；可移植核心另运行明确范围的 wasm-gc 检查/测试，不强迫 Native-only 包执行所有后端。模块元数据支持范围不能比实际包能力更宽；候选包验证、registry 发布和发布后拉取是不同证据。
 - 三平台兼容性、原生传输、资源检查、测试、打包和库/宿主消费必须接入 GitHub Actions；最终完成证据包含实际 OS/CPU、提交、run/job 链接及产物哈希。初期本机验证可先推进，三平台工作流缺失或必需检查失败时不得宣称完整交付。
-- Docker 遵循 D-15：min/full 对应精简/完整 CLI，默认 Distroless static nonroot 并保留 scratch 变体；固定基础层 digest，四种组合在 Linux Actions runner 验证。产物/依赖清单分别记录，容器测试不代替 Windows/macOS Native 验收。
+- Docker 遵循 D-15：thin/full 对应精简/完整 CLI，默认 Distroless static nonroot 并保留 scratch 变体；固定基础层 digest，四种组合在 Linux Actions runner 验证。产物/依赖清单分别记录，容器测试不代替 Windows/macOS Native 验收。
 - GitHub Actions YAML 与 Dockerfile 允许作为声明文件；其中的自动化循环、解析及构建/测试驱动逻辑仍使用 `.mbtx`，与 Windows 本机复用。验证 job 上传候选产物，发行 job 按同一提交的必需检查门槛发布；不能用无条件跳过、continue-on-error 或空测试伪造通过。
 
 ## Project Structure

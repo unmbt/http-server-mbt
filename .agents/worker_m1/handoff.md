@@ -39,7 +39,7 @@
    - Updated `Server` struct: replaced `tls_acceptor : @tls.TlsAcceptor?` with `acceptor : &Acceptor`, and added `Server::acceptor(self) -> &Acceptor`.
    - Updated `with_server_at(config, port, acceptor?, action)`:
      - When `acceptor` is `None`:
-       - If `config.has_tls()` is true, immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")` before binding or listening.
+       - If `config.has_tls()` is true, immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")` before binding or listening.
        - If `config.has_tls()` is false, defaults to `PlainAcceptor::new()`.
      - When `acceptor` is `Some(acc)`:
        - If `config.has_tls()` is true and `!acc.is_tls()`, immediately raises `@core.ConfigError::InvalidTls("TLS is not supported with plain acceptor; use full build or inject a TlsAcceptor")`.
@@ -107,7 +107,7 @@
    - In `handle_client`, `transport.raw_tcp` is matched to instantiate `@http.ServerConnection(tcp)`, which is consumed by `@websocket.from_http_server(request, http_conn)` in the WebSocket proxy upgrade path.
    - When a non-raw transport is provided (`raw_fd: None`), `send_file_region` falls back cleanly to bounded 64 KB chunk streaming (`send_file_region_bounded_buffer`).
 4. **Strict Preflight Rejection (D-01 / R1 Compliance)**:
-   When `config.has_tls()` is true and no acceptor is injected (min build scenario), `with_server_at` immediately throws `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+   When `config.has_tls()` is true and no acceptor is injected (thin build scenario), `with_server_at` immediately throws `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
    - The TCP listener is never bound.
    - Process handle count before and after rejection remains identical (0 handle leaks verified).
 5. **Full TLS Integration**:
@@ -122,7 +122,7 @@
 - **Reverse Proxy Wire-Level Forwarding**:
   Milestone 1 focuses exclusively on server-TLS decoupling, `Transport`/`Acceptor` abstractions, and the `full` package integration. Reverse proxy configuration data structures and streaming forward state machine are scheduled for Milestone 4.
 - **Dual CLI Executables**:
-  `cmd/http-server-mbt` was updated to import `full` so that the existing CLI entry point remains fully backward-compatible with TLS options. Dedicated split CLI binaries (`cmd/http-server-min` and `cmd/http-server-full`) with command-line preflight exit code 1 handling are scheduled for Milestone 2.
+  `cmd/http-server-mbt` was updated to import `full` so that the existing CLI entry point remains fully backward-compatible with TLS options. Dedicated split CLI binaries (`cmd/http-server-mbt-thin` and `cmd/http-server-full`) with command-line preflight exit code 1 handling are scheduled for Milestone 2.
 - No other caveats.
 
 ---
@@ -132,7 +132,7 @@
 Milestone 1 is **fully and genuinely implemented**:
 1. `server` package is 100% decoupled from `tls` (zero crypto dependencies, zero MbedTLS C stub linkage for the server package).
 2. `Transport` and `Acceptor` abstractions and `PlainAcceptor` are cleanly implemented and exposed in `server/server.mbt`.
-3. Preflight configuration rejection for min builds is implemented and verified.
+3. Preflight configuration rejection for thin builds is implemented and verified.
 4. `full` package is created with `TlsServerAcceptor` and `with_server_at`.
 5. `cmd/http-server-mbt` compiles and functions via `@full.with_server_at`.
 6. 10 new unit and integration tests added (7 in `server/server_acceptor_test.mbt`, 3 in `full/full_test.mbt`).

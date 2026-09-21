@@ -13,7 +13,7 @@ Conduct an exhaustive specification mining investigation on C ABI export require
 ## 🔒 Key Constraints
 - Do NOT implement anything — read-only spec mining role
 - Do NOT modify any code or documentation files outside E:\project\moonbit\unmbt\http-server-mbt\.agents\spec_miner_survey_1
-- Authoritative specification sources: `ORIGINAL_REQUEST.md` (Follow-up 2026-09-18T13:08:02Z), `docs/cli-min-full-and-cabi-handover.md`, `docs/design.md` (D-07, D-08, D-11, D-16), `docs/tasks.md` (T-002, T-020, T-027), `AGENTS.md`
+- Authoritative specification sources: `ORIGINAL_REQUEST.md` (Follow-up 2026-09-18T13:08:02Z), `docs/cli-thin-full-and-cabi-handover.md`, `docs/design.md` (D-07, D-08, D-11, D-16), `docs/tasks.md` (T-002, T-020, T-027), `AGENTS.md`
 - Output detailed findings to `handoff.md` and keep `progress.md` updated
 - Use send_message to communicate results and path to handoff.md back to parent orchestrator
 
@@ -22,9 +22,9 @@ Conduct an exhaustive specification mining investigation on C ABI export require
 - Updated: 2026-09-18T13:18:00Z
 
 ## Task Summary
-- **What to build**: Comprehensive C ABI specification report covering function signatures, opaque types, error codes, calling conventions, header structure, version numbering, min vs full requirements, symbol isolation (.def, main avoidance), and server lifecycle model.
+- **What to build**: Comprehensive C ABI specification report covering function signatures, opaque types, error codes, calling conventions, header structure, version numbering, thin vs full requirements, symbol isolation (.def, main avoidance), and server lifecycle model.
 - **Success criteria**: Exhaustive Features Discovered & Edge Cases tables and 5-component handoff report in `handoff.md`.
-- **Interface contracts**: `docs/cli-min-full-and-cabi-handover.md`, `docs/design.md` D-07 / D-11, `docs/tasks.md` T-020 / T-027
+- **Interface contracts**: `docs/cli-thin-full-and-cabi-handover.md`, `docs/design.md` D-07 / D-11, `docs/tasks.md` T-020 / T-027
 - **Code layout**: `E:\project\moonbit\unmbt\http-server-mbt`
 
 ## Key Decisions Made

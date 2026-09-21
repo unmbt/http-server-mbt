@@ -9,7 +9,7 @@
 ## References
 - 权威用户需求: `E:/project/moonbit/unmbt/http-server-mbt/ORIGINAL_REQUEST.md` (必须先阅读)
 - SDD 规范文档: `docs/proposal.md`, `docs/design.md` (重点: D-07, D-08, D-11), `docs/tasks.md` (重点: T-020, T-027)
-- 阶段交接文档: `docs/cli-min-full-and-cabi-handover.md`
+- 阶段交接文档: `docs/cli-thin-full-and-cabi-handover.md`
 - 构建驱动: `scripts/build_cabi.mbtx`
 
 ## Detailed Tasks
@@ -51,7 +51,7 @@ and read your detailed dispatch assignment at:
 E:/project/moonbit/unmbt/http-server-mbt/.agents/auditor_audit_1/DISPATCH.md
 
 Your mission (R3):
-1. SDD Consistency Audit: Check docs/proposal.md, docs/design.md (D-07, D-08, D-11), docs/tasks.md (T-020, T-027), and docs/cli-min-full-and-cabi-handover.md. Verify AD records, feature descriptions, and Windows delivery evidence.
+1. SDD Consistency Audit: Check docs/proposal.md, docs/design.md (D-07, D-08, D-11), docs/tasks.md (T-020, T-027), and docs/cli-thin-full-and-cabi-handover.md. Verify AD records, feature descriptions, and Windows delivery evidence.
 2. Full Verification Gate Execution:
    - Run moon run scripts/build_cabi.mbtx: verify 6 artifacts generated and 4 independent C consumer test programs compile and run 100% PASS.
    - Run moon check --target native: verify 0 errors, 0 warnings.

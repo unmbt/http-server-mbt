@@ -14,7 +14,7 @@ for arg in "$@"; do
         uninstall|--uninstall)
             ACTION="uninstall"
             ;;
-        thin|--thin|-t|min|--min|-m)
+        thin|--thin|-t)
             VARIANT="thin"
             ;;
         full|--full)
@@ -28,7 +28,7 @@ done
 # Check if uninstall flag is passed
 if [ "$ACTION" == "uninstall" ]; then
     echo "Uninstalling $BIN_NAME..."
-    rm -f "$BIN_PATH" "$INSTALL_DIR/http-server-mbt-thin" "$INSTALL_DIR/http-server-min"
+    rm -f "$BIN_PATH" "$INSTALL_DIR/http-server-mbt-thin" "$INSTALL_DIR/http-server-mbt-thin"
     echo "Uninstalled successfully."
     exit 0
 fi

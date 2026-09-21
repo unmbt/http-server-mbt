@@ -9,9 +9,9 @@
 
 ## 1. Executive Summary
 
-This report establishes the implementation blueprint for the end-to-end (E2E) testing track supporting the `min` & `full` layered packaging, TLS decoupling, C ABI export pipeline, and reverse proxy architecture readiness project.
+This report establishes the implementation blueprint for the end-to-end (E2E) testing track supporting the `thin` & `full` layered packaging, TLS decoupling, C ABI export pipeline, and reverse proxy architecture readiness project.
 
-The architecture decouples the HTTP/1.1 static server from MbedTLS C code, provides two distinct CLI distributions (`min` and `full`), exports clean C ABI libraries (`.dll` and `.lib` without symbol pollution), and establishes reverse proxy configuration and state machines.
+The architecture decouples the HTTP/1.1 static server from MbedTLS C code, provides two distinct CLI distributions (`thin` and `full`), exports clean C ABI libraries (`.dll` and `.lib` without symbol pollution), and establishes reverse proxy configuration and state machines.
 
 To provide impenetrable quality gates, the test track spans **4 tiers**:
 1. **Tier 1 (Feature Coverage)**: 80 test cases (>=5 tests across all 16 features).
@@ -32,10 +32,10 @@ To balance developer test velocity with true end-to-end blackbox fidelity, the t
    - Run frequently during development cycles; targets 100% pass across all workspace packages.
 
 2. **`.mbtx` Process-Level Orchestration Runner (`scripts/run_e2e.mbtx`)**:
-   - Manages external multi-process lifecycles: starts server binaries (`http-server-min.exe`, `http-server-full.exe`) as child processes.
+   - Manages external multi-process lifecycles: starts server binaries (`http-server-mbt-thin.exe`, `http-server-full.exe`) as child processes.
    - Dynamically parses stdout banners for bound ephemeral ports.
    - Dispatches socket/HTTP client requests against running binaries.
-   - Tests preflight exit codes (e.g. exit code 1 on `--cert` in min CLI).
+   - Tests preflight exit codes (e.g. exit code 1 on `--cert` in thin CLI).
    - Audits symbol tables with Windows `dumpbin` and verifies zero crypto symbols.
    - Executes native C test programs (`test_cabi_dynamic.exe`, `test_cabi_static.exe`).
 
@@ -57,7 +57,7 @@ http-server-mbt/
 ├── cmd/
 │   ├── common/
 │   │   └── cli_common_test.mbt            # Tier 1/2: F04 (Shared CLI Parser Helpers)
-│   ├── http-server-min/
+│   ├── http-server-mbt-thin/
 │   │   ├── min_cli_test.mbt               # Tier 1/2: F05 (Min CLI Static Server)
 │   │   └── preflight_reject_test.mbt      # Tier 1/2: F06 (Min CLI Exit 1 Preflight)
 │   └── http-server-full/
@@ -93,8 +93,8 @@ The implementation follows progressive testability: tests are created and verifi
 ### Milestone 2: Min & Full CLI Packaging
 - **Deliverables**:
   - `cmd/common/cli_common_test.mbt` (Tests `T1-F04-01` ~ `T1-F04-05`, `T2-F04-01` ~ `T2-F04-05`)
-  - `cmd/http-server-min/min_cli_test.mbt` (Tests `T1-F05-01` ~ `T1-F05-05`, `T2-F05-01` ~ `T2-F05-05`)
-  - `cmd/http-server-min/preflight_reject_test.mbt` (Tests `T1-F06-01` ~ `T1-F06-05`, `T2-F06-01` ~ `T2-F06-05`)
+  - `cmd/http-server-mbt-thin/min_cli_test.mbt` (Tests `T1-F05-01` ~ `T1-F05-05`, `T2-F05-01` ~ `T2-F05-05`)
+  - `cmd/http-server-mbt-thin/preflight_reject_test.mbt` (Tests `T1-F06-01` ~ `T1-F06-05`, `T2-F06-01` ~ `T2-F06-05`)
   - `cmd/http-server-full/full_cli_test.mbt` (Tests `T1-F07-01` ~ `T1-F07-05`, `T2-F07-01` ~ `T2-F07-05`)
 - **Verification**: Command-line execution of binaries; exit code 1 assertions for rejected flags.
 

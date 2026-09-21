@@ -1,5 +1,5 @@
 ## 2026-09-18T12:18:59Z
-You are the E2E Test Writer for the `min` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
+You are the E2E Test Writer for the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\test_writer_e2e_1`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 

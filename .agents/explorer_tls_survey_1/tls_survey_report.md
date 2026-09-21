@@ -1,5 +1,5 @@
 # TLS & Transport Architecture Survey Report
-## Layered Packaging (`min` & `full`), TLS Decoupling, and Reverse Proxy Readiness
+## Layered Packaging (`thin` & `full`), TLS Decoupling, and Reverse Proxy Readiness
 
 **Date**: 2026-09-18  
 **Author**: TLS & Transport Architecture Explorer (`explorer_tls_survey_1`)  
@@ -12,21 +12,21 @@
 ## 1. Executive Summary
 
 This investigation surveys the current codebase architecture, module dependency topology, and transport layer in `http-server-mbt`. The primary goal is to provide the architectural blueprint for:
-1. **Decoupling `server` from `tls`**: Enabling a pure `min` build that does not import the `tls` package or compile/link any of the 109 vendored MbedTLS C source files.
+1. **Decoupling `server` from `tls`**: Enabling a pure `thin` build that does not import the `tls` package or compile/link any of the 109 vendored MbedTLS C source files.
 2. **Transport & Connection Abstraction**: Introducing clean abstractions (`Transport` and `Acceptor`) with dependency injection in `server.with_server_at`, cleanly supporting Plain TCP (with Win32 `TransmitFile` zero-copy), TLS (with bounded-buffer fallback), and future Reverse Proxy routing.
-3. **Dual CLI Architecture (`min` & `full`)**: Enforcing strict preflight rejection in `min` CLI (exiting with code 1 if `--cert`, `--key`, or `--proxy` are supplied, per D-08/D-15), while providing a full-featured `full` CLI.
-4. **Dual C ABI Export Pipeline (`.mbtx`)**: Providing a script-driven build pipeline exporting dynamic (`.dll`/`.so`/`.dylib`) and static (`.lib`/`.a`) libraries for both `min` (0 crypto symbols) and `full`.
+3. **Dual CLI Architecture (`thin` & `full`)**: Enforcing strict preflight rejection in `thin` CLI (exiting with code 1 if `--cert`, `--key`, or `--proxy` are supplied, per D-08/D-15), while providing a full-featured `full` CLI.
+4. **Dual C ABI Export Pipeline (`.mbtx`)**: Providing a script-driven build pipeline exporting dynamic (`.dll`/`.so`/`.dylib`) and static (`.lib`/`.a`) libraries for both `thin` (0 crypto symbols) and `full`.
 5. **Reverse Proxy Architecture & Readiness**: Formulating the Proxy request flow state machine (`Resolving` -> `Proxying` -> `Idle`), configuration data structures, and streaming forwarding interface to align with tests C037~C039, C041, and task T-013.
 6. **Zero-Regression Test Suite Guarantee**: Auditing the existing 183 tests across all 5 packages. Our empirical audit confirms that exactly 5 tests in `tls/loopback_test.mbt` exercise TLS, while **0 tests in `server/` exercise TLS**. Decoupling `server` from `tls` preserves all 183 tests with 100% pass rate.
 
 ### Key Metrics Summary
 
-| Component | Current State | Proposed `min` State | Proposed `full` State |
+| Component | Current State | Proposed `thin` State | Proposed `full` State |
 | :--- | :--- | :--- | :--- |
 | **`server/moon.pkg`** | Directly imports `tls` | **Zero `tls` import** | Extends `server` via injection |
 | **C Native Stubs in Server** | 3 files (`transmit_file_*.c`) + 109 files from `tls` | **Only 3 files** (`transmit_file_*.c`) | 3 files + 109 MbedTLS files |
 | **Compiled Archive Size** | `libserver.lib` (33 KB) + `libtls.lib` (6.17 MB) | **`libserver.lib` (~33 KB)** | `libserver.lib` + `libtls.lib` (~6.2 MB) |
-| **`min` CLI Build** | Not isolated (pulls 6.2 MB MbedTLS) | **Pure static server, zero crypto** | Full HTTPS + Proxy |
+| **`thin` CLI Build** | Not isolated (pulls 6.2 MB MbedTLS) | **Pure static server, zero crypto** | Full HTTPS + Proxy |
 | **Preflight Parameter Enforcement** | Accepts `--cert`/`--key` unconditionally | **Rejects `--cert`/`--proxy` with exit code 1** | Accepts all options |
 | **Test Suite Baseline** | 183 / 183 PASS | **183 / 183 PASS (0 regressions)** | **183 / 183 PASS** |
 
@@ -123,8 +123,8 @@ TARGET (Decoupled & Layered):
    │        │                tls (109 MbedTLS C stubs)
    │        │                  ▲
    │        │                  │
-   ├─── cmd/min CLI            ├─── cmd/full CLI
-   └─── min C ABI (.dll/.lib)  └─── full C ABI (.dll/.lib)
+   ├─── cmd/thin CLI            ├─── cmd/full CLI
+   └─── thin C ABI (.dll/.lib)  └─── full C ABI (.dll/.lib)
 ```
 
 ---
@@ -221,7 +221,7 @@ Every occurrence of `@tls` in `server/` is restricted to `server/server.mbt` acr
   - `_build/native/debug/build/tls/libtls.lib`: **6,171,856 bytes (~6.17 MB)** across 112 `.obj` files.
   - `_build/native/debug/build/server/libserver.lib`: **33,554 bytes (~33 KB)** across 6 `.obj` files.
 - Consequence: As long as `server/moon.pkg` imports `tls`, every binary and every test linking `server` is forced to link `libtls.lib` (6.2 MB) and compile 109 C files.
-- Benefit of decoupling: A `min` server build drops `libtls.lib` entirely, reducing library footprint from 6.2 MB to 33 KB (over 99.4% reduction in object size) and slashing native compilation time.
+- Benefit of decoupling: A `thin` server build drops `libtls.lib` entirely, reducing library footprint from 6.2 MB to 33 KB (over 99.4% reduction in object size) and slashing native compilation time.
 
 ---
 
@@ -478,14 +478,14 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
 
 ---
 
-## 5. Layered Packaging & Dual CLI Architecture (`min` vs `full`)
+## 5. Layered Packaging & Dual CLI Architecture (`thin` vs `full`)
 
 ### 5.1 Package Topology
 
 To realize clean separation without circular dependencies:
 1. **`unmbt/http-server-mbt/core`**: Pure configurations, types, MIME, validation.
 2. **`unmbt/http-server-mbt` (root)**: `StaticEngine`, `Response`, `FileLease`.
-3. **`unmbt/http-server-mbt/server`**: `min` server engine with `Transport` & `Acceptor` abstractions. **NO TLS dependency**.
+3. **`unmbt/http-server-mbt/server`**: `thin` server engine with `Transport` & `Acceptor` abstractions. **NO TLS dependency**.
 4. **`unmbt/http-server-mbt/tls`**: MbedTLS 4.2.0 C bridge, `TlsAcceptor`, `TlsConn`.
 5. **`unmbt/http-server-mbt/full` (or `server_full`)**:
    - Imports: `server`, `tls`, `core`, `root`.
@@ -523,12 +523,12 @@ To realize clean separation without circular dependencies:
 ### 5.2 Dual CLI Architecture
 
 We construct two distinct executable packages:
-- **`cmd/http-server-min`** (`min` CLI executable):
+- **`cmd/http-server-mbt-thin`** (`thin` CLI executable):
   - Imports: `server`, `core`, `async`.
   - Does **NOT** import `tls` or `full`.
   - Parameter checking:
-    If `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, or `--proxy-config` is provided, `min` CLI prints to stderr:
-    `"error: <option> is not supported in this build (compiled as 'min' without TLS/proxy support)"`
+    If `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, or `--proxy-config` is provided, `thin` CLI prints to stderr:
+    `"error: <option> is not supported in this build (compiled as 'thin' without TLS/proxy support)"`
     and exits immediately with status code 1.
 - **`cmd/http-server-full`** (`full` CLI executable, or default `cmd/http-server-mbt`):
   - Imports: `server`, `tls` (or `full`), `core`, `async`.
@@ -537,28 +537,28 @@ We construct two distinct executable packages:
 
 ---
 
-## 6. C ABI Export Pipeline (`min` vs `full`)
+## 6. C ABI Export Pipeline (`thin` vs `full`)
 
 ### 6.1 Requirements & Specifications (D-07 / D-11)
 - ABI Symbol Prefix: Strictly `hs_*` (e.g. `hs_abi_version`, `hs_server_create`, `hs_server_start_async`, `hs_server_stop_async`, `hs_server_release`).
 - No CLI main symbol exported in library.
 - Host Toolchain: Verified MinGW GCC (`gcc.exe`, `ar.exe`, `nm.exe`, `dlltool.exe`, `strip.exe`) on Windows; `clang`/`gcc` + `ar` on macOS/Linux.
 - Output artifacts:
-  - **`min` Dynamic**: `bin/http_server_min.dll` (+ import lib `libhttp_server_min.dll.a`)
-  - **`min` Static**: `lib/http_server_min.lib` (or `libhttp_server_min.a`)
+  - **`thin` Dynamic**: `bin/http_server_min.dll` (+ import lib `libhttp_server_min.dll.a`)
+  - **`thin` Static**: `lib/http_server_min.lib` (or `libhttp_server_min.a`)
   - **`full` Dynamic**: `bin/http_server_full.dll` (+ import lib `libhttp_server_full.dll.a`)
   - **`full` Static**: `lib/http_server_full.lib` (or `libhttp_server_full.a`)
-  - **Header**: `include/http_server.h` (compatible with both `min` and `full`).
+  - **Header**: `include/http_server.h` (compatible with both `thin` and `full`).
 
 ### 6.2 Automation Script (`scripts/build_c_abi.mbtx`)
-Driven by `moon run scripts/build_c_abi.mbtx [min|full|all]`:
+Driven by `moon run scripts/build_c_abi.mbtx [thin|full|all]`:
 1. Runs `moon build --target native` on the appropriate package (`server` or `full`).
 2. Collects runtime objects (`libruntime.lib`), core objects (`libcore.lib`), server objects (`libserver.lib`), platform stubs (`transmit_file_windows.obj`).
-3. For `min`: Links objects together without `libtls.lib` using `gcc -shared` (dynamic) and `ar rcs` (static).
+3. For `thin`: Links objects together without `libtls.lib` using `gcc -shared` (dynamic) and `ar rcs` (static).
 4. For `full`: Links objects including `libtls.lib`.
 5. Verifies symbol table via `nm.exe`:
    - Confirms presence of `hs_*` symbols.
-   - Confirms ABSENCE of `mbedtls_*` or `psa_*` symbols in `min`.
+   - Confirms ABSENCE of `mbedtls_*` or `psa_*` symbols in `thin`.
    - Confirms ABSENCE of `main` entry point.
 
 ---
@@ -737,7 +737,7 @@ When `"unmbt/http-server-mbt/tls"` is removed from `server/moon.pkg`:
    - Add unit/integration tests verifying real HTTPS loopback requests over the `full` server.
 
 3. **Step 3: Dual CLI Executables**:
-   - `cmd/http-server-min`: Clean static server, rejects `--cert`/`--proxy` with exit code 1.
+   - `cmd/http-server-mbt-thin`: Clean static server, rejects `--cert`/`--proxy` with exit code 1.
    - `cmd/http-server-full`: Full server supporting all TLS & proxy flags.
 
 4. **Step 4: C ABI Build Script (`scripts/build_c_abi.mbtx`)**:
@@ -752,4 +752,4 @@ When `"unmbt/http-server-mbt/tls"` is removed from `server/moon.pkg`:
 
 ## 10. Conclusion
 
-The decoupling of `server` from `tls` is not only completely feasible, but remarkably clean. The existing architecture was already 95% prepared: `core` is already crypto-free, `HttpReader` is already generalized over `&@io.Reader`, and all 75 server tests already run plain HTTP. By introducing the `Transport` and `Acceptor` abstractions, `server` is instantly relieved of 109 MbedTLS C source files, reducing its compiled library footprint from 6.2 MB to 33 KB, while preserving 100% of the existing 183 tests and preparing the ground for `min`/`full` layered packaging and reverse proxy routing.
+The decoupling of `server` from `tls` is not only completely feasible, but remarkably clean. The existing architecture was already 95% prepared: `core` is already crypto-free, `HttpReader` is already generalized over `&@io.Reader`, and all 75 server tests already run plain HTTP. By introducing the `Transport` and `Acceptor` abstractions, `server` is instantly relieved of 109 MbedTLS C source files, reducing its compiled library footprint from 6.2 MB to 33 KB, while preserving 100% of the existing 183 tests and preparing the ground for `thin`/`full` layered packaging and reverse proxy routing.

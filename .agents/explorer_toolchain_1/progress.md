@@ -4,7 +4,7 @@ Last visited: 2026-09-18T13:13:00Z
 
 ## Status
 - [x] Initialized workspace and briefing
-- [x] Read ORIGINAL_REQUEST.md and docs/cli-min-full-and-cabi-handover.md
+- [x] Read ORIGINAL_REQUEST.md and docs/cli-thin-full-and-cabi-handover.md
 - [x] Inspect host environment (compilers, linkers, archivers in PATH)
 - [x] Check moon version and native build output layout (_build / target)
 - [x] Investigate moonrun / .mbtx scripting support

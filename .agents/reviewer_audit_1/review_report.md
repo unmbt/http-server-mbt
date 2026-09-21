@@ -3,8 +3,8 @@
 - **Reviewer**: `reviewer_audit_1` (Independent Code & Architecture Reviewer / Adversarial Critic)
 - **Review Date**: 2026-09-19
 - **Working Directory**: `E:/project/moonbit/unmbt/http-server-mbt/.agents/reviewer_audit_1/`
-- **Reviewed Commits**: `9cabfb9` (CLI min/full decoupling) and `a5c3edf` (C ABI export pipeline)
-- **Target Subsystems**: `server/`, `full/`, `cmd/http-server-min/`, `cmd/http-server-full/`, `c_abi/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
+- **Reviewed Commits**: `9cabfb9` (CLI thin/full decoupling) and `a5c3edf` (C ABI export pipeline)
+- **Target Subsystems**: `server/`, `full/`, `cmd/http-server-mbt-thin/`, `cmd/http-server-full/`, `c_abi/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
 - **Verdict**: **APPROVE**
 
 ---
@@ -13,7 +13,7 @@
 
 | Audit Dimension | Target Requirement | Evaluation | Status |
 |---|---|---|---|
-| **Architecture Decoupling** | `server/` zero crypto/TLS dependencies; `full/` dependency injection; `cmd/http-server-min` argument rejection | Complete decoupling; no MbedTLS C stubs in `server/`; clean `TlsServerAcceptor` injection | **PASS (EXEMPLARY)** |
+| **Architecture Decoupling** | `server/` zero crypto/TLS dependencies; `full/` dependency injection; `cmd/http-server-mbt-thin` argument rejection | Complete decoupling; no MbedTLS C stubs in `server/`; clean `TlsServerAcceptor` injection | **PASS (EXEMPLARY)** |
 | **C ABI Contract** | Strictly 5 `hs_*` public APIs; zero MoonBit managed types leaked; buffer safety in `hs_error_copy`; explicit lifecycle ownership | Exact adherence to D-07 / D-11; 5 public C APIs; no leaked runtime types; buffer truncation safe | **PASS** |
 | **Build Pipeline** | Pure `.mbtx` script; MSVC/LLVM toolchain detection; `.drectve` stripping; `.def` export control | 100% pure MoonBit script; robust toolchain probing; verified 0 `main` / 0 `mbedtls` symbol leaks | **PASS** |
 | **Adversarial Resilience** | Safe against NULL, malformed JSON, out-of-bounds ports, double stop, double destroy | 0 crashes, 0 segfaults, all invalid inputs cleanly mapped to error codes | **PASS** |
@@ -82,7 +82,7 @@
     None => {
       if config.has_tls() {
         raise @core.ConfigError::InvalidTls(
-          "TLS is not supported in min build; use full build",
+          "TLS is not supported in thin build; use full build",
         )
       }
       PlainAcceptor::new()
@@ -110,19 +110,19 @@
 - **Preflight File Inspection** (`full/tls_acceptor.mbt:37-74`):
   `build_tls_acceptor` reads and parses `cert_file`, `key_file`, and decrypts keys using `key_passphrase` before instantiating the TLS engine. Unreadable files, invalid formats, or missing passphrases are translated into `@core.ConfigError::InvalidTls` with actionable guidance, preventing port binding when credentials are bad.
 
-### 2.3 CLI Option Partitioning (`cmd/http-server-min` vs `cmd/http-server-full`)
-- **Observation** (`cmd/http-server-min/cli.mbt:273-284` & `main.mbt:31-36`):
-  In `cmd/http-server-min/cli.mbt`:
+### 2.3 CLI Option Partitioning (`cmd/http-server-mbt-thin` vs `cmd/http-server-full`)
+- **Observation** (`cmd/http-server-mbt-thin/cli.mbt:273-284` & `main.mbt:31-36`):
+  In `cmd/http-server-mbt-thin/cli.mbt`:
   ```moonbit
   if first_value(matches, "cert") is Some(_) ||
     first_value(matches, "key") is Some(_) ||
     first_value(matches, "key-passphrase") is Some(_) {
-    return Err("TLS is not supported in min build; use full build")
+    return Err("TLS is not supported in thin build; use full build")
   }
   if first_value(matches, "proxy") is Some(_) ||
     matches.flags.get("proxy-all") == Some(true) ||
     first_value(matches, "proxy-config") is Some(_) {
-    return Err("Proxy is not supported in min build; use full build")
+    return Err("Proxy is not supported in thin build; use full build")
   }
   ```
   When an unsupported option is supplied, `main.mbt` prints the error message to stderr and invokes `runtime_native_exit(1)` immediately, cleanly preventing any network socket initialization or silent option dropping.
@@ -144,7 +144,7 @@
   All parameters and return types are standard C scalars (`uint32_t`, `int32_t`, `size_t`), C string pointers (`const char*`, `char*`), or opaque pointer handles (`hs_server_t*`). No MoonBit struct layouts, GC references, or closure pointers cross the ABI boundary.
 
 ### 3.2 Buffer Safety in `hs_error_copy`
-- **Observation** (`c_abi/min/bridge.c:392-410` & `c_abi/full/bridge.c:441-459`):
+- **Observation** (`c_abi/thin/bridge.c:392-410` & `c_abi/full/bridge.c:441-459`):
   ```c
   HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap) {
       const char* msg = "Unknown error";
@@ -159,7 +159,7 @@
   }
   ```
   - Query Mode: Calling `hs_error_copy(code, NULL, 0)` safely returns `len` without memory access.
-  - Safe Null-Termination: Whenever `buf != NULL` and `cap > 0`, exactly `to_copy = min(len, cap - 1)` bytes are copied and `buf[to_copy] = '\0'`. Truncation never causes buffer overrun or missing terminator.
+  - Safe Null-Termination: Whenever `buf != NULL` and `cap > 0`, exactly `to_copy = thin(len, cap - 1)` bytes are copied and `buf[to_copy] = '\0'`. Truncation never causes buffer overrun or missing terminator.
   - Edge Cases: `cap == 1` correctly writes `\0` at index 0 and returns `len`.
 
 ### 3.3 Server Lifecycle & Handle Ownership
@@ -193,7 +193,7 @@
     dst
   ]).output()
   ```
-  Followed by linking with `/DEF:c_abi/min/hs_min.def`.
+  Followed by linking with `/DEF:c_abi/thin/hs_min.def`.
 - **Independent Verification**:
   - `dumpbin.exe /EXPORTS target/cabi/hs_min.dll` confirms:
     ```
@@ -214,7 +214,7 @@
 ## 5. Adversarial Analysis & Stress-Testing Findings
 
 ### Challenge 1 (Minor / Advisory): Concurrency Window in `ensure_runtime_init`
-- **Location**: `c_abi/min/bridge.c:21-27` and `c_abi/full/bridge.c:21-27`
+- **Location**: `c_abi/thin/bridge.c:21-27` and `c_abi/full/bridge.c:21-27`
 - **Code**:
   ```c
   static volatile LONG s_rt_init = 0;
@@ -233,7 +233,7 @@
 - **Recommended Fix**: Use Win32 `InitOnceExecuteOnce` or a lightweight critical section so competing threads block until initialization finishes.
 
 ### Challenge 2 (Minor / Advisory): Infinite Wait on Startup Failure
-- **Location**: `c_abi/min/bridge.c:449` and `c_abi/full/bridge.c:498`
+- **Location**: `c_abi/thin/bridge.c:449` and `c_abi/full/bridge.c:498`
 - **Code**:
   `WaitForSingleObject(s->ready_event, INFINITE);`
 - **Observation**:
@@ -251,9 +251,9 @@
 | `build_cabi.mbtx` pipeline | Ran `moon run scripts/build_cabi.mbtx` | **All 7 steps PASS** | Produced 6 library artifacts + 4 C tests pass |
 | DLL export count | Ran `dumpbin /EXPORTS hs_min.dll` | **Exactly 5 exports** | `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy` |
 | DLL export count (full) | Ran `dumpbin /EXPORTS hs_full.dll` | **Exactly 5 exports** | Clean export table, no `main` |
-| Static symbol isolation | Ran `dumpbin /SYMBOLS hs_min_static.lib` | **0 mbedtls/psa symbols** | Zero crypto symbols in min static archive |
-| C consumer tests (dynamic min) | `test_dynamic_min.exe` execution | **PASS** | Validated ABI version, config error, lifecycle |
-| C consumer tests (static min) | `test_static_min.exe` execution | **PASS** | Static link, lifecycle, 0 handle leaks |
+| Static symbol isolation | Ran `dumpbin /SYMBOLS hs_min_static.lib` | **0 mbedtls/psa symbols** | Zero crypto symbols in thin static archive |
+| C consumer tests (dynamic thin) | `test_dynamic_min.exe` execution | **PASS** | Validated ABI version, config error, lifecycle |
+| C consumer tests (static thin) | `test_static_min.exe` execution | **PASS** | Static link, lifecycle, 0 handle leaks |
 | C consumer tests (dynamic full) | `test_dynamic_full.exe` execution | **PASS** | TLS preflight checks, lifecycle |
 | C consumer tests (static full) | `test_static_full.exe` execution | **PASS** | Static link, TLS preflight, lifecycle |
 | Code formatting | Ran `moon fmt` | **Clean** | No formatting changes needed |
@@ -263,6 +263,6 @@
 
 ## 7. Conclusion
 
-The implementation of the `min` and `full` architecture decoupling, the C ABI bridge contracts (`hs_*`), and the `.mbtx` build and export pipeline satisfies all requirements of R1, D-07, D-08, and D-11 with high quality. No integrity violations, dummy implementations, or hardcoded facades were found.
+The implementation of the `thin` and `full` architecture decoupling, the C ABI bridge contracts (`hs_*`), and the `.mbtx` build and export pipeline satisfies all requirements of R1, D-07, D-08, and D-11 with high quality. No integrity violations, dummy implementations, or hardcoded facades were found.
 
 **Verdict**: **APPROVE**

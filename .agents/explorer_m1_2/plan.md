@@ -3,7 +3,7 @@
 **Author**: TLS Injection Explorer (`explorer_m1_2`)  
 **Date**: 2026-09-18  
 **Scope**: `unmbt/http-server-mbt/server`, `unmbt/http-server-mbt/tls`, and new integration package `unmbt/http-server-mbt/full`  
-**Parent Task**: Milestone 1 of `min` & `full` layered packaging, TLS decoupling, and Proxy readiness  
+**Parent Task**: Milestone 1 of `thin` & `full` layered packaging, TLS decoupling, and Proxy readiness  
 
 ---
 
@@ -15,7 +15,7 @@ This plan details:
 1. The exact transport and acceptor abstraction in `server` (`Transport`, `Acceptor`, `PlainAcceptor`).
 2. The location and design of the TLS integration layer (`full/` package).
 3. The dependency injection mechanism: how `full` constructs `TlsAcceptor` from `config` and injects it into `server.with_server_at(config, port, acceptor=..., action)`.
-4. The preflight configuration validation mechanism: in `min` mode (when no acceptor is supplied), if `config.has_tls()` is true, `server.with_server_at` immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")` before binding or listening.
+4. The preflight configuration validation mechanism: in `thin` mode (when no acceptor is supplied), if `config.has_tls()` is true, `server.with_server_at` immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")` before binding or listening.
 5. The step-by-step implementation guide ensuring zero regression across all 183 existing test cases.
 
 ---
@@ -74,7 +74,7 @@ In the current implementation, `server/server.mbt` directly imports `unmbt/http-
 | :--- | :--- | :--- | :--- |
 | **Option A** | Inside `tls/` (e.g. `tls/server_acceptor.mbt`) | Would require `tls` to import `server`. This violates Dependency Inversion. When reverse proxy (T-013) needs upstream TLS client connections in `server`, having `tls` depend on `server` would create a **circular package dependency** (`server` ↔ `tls`). | **REJECTED** |
 | **Option B** | Inside new package `full/` (`unmbt/http-server-mbt/full`) | Clean composition root. `server` has 0 crypto dependencies; `tls` is a reusable standalone TLS library; `full` combines them. Fits standard layered architecture. Matches `PROJECT.md` line 7 & 113. | **RECOMMENDED & ACCEPTED** |
-| **Option C** | Subpackage `server/full/` | Valid MoonBit subpackage, but creates deeper hierarchy and separates CLI/ABI symmetry (`cmd/http-server-min` vs `cmd/http-server-full`, `min` DLL vs `full` DLL). | Less idiomatic than Option B |
+| **Option C** | Subpackage `server/full/` | Valid MoonBit subpackage, but creates deeper hierarchy and separates CLI/ABI symmetry (`cmd/http-server-mbt-thin` vs `cmd/http-server-full`, `thin` DLL vs `full` DLL). | Less idiomatic than Option B |
 
 **Decision**: The TLS acceptor implementation and server integration will live in a new top-level package: `unmbt/http-server-mbt/full` (directory `full/`).
 
@@ -246,7 +246,7 @@ pub impl Acceptor for PlainAcceptor with close(_self) {
    /// Preflight validation contract:
    /// - If acceptor is omitted (None):
    ///   - If config.has_tls() is true, immediately raises
-   ///     ConfigError::InvalidTls("TLS is not supported in min build; use full build")
+   ///     ConfigError::InvalidTls("TLS is not supported in thin build; use full build")
    ///     BEFORE binding or listening.
    ///   - Otherwise uses PlainAcceptor with kernel zero-copy.
    /// - If acceptor is provided (Some(acc)), uses the injected acceptor.
@@ -262,7 +262,7 @@ pub impl Acceptor for PlainAcceptor with close(_self) {
        None => {
          if config.has_tls() {
            raise @core.ConfigError::InvalidTls(
-             "TLS is not supported in min build; use full build",
+             "TLS is not supported in thin build; use full build",
            )
          }
          &PlainAcceptor {}
@@ -544,8 +544,8 @@ pub async fn with_server(
 
 | Case | Build / Mode | `config.has_tls()` | `acceptor` Supplied? | Resulting Behavior |
 | :---: | :---: | :---: | :---: | :--- |
-| **1** | `min` (Plain HTTP) | `false` | `None` | Starts plain server with `PlainAcceptor`. Full `TransmitFile` zero-copy. |
-| **2** | `min` (Misconfigured TLS) | `true` | `None` | **Immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`**. No socket bound, exits with code 1. |
+| **1** | `thin` (Plain HTTP) | `false` | `None` | Starts plain server with `PlainAcceptor`. Full `TransmitFile` zero-copy. |
+| **2** | `thin` (Misconfigured TLS) | `true` | `None` | **Immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`**. No socket bound, exits with code 1. |
 | **3** | `full` (Plain HTTP) | `false` | `None` | `full.with_server_at` supplies `acceptor=None`. Starts plain server. |
 | **4** | `full` (Valid HTTPS) | `true` | `Some(TlsServerAcceptor)` | `full.with_server_at` builds `TlsServerAcceptor`, injects into `@server.with_server_at`. Starts HTTPS server. |
 | **5** | `full` (Invalid Cert/Key) | `true` | N/A | `build_tls_engine` fails during preflight: raises `ConfigError::InvalidTls(...)`. Listener is never created (D-01). |
@@ -562,7 +562,7 @@ with_server_at(config, port, acceptor?)
   │     ├── Some(acc) => effective_acceptor = acc
   │     └── None =>
   │           ├── if config.has_tls():
-  │           │     RAISE ConfigError::InvalidTls("TLS is not supported in min build; use full build")
+  │           │     RAISE ConfigError::InvalidTls("TLS is not supported in thin build; use full build")
   │           │     [Listener never created, TCP socket never bound, exits code 1]
   │           └── else:
   │                 effective_acceptor = &PlainAcceptor {}
@@ -591,7 +591,7 @@ When `server/moon.pkg` removes `tls`:
 
 ### 6.2 New Tests to Add in Milestone 1
 1. **`server/min_rejection_test.mbt`**:
-   - Verify that calling `with_server_at` with `config.cert_file = Some(...)` and `config.key_file = Some(...)` without `acceptor` immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+   - Verify that calling `with_server_at` with `config.cert_file = Some(...)` and `config.key_file = Some(...)` without `acceptor` immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
    - Verify that calling `with_server_at` with a custom `&Acceptor` successfully runs and dispatches requests.
 2. **`full/https_loopback_test.mbt`**:
    - Real HTTPS loopback test:

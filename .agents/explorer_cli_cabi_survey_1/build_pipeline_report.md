@@ -2,13 +2,13 @@
 **Project**: `http-server-mbt`  
 **Explorer**: `explorer_cli_cabi_survey_1`  
 **Date**: 2026-09-18  
-**Scope**: `min` & `full` Layered Packaging, CLI Architecture, and C ABI Library Export Pipeline
+**Scope**: `thin` & `full` Layered Packaging, CLI Architecture, and C ABI Library Export Pipeline
 
 ---
 
 ## 1. Executive Summary
 
-This investigation surveys the CLI packaging and C ABI library export pipeline for `http-server-mbt`, specifically addressing the decoupling of the lightweight `min` distribution from the cryptographic `tls` package (MbedTLS 4.2.0 / TF-PSA-Crypto 1.2.0) and establishing a production-ready C ABI export and verification workflow.
+This investigation surveys the CLI packaging and C ABI library export pipeline for `http-server-mbt`, specifically addressing the decoupling of the lightweight `thin` distribution from the cryptographic `tls` package (MbedTLS 4.2.0 / TF-PSA-Crypto 1.2.0) and establishing a production-ready C ABI export and verification workflow.
 
 ### Core Discoveries & Verified Facts:
 1. **Current `cmd/http-server-mbt` Architecture**:
@@ -17,9 +17,9 @@ This investigation surveys the CLI packaging and C ABI library export pipeline f
    - The CLI argument parsing in `cmd/http-server-mbt/cli.mbt` already supports all standard flags (`--port`, `root`, `--base-url`, `--spa`, `--try-files`, `--cors`, `--auth`, `--cache`, `--silent`, `--cert`, `--key`, `--key-passphrase`).
 
 2. **Dual-Version CLI Separation Strategy**:
-   - We recommend splitting into `cmd/http-server-min/` and `cmd/http-server-full/` (with common parsing/banner/terminal helpers extracted into `cmd/common/`).
+   - We recommend splitting into `cmd/http-server-mbt-thin/` and `cmd/http-server-full/` (with common parsing/banner/terminal helpers extracted into `cmd/common/`).
    - `cmd/http-server-mbt/` should be retained as an alias to `full` to maintain 100% backward compatibility with existing test scripts (`cli_wbtest.mbt`, `cli_challenger_wbtest.mbt`) and documentation.
-   - In `cmd/http-server-min`, encountering `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, or `--websocket` intercepts execution during pre-flight argument validation, outputs a clear error message to `stderr`, and terminates immediately with exit code 1 (`runtime_native_exit(1)`), without attempting to bind sockets or start listening.
+   - In `cmd/http-server-mbt-thin`, encountering `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, or `--websocket` intercepts execution during pre-flight argument validation, outputs a clear error message to `stderr`, and terminates immediately with exit code 1 (`runtime_native_exit(1)`), without attempting to bind sockets or start listening.
 
 3. **C ABI Native Library Generation & Constraints**:
    - Design D-11 is verified: MoonBit's native backend does not currently output standalone `.dll`/`.so` or `.lib`/`.a` directly via `moon build` for packages declared with `pkgtype(kind: "foreign_library")`.
@@ -32,7 +32,7 @@ This investigation surveys the CLI packaging and C ABI library export pipeline f
 5. **Eliminating Internal Symbol Leakage in C ABI**:
    - MoonBit's `runtime.c` hardcodes `#define MOONBIT_BUILD_RUNTIME`, which causes MSVC to embed `/EXPORT:moonbit_*` directives in the `.obj` file's `.drectve` section, exposing 70+ internal runtime symbols.
    - **Solution verified empirically**: Pre-including a clean export header (`/FIclean_exports.h`) undefines `MOONBIT_EXPORT` and `MOONBIT_FFI_EXPORT`. When combined with a `.def` file or `/EXPORT:hs_*` linker flags, the resulting DLL export table contains **strictly and exclusively the public `hs_*` API** (0 internal exports, 0 MbedTLS symbols).
-   - In `min` mode, neither the `tls` package nor any MbedTLS C files are compiled or linked, resulting in an ultra-lean library (dynamic DLL ~10 KB, static library ~150 KB).
+   - In `thin` mode, neither the `tls` package nor any MbedTLS C files are compiled or linked, resulting in an ultra-lean library (dynamic DLL ~10 KB, static library ~150 KB).
 
 6. **Minimal C Verification Program**:
    - Standalone C verification programs (`verify_dynamic.c` and `verify_static.c`) were compiled and executed against both the generated DLL import library and the static library on this Windows system. Both passed with return code 0 and exact symbol resolution.
@@ -120,8 +120,8 @@ cmd/
 │   ├── moon.pkg             # Standard library package (depends on core)
 │   └── tty.c                # TTY detection stub
 │
-├── http-server-min/         # Lightweight CLI (min)
-│   ├── main.mbt             # Entry point enforcing min constraints
+├── http-server-mbt-thin/         # Lightweight CLI (thin)
+│   ├── main.mbt             # Entry point enforcing thin constraints
 │   └── moon.pkg             # Imports server_min (or decoupled server) & cmd/common
 │                            # pkgtype(kind: "executable")
 │
@@ -138,16 +138,16 @@ cmd/
 #### Executable Artifact Comparison:
 | Package | Output Executable | TLS Support | Proxy Support | Dependencies | Release Size |
 |---|---|---|---|---|---|
-| `cmd/http-server-min` | `http-server-min.exe` | ❌ Disallowed (exit 1) | ❌ Disallowed (exit 1) | `core`, `server_min` | ~1.2 MB |
+| `cmd/http-server-mbt-thin` | `http-server-mbt-thin.exe` | ❌ Disallowed (exit 1) | ❌ Disallowed (exit 1) | `core`, `server_min` | ~1.2 MB |
 | `cmd/http-server-full` | `http-server-full.exe` | ✅ Supported | ✅ Supported | `core`, `server`, `tls` | ~2.8 MB |
 | `cmd/http-server-mbt` | `http-server-mbt.exe` | ✅ Supported | ✅ Supported | `core`, `server`, `tls` | ~2.8 MB |
 
 ---
 
-### 2.3 Enforcement of Exit Code 1 on Unsupported Options in `min` CLI
+### 2.3 Enforcement of Exit Code 1 on Unsupported Options in `thin` CLI
 
 Per specifications D-08, D-15, and the project requirements:
-- In `min` CLI, options `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, and `--websocket` must **not** be silently ignored.
+- In `thin` CLI, options `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, and `--websocket` must **not** be silently ignored.
 - They must be recognized by `@argparse.Command` (so they do not fail as generic "unknown argument" errors), but intercepted in `parse_cli_min`.
 
 #### Implementation Logic:
@@ -177,20 +177,20 @@ pub fn parse_cli_tiered(
   match tier {
     MinTier => {
       if matches.values.contains("cert") {
-        return Err("flag '--cert' is not supported in 'min' build (use 'full' build for HTTPS/TLS)")
+        return Err("flag '--cert' is not supported in 'thin' build (use 'full' build for HTTPS/TLS)")
       }
       if matches.values.contains("key") {
-        return Err("flag '--key' is not supported in 'min' build (use 'full' build for HTTPS/TLS)")
+        return Err("flag '--key' is not supported in 'thin' build (use 'full' build for HTTPS/TLS)")
       }
       if matches.values.contains("key-passphrase") {
-        return Err("flag '--key-passphrase' is not supported in 'min' build (use 'full' build for HTTPS/TLS)")
+        return Err("flag '--key-passphrase' is not supported in 'thin' build (use 'full' build for HTTPS/TLS)")
       }
       if matches.values.contains("proxy") || matches.values.contains("proxy-all") ||
          matches.values.contains("proxy-options") || matches.values.contains("proxy-config") {
-        return Err("reverse proxy options are not supported in 'min' build (use 'full' build)")
+        return Err("reverse proxy options are not supported in 'thin' build (use 'full' build)")
       }
       if matches.flags.get("websocket") == Some(true) {
-        return Err("WebSocket proxy is not supported in 'min' build (use 'full' build)")
+        return Err("WebSocket proxy is not supported in 'thin' build (use 'full' build)")
       }
     }
     FullTier => ()
@@ -201,7 +201,7 @@ pub fn parse_cli_tiered(
 }
 ```
 
-In `cmd/http-server-min/main.mbt`:
+In `cmd/http-server-mbt-thin/main.mbt`:
 ```moonbit
 async fn run() -> Unit {
   let argv = @env.args()
@@ -227,10 +227,10 @@ async fn run() -> Unit {
 ```
 
 #### Exact Behavior Trace:
-1. Client runs: `http-server-min.exe --cert server.crt --key server.key`
+1. Client runs: `http-server-mbt-thin.exe --cert server.crt --key server.key`
 2. `parse_cli_tiered` matches `--cert`.
-3. Returns `Err("flag '--cert' is not supported in 'min' build (use 'full' build for HTTPS/TLS)")`.
-4. `run()` prints `error: flag '--cert' is not supported in 'min' build (use 'full' build for HTTPS/TLS)` to `stderr`.
+3. Returns `Err("flag '--cert' is not supported in 'thin' build (use 'full' build for HTTPS/TLS)")`.
+4. `run()` prints `error: flag '--cert' is not supported in 'thin' build (use 'full' build for HTTPS/TLS)` to `stderr`.
 5. Calls `runtime_native_exit(1)`.
 6. Process terminates with exit code 1. No socket is opened; no listening occurs.
 
@@ -355,16 +355,16 @@ Because `moonbit.h` includes an `#ifndef moonbit_h_INCLUDED` guard, the subseque
 
 ---
 
-### 3.5 Strictly Decoupled `min` C Library (Zero MbedTLS Symbols)
+### 3.5 Strictly Decoupled `thin` C Library (Zero MbedTLS Symbols)
 
-In the `min` build of the C ABI:
+In the `thin` build of the C ABI:
 1. `c_abi_min` imports only `server_min` (decoupled server) and `core`.
 2. The compilation command does **not** include any file from `tls/mbedtls-4.2.0/` or `tls/tls_bridge.c`.
-3. In the final static archive (`http-server-min.lib`) and dynamic library (`http-server-min.dll`), symbol verification via `dumpbin /EXPORTS` and `dumpbin /SYMBOLS` confirms:
+3. In the final static archive (`http-server-mbt-thin.lib`) and dynamic library (`http-server-mbt-thin.dll`), symbol verification via `dumpbin /EXPORTS` and `dumpbin /SYMBOLS` confirms:
    - Zero occurrences of `mbedtls_*`.
    - Zero occurrences of `psa_*`.
    - Zero occurrences of `hs_tls_*`.
-4. The static library size drops from >10 MB (full with MbedTLS) to ~150 KB (`min`).
+4. The static library size drops from >10 MB (full with MbedTLS) to ~150 KB (`thin`).
 
 ---
 
@@ -383,7 +383,7 @@ import {
 }
 
 // Modes supported:
-// moon run scripts/build_cabi.mbtx -- [min|full|all|verify]
+// moon run scripts/build_cabi.mbtx -- [thin|full|all|verify]
 ```
 
 ### 4.2 Toolchain Discovery Logic (Windows)
@@ -443,7 +443,7 @@ The `.mbtx` script uses `@shell.Cmd` or `@process.collect_output` to execute `du
 2. **Forbidden Symbols Absent**:
    - `main` (assert `!output.contains(" main")`).
    - `moonbit_*` (assert `!output.contains("moonbit_")`).
-   - In `min` mode: `mbedtls_*` and `psa_*` (assert `!output.contains("mbedtls") && !output.contains("psa_")`).
+   - In `thin` mode: `mbedtls_*` and `psa_*` (assert `!output.contains("mbedtls") && !output.contains("psa_")`).
 
 ---
 
@@ -516,7 +516,7 @@ int main(void) {
 
 #### Compilation & Verification Command (MSVC):
 ```cmd
-cl.exe /O2 /MD verify_dyn.c /Iinclude http-server-min.lib /Fe:verify_dyn.exe
+cl.exe /O2 /MD verify_dyn.c /Iinclude http-server-mbt-thin.lib /Fe:verify_dyn.exe
 verify_dyn.exe
 ```
 **Observed Output**:
@@ -551,7 +551,7 @@ int main(void) {
 
 #### Compilation & Verification Command (MSVC):
 ```cmd
-cl.exe /O2 /MD verify_stat.c /Iinclude http-server-min-static.lib ws2_32.lib kernel32.lib /Fe:verify_stat.exe
+cl.exe /O2 /MD verify_stat.c /Iinclude http-server-mbt-thin-static.lib ws2_32.lib kernel32.lib /Fe:verify_stat.exe
 verify_stat.exe
 ```
 **Observed Output**:
@@ -570,7 +570,7 @@ To execute this architecture during the upcoming implementation milestones:
 | Phase | Target Area | Key Actions |
 |---|---|---|
 | **Phase 1** | `server` & `core` decoupling | 1. Define `Acceptor` abstraction in `server`.<br>2. Move direct TLS handling to a pluggable module (`server_full`).<br>3. Remove `unmbt/http-server-mbt/tls` from `server/moon.pkg`. |
-| **Phase 2** | `cmd/` modularization | 1. Create `cmd/common/` with shared parsing, colors, and banner.<br>2. Implement `cmd/http-server-min/` enforcing exit 1 on `--cert`/`--key`/`--proxy`.<br>3. Implement `cmd/http-server-full/` with full TLS and proxy support.<br>4. Retain `cmd/http-server-mbt/` as default full CLI. |
-| **Phase 3** | `c_abi/` implementation | 1. Create `c_abi/` package exposing `hs_*` APIs with `#export_name`.<br>2. Support `min` configuration (linking `server_min`) and `full` configuration (linking `server` + `tls`). |
+| **Phase 2** | `cmd/` modularization | 1. Create `cmd/common/` with shared parsing, colors, and banner.<br>2. Implement `cmd/http-server-mbt-thin/` enforcing exit 1 on `--cert`/`--key`/`--proxy`.<br>3. Implement `cmd/http-server-full/` with full TLS and proxy support.<br>4. Retain `cmd/http-server-mbt/` as default full CLI. |
+| **Phase 3** | `c_abi/` implementation | 1. Create `c_abi/` package exposing `hs_*` APIs with `#export_name`.<br>2. Support `thin` configuration (linking `server_min`) and `full` configuration (linking `server` + `tls`). |
 | **Phase 4** | Build script `.mbtx` | 1. Implement `scripts/build_cabi.mbtx` using `@async/shell`.<br>2. Automate MSVC / GCC compilation, DLL linking, static archiving, symbol verification, and C smoke test execution. |
 | **Phase 5** | Regression & Gate Testing | 1. Run all 183 existing unit and integration tests (`moon test --target native`).<br>2. Run new CLI tier tests and C ABI verification tests. |

@@ -2,7 +2,7 @@
 
 > **Author**: `explorer_codebase_1` (teamwork_preview_explorer)  
 > **Target**: Orchestrator / Implementation Team (`orchestrator_cabi_1`)  
-> **Scope**: Investigation of `server/`, `full/`, `cmd/`, `core/`, `tls/`, programmatic control mechanisms, FFI export pipeline, package structure, and symbol isolation for `min` and `full` C ABI libraries.  
+> **Scope**: Investigation of `server/`, `full/`, `cmd/`, `core/`, `tls/`, programmatic control mechanisms, FFI export pipeline, package structure, and symbol isolation for `thin` and `full` C ABI libraries.  
 > **Timestamp**: 2026-09-18T13:25:00Z  
 
 ---
@@ -38,7 +38,7 @@
     server.stop_and_drain()
     server_task.cancel()
     ```
-  * Note: The MoonBit API is **scoped** (`with_server_at(config, port, action)`), whereas the C ABI contract in `docs/cli-min-full-and-cabi-handover.md` is **handle-based** (`hs_server_start`, `hs_server_stop`, `hs_server_destroy`).
+  * Note: The MoonBit API is **scoped** (`with_server_at(config, port, action)`), whereas the C ABI contract in `docs/cli-thin-full-and-cabi-handover.md` is **handle-based** (`hs_server_start`, `hs_server_stop`, `hs_server_destroy`).
 
 ### 1.2 MoonBit FFI Import vs. Export Syntax
 * **FFI Import (Calling C from MoonBit)**:
@@ -93,7 +93,7 @@
 1. **Decoupling Verification**:
    * `server/moon.pkg` does NOT import `tls`. It only contains static HTTP, socket, IO, and zero-copy transmit file stubs (`transmit_file_windows.c`, `transmit_file_linux.c`, `transmit_file_darwin.c`).
    * `full/moon.pkg` imports `server` and `tls`.
-   * Therefore, creating separate `c_abi/min` (importing only `server`) and `c_abi/full` (importing `full`) guarantees physical decoupling: `min` builds will never touch or link MbedTLS sources or PSA crypto objects.
+   * Therefore, creating separate `c_abi/thin` (importing only `server`) and `c_abi/full` (importing `full`) guarantees physical decoupling: `thin` builds will never touch or link MbedTLS sources or PSA crypto objects.
 
 2. **Server Lifecycle Bridge**:
    * Scoped `with_server_at(config, port, action)` cannot be exposed directly to C because C hosts manage lifecycles imperatively across distinct function calls (`hs_server_start`, `hs_server_stop`).
@@ -105,7 +105,7 @@
      * Calling `hs_server_stop` signals the stop event, allowing `action` to complete, which triggers `server.stop_and_drain()` and closes sockets cleanly.
 
 3. **Package Structure Decision**:
-   * Placing sub-packages under `c_abi/` (`c_abi/min` and `c_abi/full`) directly parallels `cmd/http-server-min` and `cmd/http-server-full`.
+   * Placing sub-packages under `c_abi/` (`c_abi/thin` and `c_abi/full`) directly parallels `cmd/http-server-mbt-thin` and `cmd/http-server-full`.
    * Public headers belong in `c_abi/include/http_server.h`.
    * Sub-packages under `c_abi/` allow dedicated `moon.pkg` configurations (`pkgtype(kind: "foreign_library")`) without cluttering the project root.
 
@@ -114,7 +114,7 @@
 ## 3. Caveats
 
 1. **MoonBit `foreign_library` Linking Limitation**:
-   * As observed, `moon build c_abi/min --target native` will compile `.c` and `.obj` but fail at the final linker step with `LNK1561`. The `.mbtx` build script must handle this by invoking the compilation and then running `link.exe` / `lib.exe` explicitly.
+   * As observed, `moon build c_abi/thin --target native` will compile `.c` and `.obj` but fail at the final linker step with `LNK1561`. The `.mbtx` build script must handle this by invoking the compilation and then running `link.exe` / `lib.exe` explicitly.
 2. **JSON Config Parsing**:
    * `hs_server_start` accepts `const char* json_config`. If JSON configuration parsing is needed in MoonBit, `core` or `c_abi` should utilize `@json.parse` from `moonbitlang/core` to construct `@core.Config`. If `json_config` is NULL or empty, it defaults to `@core.Config::default(".")`.
 3. **Cross-Platform C ABI Considerations**:
@@ -129,7 +129,7 @@
    c_abi/
    ├── include/
    │   └── http_server.h          # Public C header (hs_abi_version, hs_server_start, hs_server_stop, hs_error_copy)
-   ├── min/
+   ├── thin/
    │   ├── moon.pkg               # pkgtype(kind: "foreign_library"), imports "unmbt/http-server-mbt/server", "unmbt/http-server-mbt/core"
    │   ├── abi.mbt                # #export_name declarations for hs_*
    │   ├── bridge.c               # Native stub managing background thread, OS events, and server handle
@@ -142,15 +142,15 @@
    ```
 
 2. **Preventing `main` from Being Linked**:
-   * Set `pkgtype(kind: "foreign_library")` in `c_abi/min/moon.pkg` and `c_abi/full/moon.pkg`.
+   * Set `pkgtype(kind: "foreign_library")` in `c_abi/thin/moon.pkg` and `c_abi/full/moon.pkg`.
    * Do NOT define `fn main` in these packages.
    * In the generated C output, MoonBit creates `void moonbit_init()` and omits `int main()`.
 
 3. **Symbol Isolation Pipeline (`scripts/build_cabi.mbtx`)**:
    * Generate package objects via `moon build`.
    * Strip embedded `/EXPORT` directives from runtime dependencies using `objcopy --remove-section=.drectve`.
-   * Link dynamic library with MSVC `link.exe /DLL /DEF:hs_<min|full>.def` and required system libraries (`ws2_32.lib`, `dbghelp.lib`, `userenv.lib`, `ntdll.lib`).
-   * Create static library with MSVC `lib.exe /OUT:target/hs_<min|full>_static.lib`.
+   * Link dynamic library with MSVC `link.exe /DLL /DEF:hs_<thin|full>.def` and required system libraries (`ws2_32.lib`, `dbghelp.lib`, `userenv.lib`, `ntdll.lib`).
+   * Create static library with MSVC `lib.exe /OUT:target/hs_<thin|full>_static.lib`.
    * Audit exports: Verify dynamic library exports ONLY `hs_*` symbols and 0 `mbedtls_*` symbols in `hs_min`.
 
 ---
@@ -160,9 +160,9 @@
 1. **Verify No `main` and Proper Symbol Export**:
    ```powershell
    # 1. Compile foreign_library package
-   moon check c_abi/min --target native
+   moon check c_abi/thin --target native
    # 2. Inspect generated C code in _build to ensure no main() exists
-   Select-String -Path "_build\native\debug\build\c_abi\min\*.c" -Pattern "int main\("
+   Select-String -Path "_build\native\debug\build\c_abi\thin\*.c" -Pattern "int main\("
    # 3. Build DLL and check exports
    & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_min.dll
    ```

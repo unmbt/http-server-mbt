@@ -9,10 +9,10 @@
 ## 1. Observation
 
 1. **SDD Documents & Task Evidence**:
-   - `docs/proposal.md`: Lines 36-56 map R-N06 (C ABI dynamic library), R-N08 (C ABI static library), R-N02 (standalone min/full CLI), and R-N14 (library-managed lifecycle).
+   - `docs/proposal.md`: Lines 36-56 map R-N06 (C ABI dynamic library), R-N08 (C ABI static library), R-N02 (standalone thin/full CLI), and R-N14 (library-managed lifecycle).
    - `docs/design.md`: Lines 214-261 (D-07) define `hs_*` C ABI v1 functions, opaque handles, declarative JSON configuration, and error copying; lines 262-285 (D-08) define Min/Full product contracts and MbedTLS 4.2.0 (Apache-2.0); lines 337-358 (D-11) specify `scripts/build_cabi.mbtx`, `.drectve` stripping via `llvm-objcopy`, `.def` whitelisting, static archive naming (`hs_*_static.lib`), and C consumer tests; lines 11-26 define AD-01 ~ AD-10.
    - `docs/tasks.md`: Line 116 (T-020) and Line 145 (T-027) are maintained in status `- [ ] 进行中（Windows 分项交付，2026-09-18）`, recording the Windows deliverables (5 C APIs, 6 library artifacts, dumpbin symbol audit, 4 C consumers). Neither task is prematurely marked as completed (`- [x]`), adhering to multi-platform delivery rules.
-   - `docs/cli-min-full-and-cabi-handover.md`: Accurately recorded the handover state between Milestone 2 and Milestone 3.
+   - `docs/cli-thin-full-and-cabi-handover.md`: Accurately recorded the handover state between Milestone 2 and Milestone 3.
 
 2. **C ABI Build Pipeline (`scripts/build_cabi.mbtx`)**:
    - Command: `moon run scripts/build_cabi.mbtx`
@@ -43,8 +43,8 @@
    - `dumpbin /SYMBOLS target/cabi/hs_full_static.lib`: 0 matches for `| main$`.
 
 5. **Code Authenticity & License Compliance**:
-   - `c_abi/min/bridge.c` and `c_abi/full/bridge.c`: Genuine JSON parser, thread event synchronization (`CreateEventW`, `CreateThread`, `WaitForSingleObject`), error copy logic, mutual exclusion validation.
-   - `c_abi/min/abi.mbt` and `c_abi/full/abi.mbt`: Genuine MoonBit server calls (`@server.with_server_at`, `@full_server.with_server_at`).
+   - `c_abi/thin/bridge.c` and `c_abi/full/bridge.c`: Genuine JSON parser, thread event synchronization (`CreateEventW`, `CreateThread`, `WaitForSingleObject`), error copy logic, mutual exclusion validation.
+   - `c_abi/thin/abi.mbt` and `c_abi/full/abi.mbt`: Genuine MoonBit server calls (`@server.with_server_at`, `@full_server.with_server_at`).
    - Licenses: Root `LICENSE` is MIT, `moon.mod` is MIT, `moonbitlang/async` is Apache-2.0, `tls/mbedtls-4.2.0` is Apache-2.0. Zero GPL/AGPL contamination.
 
 6. **Git Safety**:
@@ -52,7 +52,7 @@
    - Output: `On branch feat/tls-and-lib-export. Your branch is ahead of 'origin/feat/tls-and-lib-export' by 2 commits. (use "git push" to publish your local commits)`
    - Command: `git log origin/feat/tls-and-lib-export..HEAD --oneline`
    - Output:
-     - `a5c3edf feat: 实现 min 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
+     - `a5c3edf feat: 实现 thin 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
      - `9cabfb9 feat: cli区分功能打包`
    - Zero `git push` command was executed.
 
@@ -110,7 +110,7 @@ To independently verify these findings on a Windows x86_64 machine with MSVC ins
    & "dumpbin.exe" /EXPORTS "target\cabi\hs_min.dll"
    & "dumpbin.exe" /SYMBOLS "target\cabi\hs_min_static.lib" | Select-String "mbedtls|psa_"
    ```
-   *Expected*: 5 exports for DLL; 0 matches for crypto symbols in min static archive.
+   *Expected*: 5 exports for DLL; 0 matches for crypto symbols in thin static archive.
 
 5. **Verify Git Push Constraint**:
    ```powershell

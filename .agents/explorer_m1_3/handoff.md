@@ -93,7 +93,7 @@ Total tests: 183, passed: 183, failed: 0.
 6. **Step 6 (Gap Identification & Mitigation)**:
    Currently, because `server` had no TLS tests, removing TLS from `server` would leave two new behaviors unexercised:
    - Behavior A: Explicitly injecting `PlainAcceptor` vs default behavior.
-   - Behavior B: Invoking `with_server_at` with TLS configuration when no acceptor is provided (in `min` mode) must immediately raise `ConfigError::InvalidTls(...)` with 0 socket/handle leaks.
+   - Behavior B: Invoking `with_server_at` with TLS configuration when no acceptor is provided (in `thin` mode) must immediately raise `ConfigError::InvalidTls(...)` with 0 socket/handle leaks.
    Therefore, 7 new test cases are required in `server/server_acceptor_test.mbt`.
 
 ---
@@ -101,7 +101,7 @@ Total tests: 183, passed: 183, failed: 0.
 ## 3. Caveats
 
 1. **Milestone Scope Isolation**:
-   Milestone 1 focuses on server-core TLS decoupling and test integrity. Dual CLI packaging (`cmd/http-server-min` vs `cmd/http-server-full`) is assigned to Milestone 2. CLI exit code 1 testing for `--cert` in `min` CLI will be implemented in Milestone 2.
+   Milestone 1 focuses on server-core TLS decoupling and test integrity. Dual CLI packaging (`cmd/http-server-mbt-thin` vs `cmd/http-server-full`) is assigned to Milestone 2. CLI exit code 1 testing for `--cert` in `thin` CLI will be implemented in Milestone 2.
 2. **Full HTTPS Server E2E Test Placement**:
    Integration testing of `with_server_at` with an injected `TlsAcceptor` over a real TCP socket belongs to package `full` (Milestone 1 companion explorer `explorer_m1_2`). Once `full` is wired, loopback HTTPS tests can be placed in `full/full_test.mbt`.
 3. **No Assumptions on Unchecked Code**:

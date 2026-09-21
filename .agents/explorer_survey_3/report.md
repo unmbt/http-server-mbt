@@ -309,7 +309,7 @@ Exit code: 1
 | **N-14** | Node-API addon, Promise/stream, napi_env cleanup | **Pending T-028** |
 | **N-15** | wasm-gc runtime, token recycling, host adapter | **Pending T-029** |
 | **N-16** | External Mooncakes package consumption, clean module imports | **Pending T-030** |
-| **N-17** | Distroless/scratch x min/full container matrix | **Pending T-022** |
+| **N-17** | Distroless/scratch x thin/full container matrix | **Pending T-022** |
 | **N-18** | GitHub Actions three-platform CI matrix | **Pending T-032, T-025** |
 | **N-19** | Library-managed event loop, no manual pump/poll, clean shutdown | **Partially Implemented** in `server/server.mbt` (`with_server`); lifecycle tests missing |
 | **N-20** | In-flight file mutation, FILE_CHANGED abort, retry from 0, If-Range | **Partially Covered** (`engine_test.mbt:912`; concurrent mutation is T-033) |

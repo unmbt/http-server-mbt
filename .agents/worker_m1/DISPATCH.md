@@ -1,6 +1,6 @@
 ## 2026-09-18T12:25:46Z
 
-You are the Worker for Milestone 1 of the `min` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
+You are the Worker for Milestone 1 of the `thin` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\worker_m1`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 
@@ -28,7 +28,7 @@ Implement Milestone 1: Server & Core Decoupling from TLS:
    - Update `Server` struct to store `acceptor : &Acceptor`.
    - Update `with_server_at(config : @core.Config, port : Int, acceptor? : &Acceptor, action : async (Server) -> Unit) -> Unit`:
      - If `acceptor` is None:
-       - If `config.has_tls()` is true, immediately raise `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+       - If `config.has_tls()` is true, immediately raise `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
        - If `config.has_tls()` is false, use `PlainAcceptor::new()`.
      - If `acceptor` is Some(acc), use `acc`.
    - Update `handle_connection` and `send_file_region` to consume `Transport` uniformly (preserving Win32 TransmitFile zero-copy when `raw_fd` is present, and WebSocket upgrade compatibility when `raw_tcp` is present).

@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:56:45Z
 
 ## Mission
-Implement C ABI export pipeline (min & full), .mbtx build driver script, and standalone C consumer smoke tests.
+Implement C ABI export pipeline (thin & full), .mbtx build driver script, and standalone C consumer smoke tests.
 
 ## 🔒 My Identity
 - Archetype: teamwork_preview_worker
@@ -23,15 +23,15 @@ Implement C ABI export pipeline (min & full), .mbtx build driver script, and sta
 - Updated: 2026-09-18T13:50:21Z
 
 ## Task Summary
-- **What to build**: C ABI packages (`c_abi/include`, `c_abi/min`, `c_abi/full`), `.mbtx` build driver (`scripts/build_cabi.mbtx`), standalone C smoke tests (`testdata/c_consumer/`).
-- **Success criteria**: DLL and static LIB generated for min and full; C consumer tests link and pass clean; symbol isolation verified; zero mbedtls symbols in min.
-- **Interface contracts**: docs/design.md (D-07, D-11), docs/cli-min-full-and-cabi-handover.md.
+- **What to build**: C ABI packages (`c_abi/include`, `c_abi/thin`, `c_abi/full`), `.mbtx` build driver (`scripts/build_cabi.mbtx`), standalone C smoke tests (`testdata/c_consumer/`).
+- **Success criteria**: DLL and static LIB generated for thin and full; C consumer tests link and pass clean; symbol isolation verified; zero mbedtls symbols in thin.
+- **Interface contracts**: docs/design.md (D-07, D-11), docs/cli-thin-full-and-cabi-handover.md.
 - **Code layout**: c_abi/ for C ABI packages, scripts/ for mbtx build scripts, testdata/c_consumer/ for C tests.
 
 ## Change Tracker
 - **Files modified**:
   - `c_abi/include/http_server.h`: C header declaring the 5 hs_* APIs, hs_error_code enum, opaque pointers.
-  - `c_abi/min/moon.pkg`, `c_abi/min/abi.mbt`, `c_abi/min/bridge.c`, `c_abi/min/hs_min.def`, `c_abi/min/abi_test.mbt`: min C ABI implementation.
+  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_min.def`, `c_abi/thin/abi_test.mbt`: thin C ABI implementation.
   - `c_abi/full/moon.pkg`, `c_abi/full/abi.mbt`, `c_abi/full/bridge.c`, `c_abi/full/hs_full.def`, `c_abi/full/abi_test.mbt`: full C ABI implementation.
   - `scripts/build_cabi.mbtx`: Automated pure .mbtx build driver for Windows Native.
   - `testdata/c_consumer/test_dynamic_min.c`, `testdata/c_consumer/test_static_min.c`, `testdata/c_consumer/test_dynamic_full.c`, `testdata/c_consumer/test_static_full.c`: standalone C consumer smoke tests.
@@ -42,7 +42,7 @@ Implement C ABI export pipeline (min & full), .mbtx build driver script, and sta
 ## Quality Status
 - **Build/test result**: PASS (moon check: 0 errors, 0 warnings; moon test: 230/230 passed; moon run scripts/build_cabi.mbtx: 100% exit 0).
 - **Lint status**: clean (moon info & moon fmt applied).
-- **Tests added/modified**: `c_abi/min/abi_test.mbt`, `c_abi/full/abi_test.mbt`, 4 standalone C consumer tests.
+- **Tests added/modified**: `c_abi/thin/abi_test.mbt`, `c_abi/full/abi_test.mbt`, 4 standalone C consumer tests.
 
 ## Loaded Skills
 - None specified in prompt
@@ -57,9 +57,9 @@ Implement C ABI export pipeline (min & full), .mbtx build driver script, and sta
 - `BRIEFING.md` — working memory
 - `handoff.md` — handoff report
 - `target/cabi/include/http_server.h` — exported C header
-- `target/cabi/hs_min.dll` — min dynamic library
-- `target/cabi/hs_min.lib` — min import library
-- `target/cabi/hs_min_static.lib` — min static library
+- `target/cabi/hs_min.dll` — thin dynamic library
+- `target/cabi/hs_min.lib` — thin import library
+- `target/cabi/hs_min_static.lib` — thin static library
 - `target/cabi/hs_full.dll` — full dynamic library
 - `target/cabi/hs_full.lib` — full import library
 - `target/cabi/hs_full_static.lib` — full static library

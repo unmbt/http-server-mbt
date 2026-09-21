@@ -13,7 +13,7 @@
 ## 1. Context & Objectives
 
 The `http-server-mbt` project is transitioning to a **layered architecture** supporting dual packaging:
-- **`min`**: Lightweight static file HTTP server, with **zero crypto dependencies** and zero compilation of the 109 vendored MbedTLS C source files.
+- **`thin`**: Lightweight static file HTTP server, with **zero crypto dependencies** and zero compilation of the 109 vendored MbedTLS C source files.
 - **`full`**: Complete distribution supporting HTTPS (via MbedTLS) and reverse proxy routing.
 
 Currently, `server/moon.pkg` directly imports `"unmbt/http-server-mbt/tls"`. Because of this single import:

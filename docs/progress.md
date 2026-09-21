@@ -198,7 +198,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 | 泛化 HTTP 解析器 | `server/http_parser.mbt` | 复制 `moonbitlang/async@0.21.3` parser.mbt（Apache-2.0 保留版权头），泛化到任意 `@io.Reader`，构造 `@http.Request`；裁剪 gzip/响应/Passthrough；上游泛化 `ServerConnection` 后可回切 |
 | server 集成 | `server/server.mbt` | `Transport` 抽象（Plain/Encrypted）；TLS 握手失败即回收关闭；`transmit_file` 仅明文，TLS 走 64KB 有界缓冲降级（D-05/T-017）；D-01 监听前预检（acceptor 建立失败不监听） |
 | CLI | `cmd/http-server-mbt/cli.mbt` | 新增 `--cert`、`--key`、`--key-passphrase`（支持 `TLS_KEY_PASSPHRASE` 环境变量）；配置校验含 cert/key 配对（D-01） |
-| 测试 | `tls/loopback_test.mbt` + fixtures | 管道回环完整 TLS 1.3 握手/数据交换/双向 close_notify；错误口令/正确口令；主机名不匹配拒绝（真实 TCP）；insecure 显式例外；泄漏探针（min-3 基线 + 静默等待，沿用 handle_leak_assert 模式） |
+| 测试 | `tls/loopback_test.mbt` + fixtures | 管道回环完整 TLS 1.3 握手/数据交换/双向 close_notify；错误口令/正确口令；主机名不匹配拒绝（真实 TCP）；insecure 显式例外；泄漏探针（thin-3 基线 + 静默等待，沿用 handle_leak_assert 模式） |
 
 ### 验证证据（Windows x86_64，clang-cl 22.1.3，Moon 0.1.20260904）
 

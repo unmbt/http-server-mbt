@@ -1,5 +1,5 @@
 ## 2026-09-18T12:18:59Z
-You are the Regression & Test Explorer for Milestone 1 of the `min` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
+You are the Regression & Test Explorer for Milestone 1 of the `thin` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\explorer_m1_3`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 

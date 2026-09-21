@@ -38,7 +38,7 @@ int main(void) {
     assert(rc_port == HS_ERR_CONFIG);
     assert(s_fail == NULL);
 
-    // Unsupported feature in min build (TLS cert_file)
+    // Unsupported feature in thin build (TLS cert_file)
     const char* tls_cfg = "{\"cert_file\": \"cert.pem\"}";
     int32_t rc_unsup = hs_server_start(tls_cfg, strlen(tls_cfg), &s_fail);
     assert(rc_unsup == HS_ERR_UNSUPPORTED);

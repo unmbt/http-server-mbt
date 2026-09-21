@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:42:00Z
 
 ## Mission
-Orchestrate the `min` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`. Focus on completing Milestone 1 (Server & TLS decoupling) and Milestone 2 (Min & Full CLI packaging & verification). PAUSE before starting Milestone 3 (C ABI dynamic/static library export) to document completed work and author the continuation guide.
+Orchestrate the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`. Focus on completing Milestone 1 (Server & TLS decoupling) and Milestone 2 (Min & Full CLI packaging & verification). PAUSE before starting Milestone 3 (C ABI dynamic/static library export) to document completed work and author the continuation guide.
 
 ## 🔒 My Identity
 - Archetype: orchestrator
@@ -57,7 +57,7 @@ Orchestrate the `min` & `full` layered packaging, TLS decoupling, and Proxy arch
 |-------|------|-----------|--------|---------|
 | spec_miner_survey_1 | teamwork_preview_spec_miner | Survey specs, requirements & proxy design | completed | 4d6b9d16-b24b-435a-898d-b17eb800c02a |
 | explorer_tls_survey_1 | teamwork_preview_explorer | Survey server/core/tls dependency & abstraction | completed | 5ffab0ac-8f1d-49d7-8153-85cb4924a9ed |
-| explorer_cli_cabi_survey_1 | teamwork_preview_explorer | Survey CLI min/full & C ABI library pipeline | completed | 0cc0bf29-bef2-471a-a465-c994f024a3d5 |
+| explorer_cli_cabi_survey_1 | teamwork_preview_explorer | Survey CLI thin/full & C ABI library pipeline | completed | 0cc0bf29-bef2-471a-a465-c994f024a3d5 |
 | explorer_m1_1 | teamwork_preview_explorer | M1 Server Transport & Decoupling | completed | 0571fcc4-17a2-4705-aa29-0d4a70d87f29 |
 | explorer_m1_2 | teamwork_preview_explorer | M1 TLS Injection & Full Integration | completed | dc2be392-4700-4cb0-9050-c5557523e203 |
 | explorer_m1_3 | teamwork_preview_explorer | M1 Test Suite Integrity & Regression | completed | 0dc3589b-3085-4ce2-ba33-f7f6f0af6e9c |

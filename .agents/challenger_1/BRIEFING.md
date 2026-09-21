@@ -24,7 +24,7 @@ Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle
 ## Review Scope
 - **Files to review**:
   - `c_abi/include/http_server.h`
-  - `c_abi/min/bridge.c`, `c_abi/min/abi.mbt`
+  - `c_abi/thin/bridge.c`, `c_abi/thin/abi.mbt`
   - `c_abi/full/bridge.c`, `c_abi/full/abi.mbt`
   - `target/cabi/*` (`hs_min.dll`, `hs_min.lib`, `hs_min_static.lib`, `hs_full.dll`, `hs_full.lib`, `hs_full_static.lib`)
   - `scripts/build_cabi.mbtx`
@@ -33,7 +33,7 @@ Adversarially challenge and stress-test the C ABI runtime behavior and lifecycle
 - **Review criteria**: Robustness against invalid configs, rapid lifecycles, NULL pointers, buffer overflows/bounds, concurrency/race conditions, handle/socket leaks.
 
 ## Key Decisions Made
-- Will inspect `c_abi/min/bridge.c` and `c_abi/full/bridge.c` implementation to understand internal mechanisms and locate potential vulnerabilities.
+- Will inspect `c_abi/thin/bridge.c` and `c_abi/full/bridge.c` implementation to understand internal mechanisms and locate potential vulnerabilities.
 - Will compile and execute custom adversarial C test programs against both dynamic and static variants.
 
 ## Artifact Index

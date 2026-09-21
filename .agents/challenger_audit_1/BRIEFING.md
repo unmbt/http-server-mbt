@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-19T03:31:47Z
 
 ## Mission
-Adversarial challenge and boundary stressing for http-server-mbt min/full packaging and C ABI export pipeline (R2).
+Adversarial challenge and boundary stressing for http-server-mbt thin/full packaging and C ABI export pipeline (R2).
 
 ## 🔒 My Identity
 - Archetype: challenger
@@ -22,9 +22,9 @@ Adversarial challenge and boundary stressing for http-server-mbt min/full packag
 - Updated: 2026-09-19T03:45:00Z
 
 ## Review Scope
-- **Files to review**: `c_abi/`, `cmd/http-server-min/`, `cmd/http-server-full/`, `target/cabi/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
+- **Files to review**: `c_abi/`, `cmd/http-server-mbt-thin/`, `cmd/http-server-full/`, `target/cabi/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
 - **Interface contracts**: `docs/design.md` (D-07, D-08, D-11), `docs/tasks.md` (T-020, T-027)
-- **Review criteria**: Robustness against NULL/malformed inputs, lifecycle re-entry safety, symbol isolation (no main, no moonbit_*, no mbedtls_* in min), CLI rejection of unsupported flags.
+- **Review criteria**: Robustness against NULL/malformed inputs, lifecycle re-entry safety, symbol isolation (no main, no moonbit_*, no mbedtls_* in thin), CLI rejection of unsupported flags.
 
 ## Attack Surface
 - **Hypotheses tested**: NULL pointers, 25 malformed JSON inputs, extreme ports (-1, 0, 65536, 99999, overflow), invalid roots, TLS negative combinations, CLI option rejection, symbol isolation, lifecycle re-entry.
@@ -36,8 +36,8 @@ None
 
 ## Key Decisions Made
 - Executed custom C harness `target/cabi/adversarial_challenge.exe` across 51 test cases with 0 crashes, 0 segfaults.
-- Audited symbol exports and absence of cryptographic dependencies in min build using MSVC `dumpbin`.
-- Tested all CLI rejection flags for `http-server-min`.
+- Audited symbol exports and absence of cryptographic dependencies in thin build using MSVC `dumpbin`.
+- Tested all CLI rejection flags for `http-server-mbt-thin`.
 - Verdict: APPROVE.
 
 ## Artifact Index

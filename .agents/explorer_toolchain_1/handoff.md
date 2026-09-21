@@ -47,23 +47,23 @@ Direct execution of shell inspection commands revealed the following host toolch
 
 ### 1.2 MoonBit Native Compilation Model & Toolchain Execution
 
-When executing `moon build cmd/http-server-min --target native --dry-run -v`:
+When executing `moon build cmd/http-server-mbt-thin --target native --dry-run -v`:
 1. `moon` natively discovers and invokes the installed MSVC toolchain, auto-configuring `LIB`, `INCLUDE`, and `PATH`:
    ```pwsh
-   'E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/cl.exe' /Fe./_build/native/debug/build/cmd/http-server-min/http-server-min.exe '/I$MOON_HOME/include' /Fo./_build/native/debug/build/cmd/http-server-min/ /Z7 /std:c11 /utf-8 /wd4819 /nologo /Od '/DMOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_SYSTEM' ./_build/native/debug/build/cmd/http-server-min/http-server-min.c ... /MT /link '/LIBPATH:$MOON_HOME/lib'
+   'E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433/bin/HostX64/x64/cl.exe' /Fe./_build/native/debug/build/cmd/http-server-mbt-thin/http-server-mbt-thin.exe '/I$MOON_HOME/include' /Fo./_build/native/debug/build/cmd/http-server-mbt-thin/ /Z7 /std:c11 /utf-8 /wd4819 /nologo /Od '/DMOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_SYSTEM' ./_build/native/debug/build/cmd/http-server-mbt-thin/http-server-mbt-thin.c ... /MT /link '/LIBPATH:$MOON_HOME/lib'
    ```
 2. **Intermediate Artifact Layout**:
    - `_build/native/debug/build/libruntime.lib`: Compiled static archive for MoonBit C runtime (composed of `runtime-backtrace.obj`, `runtime-env.obj`, `runtime-runtime.obj`, `runtime-sync_io.obj`, `runtime-utf.obj`).
    - Dependency stubs (`native-stub`):
      - `server/libserver.lib`: Contains `transmit_file_windows.obj` (and Unix/macOS stubs).
-     - `cmd/http-server-min/libhttp-server-min.lib`: Contains `local_ips.obj`, `tty.obj`.
+     - `cmd/http-server-mbt-thin/libhttp-server-thin.lib`: Contains `local_ips.obj`, `tty.obj`.
      - `.mooncakes/moonbitlang/async/...`: Contains `libevent_loop.lib`, `libfs.lib`, `libsocket.lib`, etc.
    - For `is-main: true` or executable packages:
-     - `moonc link-core` combines all package `.core` IR files into a single unified whole-program C source file: `_build/native/debug/build/cmd/http-server-min/http-server-min.c`.
-     - MSVC `cl.exe` compiles this `.c` file into `http-server-min.obj`, and links against all `.lib` stub archives, `libruntime.lib`, and CRT to generate `http-server-min.exe`.
-3. **Symbol Isolation in `min` Build**:
-   - Inspection of `_build/native/debug/build/cmd/http-server-min/http-server-min.obj` via `dumpbin /SYMBOLS` confirmed **zero** `mbedtls` or `psa_` symbols.
-   - Binary string search on `http-server-min.exe` with `llvm-strings` confirmed **0 occurrences** of `mbedtls`.
+     - `moonc link-core` combines all package `.core` IR files into a single unified whole-program C source file: `_build/native/debug/build/cmd/http-server-mbt-thin/http-server-mbt-thin.c`.
+     - MSVC `cl.exe` compiles this `.c` file into `http-server-mbt-thin.obj`, and links against all `.lib` stub archives, `libruntime.lib`, and CRT to generate `http-server-mbt-thin.exe`.
+3. **Symbol Isolation in `thin` Build**:
+   - Inspection of `_build/native/debug/build/cmd/http-server-mbt-thin/http-server-mbt-thin.obj` via `dumpbin /SYMBOLS` confirmed **zero** `mbedtls` or `psa_` symbols.
+   - Binary string search on `http-server-mbt-thin.exe` with `llvm-strings` confirmed **0 occurrences** of `mbedtls`.
    - In contrast, `http-server-full` compiles `tls/libtls.lib` (6.17 MB, 100+ MbedTLS object files) and links it into `http-server-full.exe`.
 
 ### 1.3 `moonrun` and `.mbtx` Scripting Mechanics
@@ -136,7 +136,7 @@ When executing `moon build cmd/http-server-min --target native --dry-run -v`:
      - Compiling the generated C file with `/Dmain=moonbit_unused_main` eliminates any duplicate `main` symbol. Packaging the resulting object files, C bridge object, and runtime objects via `lib.exe /OUT:target/cabi/hs_min_static.lib` creates a static library that can be linked by standard C/Rust consumers without symbol collisions.
    - For **Symbol Purity Verification**:
      - `dumpbin /EXPORTS target/cabi/hs_min.dll` verifies that only `hs_*` symbols appear in the export table.
-     - `dumpbin /SYMBOLS` or `nm -g` or `llvm-strings` verifies that no `mbedtls_*` or `psa_*` symbols exist in `min` artifacts, and no `main` symbol exists.
+     - `dumpbin /SYMBOLS` or `nm -g` or `llvm-strings` verifies that no `mbedtls_*` or `psa_*` symbols exist in `thin` artifacts, and no `main` symbol exists.
 
 ---
 
@@ -190,13 +190,13 @@ To independently verify these findings, run the following commands on this Windo
 
 2. **Verify MoonBit Build Output & Dry Run Command Tracing**:
    ```pwsh
-   moon build cmd/http-server-min --target native --dry-run -v
+   moon build cmd/http-server-mbt-thin --target native --dry-run -v
    ```
    Inspect the dry run output to see the exact MSVC compilation and linking command lines.
 
-3. **Verify Symbol Isolation in `min` CLI**:
+3. **Verify Symbol Isolation in `thin` CLI**:
    ```pwsh
-   & "E:\Program Files\llvm-mingw-20220906-msvcrt-x86_64\bin\llvm-strings.exe" "_build\native\debug\build\cmd\http-server-min\http-server-min.exe" | Select-String "mbedtls"
+   & "E:\Program Files\llvm-mingw-20220906-msvcrt-x86_64\bin\llvm-strings.exe" "_build\native\debug\build\cmd\http-server-mbt-thin\http-server-mbt-thin.exe" | Select-String "mbedtls"
    ```
    Output will be empty (0 occurrences).
 

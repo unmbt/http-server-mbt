@@ -104,7 +104,7 @@ irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/insta
 
 #### 嵌入式 C ABI SDK
 
-如果需要在 C、C++、Rust、Zig、Go 或 Python 等项目中将 `http-server-mbt` 作为动态库（`.so` / `.dylib` / `.dll`）或静态库（`.a` / `.lib`）内嵌使用，可直接前往 [GitHub Releases](https://github.com/unmbt/http-server-mbt/releases) 页面下载独立的 `http-server-cabi-<platform>-<arch>.tar.gz`（Windows 为 `.zip`）归档包。该包内含 `http_server.h` 头文件、`min` 与 `full` 双变体库及完整嵌入调用示例。详见 [C ABI 嵌入使用指南](docs/cabi-usage-guide.md)。
+如果需要在 C、C++、Rust、Zig、Go 或 Python 等项目中将 `http-server-mbt` 作为动态库（`.so` / `.dylib` / `.dll`）或静态库（`.a` / `.lib`）内嵌使用，可直接前往 [GitHub Releases](https://github.com/unmbt/http-server-mbt/releases) 页面下载独立的 `http-server-cabi-<platform>-<arch>.tar.gz`（Windows 为 `.zip`）归档包。该包内含 `http_server.h` 头文件、`thin` 与 `full` 双变体库及完整嵌入调用示例。详见 [C ABI 嵌入使用指南](docs/cabi-usage-guide.md)。
 
 ---
 

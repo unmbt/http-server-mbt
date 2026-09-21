@@ -104,7 +104,7 @@ irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/insta
 
 #### C ABI SDK for Native Embedding
 
-If you are embedding `http-server-mbt` as a shared library (`.so` / `.dylib` / `.dll`) or static archive (`.a` / `.lib`) into C, C++, Rust, Zig, Go, or Python, download the pre-packaged `http-server-cabi-<platform>-<arch>.tar.gz` (or `.zip` for Windows) from the [GitHub Releases](https://github.com/unmbt/http-server-mbt/releases) page. It contains `http_server.h`, both `min` and `full` library binaries, and runnable integration examples. See the [C ABI Integration Guide](docs/cabi-usage-guide.md) for complete details.
+If you are embedding `http-server-mbt` as a shared library (`.so` / `.dylib` / `.dll`) or static archive (`.a` / `.lib`) into C, C++, Rust, Zig, Go, or Python, download the pre-packaged `http-server-cabi-<platform>-<arch>.tar.gz` (or `.zip` for Windows) from the [GitHub Releases](https://github.com/unmbt/http-server-mbt/releases) page. It contains `http_server.h`, both `thin` and `full` library binaries, and runnable integration examples. See the [C ABI Integration Guide](docs/cabi-usage-guide.md) for complete details.
 
 ---
 

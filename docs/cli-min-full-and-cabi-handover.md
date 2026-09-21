@@ -1,4 +1,4 @@
-# CLI min/full 双版本打包完成记录与动静态库导出接续指南
+# CLI thin/full 双版本打包完成记录与动静态库导出接续指南
 
 > **记录时间**：2026-09-18
 > **当前状态**：已完成 Milestone 1（核心包解耦）与 Milestone 2（Min/Full 双版本 CLI 打包及全量测试保护）；在此节点主动暂停（PAUSE），以便后续无缝接续动静态库导出（Milestone 3）。
@@ -18,15 +18,15 @@
   - 在 `build_tls_acceptor` 前置校验 `@core.validate_tls(config)`，确保证书与密钥缺失在监听前精准报错。
 
 ### 2. 双版本 CLI 打包体系（Milestone 2）
-- **精简版 CLI (`cmd/http-server-min`)**：
-  - **包路径**：`cmd/http-server-min/`
+- **精简版 CLI (`cmd/http-server-mbt-thin`)**：
+  - **包路径**：`cmd/http-server-mbt-thin/`
   - **依赖特征**：仅依赖 `server`、`core` 与基础 I/O，**完全不依赖 `full` 或 `tls`**，编译产物 0 MbedTLS C 桩代码。
   - **产物体积对比**（Windows Native debug）：
-    - `http-server-min.exe`：**~3.98 MB**
+    - `http-server-mbt-thin.exe`：**~3.98 MB**
     - `http-server-mbt.exe` (含 MbedTLS)：**~5.58 MB**（体积降低约 29%，Release 剥离符号后更具优势）。
   - **严格参数拦截**（符合 D-08 / D-15 规范）：
-    - 传入 `--cert`、`--key` 或 `--key-passphrase`：报错 `error: TLS is not supported in min build; use full build`，退出码 1。
-    - 传入 `-P`、`--proxy`、`--proxy-all` 或 `--proxy-config`：报错 `error: Proxy is not supported in min build; use full build`，退出码 1。
+    - 传入 `--cert`、`--key` 或 `--key-passphrase`：报错 `error: TLS is not supported in thin build; use full build`，退出码 1。
+    - 传入 `-P`、`--proxy`、`--proxy-all` 或 `--proxy-config`：报错 `error: Proxy is not supported in thin build; use full build`，退出码 1。
 - **完整版 CLI (`cmd/http-server-full`)**：
   - **包路径**：`cmd/http-server-full/`
   - **依赖特征**：依赖 `full`、`core`，支持完整 TLS 与 Proxy 参数。
@@ -36,7 +36,7 @@
 
 ### 3. 全量测试与质量门禁验证
 - **测试通过率**：全仓 **228 / 228 测试 100% 全部通过（0 失败、0 回归、0 句柄泄漏）**。
-  - `cmd/http-server-min`：7/7 项参数解析与非法参数拦截测试通过。
+  - `cmd/http-server-mbt-thin`：7/7 项参数解析与非法参数拦截测试通过。
   - `cmd/http-server-full`：5/5 项 TLS 与代理参数映射测试通过。
   - `server/`：95/95 项单元、集成、零拷贝与故障注入测试通过。
   - `full/`：13/13 项真实 TLS 回环、预检拦截与句柄压力测试通过。
@@ -69,7 +69,7 @@
 
 ### 1. 目标产物定义
 依据设计规范 D-07（托管异步 C ABI）与 D-11（静态库打包与消费），需构建两组库产物：
-1. **`min` 动静态库**：
+1. **`thin` 动静态库**：
    - 动态库：Windows `hs_min.dll`（配套 import library `hs_min.lib`）/ Linux `libhs_min.so` / macOS `libhs_min.dylib`
    - 静态库：Windows `hs_min_static.lib` / Linux `libhs_min.a` / macOS `libhs_min.a`
    - **核心约束**：完全不包含任何 MbedTLS / TF-PSA-Crypto 符号与对象，极致轻量。
@@ -183,6 +183,6 @@ HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap);
 当准备启动动静态库导出时，可直接按以下步骤执行：
 1. [ ] 创建 `c_abi/` 目录与 `moon.pkg`，定义 `hs_*` 接口的 MoonBit 声明与 C 桩函数桥接。
 2. [ ] 编写 `scripts/build_cabi.mbtx` 脚本，自动化打包 Windows `.dll` / `.lib` 与静态 `.lib`。
-3. [ ] 验证 `min` 产物无 MbedTLS 符号污染，验证 `full` 产物包含完整 TLS 导出能力。
+3. [ ] 验证 `thin` 产物无 MbedTLS 符号污染，验证 `full` 产物包含完整 TLS 导出能力。
 4. [ ] 编写 `testdata/c_consumer/` 最小 C 验证程序，并在 Windows 本机编译运行验证。
 5. [ ] 更新 `docs/design.md` D-11 与 `docs/tasks.md` T-020/T-027 交付证据。

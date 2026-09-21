@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:58:05Z
 
 ## Mission
-Technical review of C ABI export pipeline (min & full), build driver script, and C headers for memory safety, thread synchronization, and C API compatibility.
+Technical review of C ABI export pipeline (thin & full), build driver script, and C headers for memory safety, thread synchronization, and C API compatibility.
 
 ## 🔒 My Identity
 - Archetype: teamwork_preview_reviewer
@@ -22,7 +22,7 @@ Technical review of C ABI export pipeline (min & full), build driver script, and
 
 ## Review Scope
 - Files to review:
-  - c_abi/min/bridge.c
+  - c_abi/thin/bridge.c
   - c_abi/full/bridge.c
   - c_abi/include/http_server.h
   - scripts/build_cabi.mbtx

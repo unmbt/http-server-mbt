@@ -4,10 +4,10 @@
 
 - **Git Commit & Push Verification**:
   - `git branch -vv`:
-    `* feat/tls-and-lib-export a5c3edf [origin/feat/tls-and-lib-export: ahead 2] feat: 实现 min 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
+    `* feat/tls-and-lib-export a5c3edf [origin/feat/tls-and-lib-export: ahead 2] feat: 实现 thin 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
   - `git log origin/feat/tls-and-lib-export..HEAD --oneline`:
     ```
-    a5c3edf feat: 实现 min 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)
+    a5c3edf feat: 实现 thin 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)
     9cabfb9 feat: cli区分功能打包
     ```
   - Remote `origin/feat/tls-and-lib-export` remains at `d3c7a62b89935eed6ae16e7855573e9eba21697c`. Exactly 0 commits were pushed to the remote repository.
@@ -30,9 +30,9 @@
   - `dumpbin /EXPORTS target/cabi/hs_full.dll`: Exactly 5 exported functions (`hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`), 0 `main`, 0 MoonBit runtime leaks.
   - `dumpbin /SYMBOLS target/cabi/hs_min_static.lib`: Matched count for `mbedtls` or `psa_`: **0**.
 - **CLI Rejection Flags**:
-  - Running `http-server-min.exe` with `--cert foo.pem`: Output `error: TLS is not supported in min build; use full build`, exit code: 1.
-  - Running `http-server-min.exe` with `--key bar.pem`: Output `error: TLS is not supported in min build; use full build`, exit code: 1.
-  - Running `http-server-min.exe` with `--proxy http://localhost:3000`: Output `error: Proxy is not supported in min build; use full build`, exit code: 1.
+  - Running `http-server-mbt-thin.exe` with `--cert foo.pem`: Output `error: TLS is not supported in thin build; use full build`, exit code: 1.
+  - Running `http-server-mbt-thin.exe` with `--key bar.pem`: Output `error: TLS is not supported in thin build; use full build`, exit code: 1.
+  - Running `http-server-mbt-thin.exe` with `--proxy http://localhost:3000`: Output `error: Proxy is not supported in thin build; use full build`, exit code: 1.
 - **Independent Execution Verification**:
   - `moon check --target native --deny-warn`: Exit code 0, 47 tasks ran, 0 errors, 0 warnings.
   - `moon test --target native`: Exit code 0, `Total tests: 230, passed: 230, failed: 0.` (100% pass).
@@ -47,8 +47,8 @@
 
 1. From `git branch -vv` and `git log origin/feat/tls-and-lib-export..HEAD`, the HEAD branch has exactly 2 local commits (`9cabfb9` and `a5c3edf`), with `origin` remaining untouched at `d3c7a62`. This establishes that the "no git push" constraint was strictly upheld.
 2. From `server/moon.pkg` and `full/full.mbt`, `server` contains zero references or stub dependencies to `tls` or `mbedtls`. The `full` package encapsulates TLS by implementing the `@server.Acceptor` trait and injecting it into the server entrypoint. This proves genuine architecture decoupling without facade shortcuts.
-3. From `c_abi/include/http_server.h`, `c_abi/min/hs_min.def`, and `c_abi/full/hs_full.def`, only 5 public C API functions are exposed, backed by opaque pointers. `dumpbin /EXPORTS` on both DLLs confirms that only these 5 symbols are exported, and `dumpbin /SYMBOLS` proves `hs_min_static.lib` contains zero MbedTLS or PSA symbols.
-4. Directly executing `http-server-min.exe` with `--cert`, `--key`, and `--proxy` outputs user-friendly error messages and exits with code 1 before any network listener is established.
+3. From `c_abi/include/http_server.h`, `c_abi/thin/hs_min.def`, and `c_abi/full/hs_full.def`, only 5 public C API functions are exposed, backed by opaque pointers. `dumpbin /EXPORTS` on both DLLs confirms that only these 5 symbols are exported, and `dumpbin /SYMBOLS` proves `hs_min_static.lib` contains zero MbedTLS or PSA symbols.
+4. Directly executing `http-server-mbt-thin.exe` with `--cert`, `--key`, and `--proxy` outputs user-friendly error messages and exits with code 1 before any network listener is established.
 5. Independent execution of `moon check`, `moon test`, and `scripts/build_cabi.mbtx` all succeeded with 100% passing results, exactly matching claimed team deliverables.
 
 ## 3. Caveats
@@ -92,7 +92,7 @@ All milestones (1~3), commits (`9cabfb9` and `a5c3edf`), architectural decouplin
   ```
 - CLI rejection flags:
   ```powershell
-  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-min\http-server-min.exe" --cert foo.pem
-  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-min\http-server-min.exe" --key bar.pem
-  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-min\http-server-min.exe" --proxy http://localhost:3000
+  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-mbt-thin\http-server-mbt-thin.exe" --cert foo.pem
+  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-mbt-thin\http-server-mbt-thin.exe" --key bar.pem
+  & "E:\project\moonbit\unmbt\http-server-mbt\_build\native\debug\build\cmd\http-server-mbt-thin\http-server-mbt-thin.exe" --proxy http://localhost:3000
   ```

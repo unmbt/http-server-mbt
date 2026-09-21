@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T20:48:40+08:00
 
 ## Mission
-Milestone 1 independent code and architecture review for min/full layered packaging, TLS decoupling, and Proxy readiness in http-server-mbt.
+Milestone 1 independent code and architecture review for thin/full layered packaging, TLS decoupling, and Proxy readiness in http-server-mbt.
 
 ## 🔒 My Identity
 - Archetype: reviewer_critic
@@ -58,4 +58,4 @@ Milestone 1 independent code and architecture review for min/full layered packag
 ## Attack Surface
 - **Hypotheses tested**: Rapid connection churn (50 conn), 20 concurrent requests, Win32 zero-copy vs bounded buffer byte-for-byte equivalence, abrupt client disconnect mid-stream, failing `Acceptor::accept`, preflight port safety & 100-iteration rejection handle audit.
 - **Vulnerabilities found**: None in scope.
-- **Untested angles**: WebSocket proxy upgrade over TLS (WSS) is scoped for Milestone 4; CLI binary splitting (`min` vs `full`) is scoped for Milestone 2.
+- **Untested angles**: WebSocket proxy upgrade over TLS (WSS) is scoped for Milestone 4; CLI binary splitting (`thin` vs `full`) is scoped for Milestone 2.

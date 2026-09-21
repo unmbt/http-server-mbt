@@ -12,7 +12,7 @@
 ## 1. Executive Summary
 
 As an independent forensic auditor, an exhaustive verification of the work products from Milestones 1 through 3 was conducted. This includes:
-1. **SDD Consistency Audit**: Verified `docs/proposal.md`, `docs/design.md` (D-07, D-08, D-11, AD-01~AD-10), `docs/tasks.md` (T-020, T-027), and `docs/cli-min-full-and-cabi-handover.md`. Confirmed that task states, delivery evidence, and interface specifications are strictly truthful.
+1. **SDD Consistency Audit**: Verified `docs/proposal.md`, `docs/design.md` (D-07, D-08, D-11, AD-01~AD-10), `docs/tasks.md` (T-020, T-027), and `docs/cli-thin-full-and-cabi-handover.md`. Confirmed that task states, delivery evidence, and interface specifications are strictly truthful.
 2. **Full Verification Gate Execution**:
    - `moon run scripts/build_cabi.mbtx`: Generated all 6 C ABI target artifacts (Windows `.dll`, `.lib`, and static `.lib`) and compiled/executed 4 standalone C consumer programs with 100% PASS.
    - `moon check --target native --deny-warn`: 0 errors, 0 warnings across all 47 tasks.
@@ -30,7 +30,7 @@ As an independent forensic auditor, an exhaustive verification of the work produ
 ### 2.1 Specification Alignment (`proposal.md` & `design.md`)
 - **`docs/proposal.md`**:
   - Section 2 defines the delivery matrix including Windows `.dll`, MSVC `.lib` static libraries, and Min/Full CLI packaging.
-  - Section 3 maps R-N06 (C ABI dynamic library), R-N08 (C ABI static library), R-N02 (standalone CLI min/full), and R-N14 (library-managed lifecycle).
+  - Section 3 maps R-N06 (C ABI dynamic library), R-N08 (C ABI static library), R-N02 (standalone CLI thin/full), and R-N14 (library-managed lifecycle).
 - **`docs/design.md`**:
   - **D-07 (MoonBit API & C ABI v1)**: Specifies the `hs_*` C calling convention, versioning (`hs_abi_version`), opaque handles, declarative JSON configuration, error copying (`hs_error_copy`), and library-managed lifecycle (`hs_server_start`, `hs_server_stop`, `hs_server_destroy`).
   - **D-08 (Build, TLS & Distribution)**: Defines the dual-tier product architecture:
@@ -50,11 +50,11 @@ As an independent forensic auditor, an exhaustive verification of the work produ
   - **Audit Note**: The task remains unchecked `- [ ]` because Linux/macOS variants are awaiting CI integration. This strictly conforms to `AGENTS.md` guidelines that tasks spanning multiple platforms must not be falsely marked as completed (`- [x]`) before all platforms are satisfied.
 - **T-027 (静态库打包与 C/Rust 消费)**:
   - **Status**: `- [ ] 进行中（Windows 分项交付，2026-09-18）`.
-  - **Evidence Recorded**: Generation of `target/cabi/hs_min_static.lib` and `target/cabi/hs_full_static.lib`; dumpbin verification of zero MbedTLS symbols in min static archive; standalone C static consumers `test_static_min.c` and `test_static_full.c` 100% PASS.
+  - **Evidence Recorded**: Generation of `target/cabi/hs_min_static.lib` and `target/cabi/hs_full_static.lib`; dumpbin verification of zero MbedTLS symbols in thin static archive; standalone C static consumers `test_static_min.c` and `test_static_full.c` 100% PASS.
   - **Audit Note**: Accurately marked as in-progress with Windows delivery evidence.
 
-### 2.3 Handover Documentation (`cli-min-full-and-cabi-handover.md`)
-- Verified that `docs/cli-min-full-and-cabi-handover.md` faithfully documented the state after Milestone 1 & 2 (core decoupling, min/full CLI) and established the blueprint executed in Milestone 3.
+### 2.3 Handover Documentation (`cli-thin-full-and-cabi-handover.md`)
+- Verified that `docs/cli-thin-full-and-cabi-handover.md` faithfully documented the state after Milestone 1 & 2 (core decoupling, thin/full CLI) and established the blueprint executed in Milestone 3.
 
 ---
 
@@ -79,7 +79,7 @@ http-server-mbt C ABI Build Pipeline (D-07, D-11, T-020, T-027)
   LLVM Objcopy: E:/Program Files/llvm-mingw-20220906-msvcrt-x86_64/bin/llvm-objcopy.exe
 2. Building MoonBit packages...
 3. Preparing target/cabi/ directories...
-4. Building min variant (zero crypto, static HTTP server)...
+4. Building thin variant (zero crypto, static HTTP server)...
 Staging 35 objects into target/cabi/_staging_min...
 Linking hs_min.dll...
 Creating static archive hs_min_static.lib...
@@ -93,7 +93,7 @@ Verifying exports for target/cabi/hs_min.dll...
 Verifying exports for target/cabi/hs_full.dll...
   -> Verified: strictly 5 hs_* exports, zero symbol leaks.
 Verifying absence of MbedTLS symbols in target/cabi/hs_min_static.lib...
-  -> Verified: zero mbedtls/psa symbols in min static archive.
+  -> Verified: zero mbedtls/psa symbols in thin static archive.
 7. Compiling and running standalone C consumer tests...
 Compiling consumer test test_dynamic_min...
 Running consumer test test_dynamic_min...
@@ -161,12 +161,12 @@ moon test --target native
 core.internal_test.c
 server.internal_test.c
 http-server-mbt.internal_test.c
-min.blackbox_test.c
-http-server-min.internal_test.c
+thin.blackbox_test.c
+http-server-mbt-thin.internal_test.c
 core.blackbox_test.c
 http-server-full.internal_test.c
 full.internal_test.c
-http-server-min.whitebox_test.c
+http-server-mbt-thin.whitebox_test.c
 tls.internal_test.c
 http-server-mbt.internal_test.c
 full.blackbox_test.c
@@ -174,8 +174,8 @@ http-server-full.whitebox_test.c
 http-server-mbt.whitebox_test.c
 tls.blackbox_test.c
 http-server-mbt.blackbox_test.c
-min.internal_test.c
-http-server-min.blackbox_test.c
+thin.internal_test.c
+http-server-mbt-thin.blackbox_test.c
 full.internal_test.c
 full.blackbox_test.c
 http-server-full.blackbox_test.c
@@ -192,13 +192,13 @@ Total tests: 230, passed: 230, failed: 0.
 ## 4. Forensic Integrity & Anti-Cheating Audit
 
 ### 4.1 Authentic Implementation Inspection
-- **C ABI Bridge (`c_abi/min/bridge.c` & `c_abi/full/bridge.c`)**:
+- **C ABI Bridge (`c_abi/thin/bridge.c` & `c_abi/full/bridge.c`)**:
   - Implements a genuine JSON parser handling strings, numbers, booleans, escape characters, and structural validations.
   - Enforces port range limits `[0, 65535]`.
   - Enforces mutual exclusion rules (e.g., `spa` and `try_files`, or `spa` and `proxy`).
   - Manages Windows thread creation (`CreateThread`), synchronization events (`ready_event`, `stop_event`), and runtime initialization (`ensure_runtime_init`).
   - Correctly copies error descriptions with buffer length boundary checks in `hs_error_copy`.
-- **MoonBit Bridge (`c_abi/min/abi.mbt` & `c_abi/full/abi.mbt`)**:
+- **MoonBit Bridge (`c_abi/thin/abi.mbt` & `c_abi/full/abi.mbt`)**:
   - `hs_min_run_server` launches the MoonBit async event loop using `@server.with_server_at(config, port, ...)`.
   - `hs_full_run_server` launches `@full_server.with_server_at(config, port, ...)`.
   - Handles server readiness notification via `hs_bridge_notify_ready` and polls stop flag via `hs_bridge_is_stopped`.
@@ -261,7 +261,7 @@ MSVC `dumpbin.exe` was used to perform independent symbol inspection on the gene
   ```
 - **Unpushed Local Commits**:
   1. `9cabfb9 feat: cli区分功能打包`
-  2. `a5c3edf feat: 实现 min 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
+  2. `a5c3edf feat: 实现 thin 与 full 双版本 C ABI 动静态库导出流水线 (T-020, T-027)`
 - **Remote Origin URL**: `https://github.com/unmbt/http-server-mbt.git`
 - **Audit Finding**: Both commits are strictly local. Zero `git push` command was executed. Repository safety constraints are 100% satisfied.
 
@@ -278,7 +278,7 @@ MSVC `dumpbin.exe` was used to perform independent symbol inspection on the gene
 | 5 | C ABI Build Pipeline execution | Quality Gate | **PASS** | `build_cabi.mbtx` generated 6 artifacts + 4 C tests passed 100% |
 | 6 | Native compiler check (`moon check`) | Quality Gate | **PASS** | 47 tasks, 0 errors, 0 warnings with `--deny-warn` |
 | 7 | Full test suite execution (`moon test`) | Quality Gate | **PASS** | 230/230 tests passed (0 failures, 0 regressions) |
-| 8 | Symbol Isolation & Export purity | Security Gate | **PASS** | DLL exports strictly 5 `hs_*` APIs; min static archive has 0 crypto symbols |
+| 8 | Symbol Isolation & Export purity | Security Gate | **PASS** | DLL exports strictly 5 `hs_*` APIs; thin static archive has 0 crypto symbols |
 | 9 | Open-source license compliance | Legal Gate | **PASS** | MIT / Apache-2.0 across all dependencies; 0 GPL contamination |
 | 10 | Strictly NO git push | Safety Rule | **PASS** | Branch ahead by 2 local commits; 0 pushes to origin |
 

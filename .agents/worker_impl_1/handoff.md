@@ -6,7 +6,7 @@
 - **C ABI Interface Header**:
   `c_abi/include/http_server.h`: Defines standard C API declarations (`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`), `hs_error_code` enum, opaque types (`hs_server_t`, `hs_engine_t`), macros (`HS_EXPORT`, `HS_STATIC`). Pure ASCII comments to avoid MSVC CP936 character corruption.
 - **C ABI Packages**:
-  - `c_abi/min/`:
+  - `c_abi/thin/`:
     - `moon.pkg`: Configured with `pkgtype(kind: "foreign_library")`, imports `unmbt/http-server-mbt/server`, `unmbt/http-server-mbt/core`, `moonbitlang/async`, with native stub `bridge.c`.
     - `abi.mbt`: Implements `#export_name("hs_abi_version")` and `#export_name("hs_min_run_server")`, invoking `@async.run_async_main` and `@server.with_server_at`.
     - `bridge.c`: Genuine JSON parser for server config, preflight checks (invalid port, mutual exclusion between spa and try_files, rejection of unsupported features like TLS/proxy with `HS_ERR_CONFIG`), OS thread creation via Win32 `CreateThread`, event synchronization via Win32 `CreateEvent` / `WaitForSingleObject`, graceful shutdown via `stop_flag`, and `hs_error_copy`.
@@ -19,7 +19,7 @@
     - `hs_full.def`: Module definition file restricting DLL exports to the 5 `hs_*` functions.
     - `abi_test.mbt`: Unit smoke test checking `hs_abi_version() == 65536`.
 - **Pure `.mbtx` Build Pipeline Driver**:
-  - `scripts/build_cabi.mbtx`: Automates toolchain discovery (MSVC `cl.exe`, `link.exe`, `lib.exe`, `dumpbin.exe`, Windows Kits UCRT/UM lib/includes, `llvm-objcopy`), compiles MoonBit packages in release mode, stages objects, executes section stripping via `llvm-objcopy` (`--remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids`), links `hs_min.dll` and `hs_full.dll` with `/DEF`, archives `hs_min_static.lib` and `hs_full_static.lib`, verifies DLL exports and absence of MbedTLS symbols in min, compiles and executes the 4 C consumer smoke tests, and reports an artifact table.
+  - `scripts/build_cabi.mbtx`: Automates toolchain discovery (MSVC `cl.exe`, `link.exe`, `lib.exe`, `dumpbin.exe`, Windows Kits UCRT/UM lib/includes, `llvm-objcopy`), compiles MoonBit packages in release mode, stages objects, executes section stripping via `llvm-objcopy` (`--remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids`), links `hs_min.dll` and `hs_full.dll` with `/DEF`, archives `hs_min_static.lib` and `hs_full_static.lib`, verifies DLL exports and absence of MbedTLS symbols in thin, compiles and executes the 4 C consumer smoke tests, and reports an artifact table.
 - **Standalone C Consumer Smoke Tests**:
   - `testdata/c_consumer/test_dynamic_min.c`: Verifies dynamic linking to `hs_min.lib` + loading `hs_min.dll`, `hs_abi_version() == 0x00010000`, `hs_error_copy`, preflight checks, and full start/stop/destroy lifecycle.
   - `testdata/c_consumer/test_static_min.c`: Verifies static linking to `hs_min_static.lib`.
@@ -55,7 +55,7 @@
      LLVM Objcopy: E:/Program Files/llvm-mingw-20220906-msvcrt-x86_64/bin/llvm-objcopy.exe
    2. Building MoonBit packages...
    3. Preparing target/cabi/ directories...
-   4. Building min variant (zero crypto, static HTTP server)...
+   4. Building thin variant (zero crypto, static HTTP server)...
    Staging 35 objects into target/cabi/_staging_min...
    Linking hs_min.dll...
    Creating static archive hs_min_static.lib...
@@ -69,7 +69,7 @@
    Verifying exports for target/cabi/hs_full.dll...
      -> Verified: strictly 5 hs_* exports, zero symbol leaks.
    Verifying absence of MbedTLS symbols in target/cabi/hs_min_static.lib...
-     -> Verified: zero mbedtls/psa symbols in min static archive.
+     -> Verified: zero mbedtls/psa symbols in thin static archive.
    7. Compiling and running standalone C consumer tests...
    Compiling consumer test test_dynamic_min...
    Running consumer test test_dynamic_min...
@@ -108,7 +108,7 @@
 
 ## 2. Logic Chain
 1. **Decoupling and ABI Architecture**:
-   - Following `docs/design.md` D-07, D-08, D-11 and handover guidelines, the C ABI layer was partitioned into `min` (pure static HTTP server, zero cryptography) and `full` (integrated TLS and proxy capabilities).
+   - Following `docs/design.md` D-07, D-08, D-11 and handover guidelines, the C ABI layer was partitioned into `thin` (pure static HTTP server, zero cryptography) and `full` (integrated TLS and proxy capabilities).
    - The shared C header `c_abi/include/http_server.h` exposes only clean C ABI symbols with fixed integer types, an error enumeration, and opaque pointer handles (`hs_server_t*`). No MoonBit managed pointers, structs, or GC internals are leaked across the C boundary.
 2. **Runtime & Thread Lifecycle Bridging**:
    - MoonBit's `@async.run_async_main` requires an event loop context. In `bridge.c`, `hs_server_start` creates a dedicated Win32 OS thread (`worker_thread`), passing a heap-allocated context structure (`hs_server_t`).
@@ -122,7 +122,7 @@
    - Per AGENTS.md rule ("Agent 编写的自动化逻辑只使用 `.mbtx`"), the entire build pipeline is written in pure MoonBit (`scripts/build_cabi.mbtx`), utilizing `@shell.Cmd` and `@fs` without external Python or Bash scripts.
 
 ## 3. Caveats
-- Windows Native platform was fully built and validated using MSVC 14.42 and LLVM-MingW llvm-objcopy. macOS and Linux shared object (.so / .dylib) and archive (.a) generation are structured to reuse the C ABI bridge packages (`c_abi/min` and `c_abi/full`) via clang/ar in their respective CI environments (T-020, T-027, T-032).
+- Windows Native platform was fully built and validated using MSVC 14.42 and LLVM-MingW llvm-objcopy. macOS and Linux shared object (.so / .dylib) and archive (.a) generation are structured to reuse the C ABI bridge packages (`c_abi/thin` and `c_abi/full`) via clang/ar in their respective CI environments (T-020, T-027, T-032).
 - Git repository remains strictly local: zero `git push` commands were issued.
 
 ## 4. Conclusion
@@ -150,7 +150,7 @@ To independently verify the implementation:
    & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /EXPORTS target\cabi\hs_full.dll
    ```
    Confirm: Exactly 5 functions exported, zero internal symbols or `main`.
-4. Verify absence of MbedTLS symbols in min static archive:
+4. Verify absence of MbedTLS symbols in thin static archive:
    ```pwsh
    & "E:\Program Files\msvc\VC\Tools\MSVC\14.42.34433\bin\HostX64\x64\dumpbin.exe" /SYMBOLS target\cabi\hs_min_static.lib | Select-String "mbedtls|psa_"
    ```

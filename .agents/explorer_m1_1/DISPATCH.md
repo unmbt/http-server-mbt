@@ -1,5 +1,5 @@
 ## 2026-09-18T12:19:00Z
-You are the Server Transport Explorer for Milestone 1 of the `min` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
+You are the Server Transport Explorer for Milestone 1 of the `thin` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\explorer_m1_1`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 

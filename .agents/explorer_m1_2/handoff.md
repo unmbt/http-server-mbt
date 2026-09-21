@@ -93,7 +93,7 @@
 5. **Preflight Validation & DI in `server.with_server_at`**:
    - `with_server_at(config, port, acceptor? : &Acceptor, action)`:
    - When `acceptor` is omitted (`None`):
-     - If `config.has_tls()` is true (Obs 1.3), it immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`. This executes *before* `TcpServer` is bound or listening, guaranteeing that an unconfigured `min` server never listens with invalid security expectations.
+     - If `config.has_tls()` is true (Obs 1.3), it immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`. This executes *before* `TcpServer` is bound or listening, guaranteeing that an unconfigured `thin` server never listens with invalid security expectations.
      - If `config.has_tls()` is false, it defaults to `&PlainAcceptor {}`.
    - When `acceptor` is provided (`Some(acc)`), it uses `acc`.
    - In package `full`, `with_server_at` builds `TlsServerAcceptor` from `config` when `config.has_tls()` is true and injects it into `@server.with_server_at`.
@@ -122,7 +122,7 @@
      - `pub async fn new_tls_acceptor(config : @core.Config) -> &@server.Acceptor raise @core.ConfigError`
      - `pub async fn with_server_at(config : @core.Config, port : Int, action : async (@server.Server) -> Unit) -> Unit`
 3. **Preflight Validation**:
-   - Calling `@server.with_server_at(config, port, action)` with `config.has_tls() == true` and no acceptor immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")` before binding.
+   - Calling `@server.with_server_at(config, port, action)` with `config.has_tls() == true` and no acceptor immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")` before binding.
 4. **Implementation Plan**: Fully drafted and available at `E:\project\moonbit\unmbt\http-server-mbt\.agents\explorer_m1_2\plan.md`.
 
 ---

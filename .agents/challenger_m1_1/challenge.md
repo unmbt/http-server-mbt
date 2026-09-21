@@ -99,7 +99,7 @@ moon test --target native -p unmbt/http-server-mbt/server
 
 - **C ABI library exports (`c_abi/`)**: Scheduled for Milestone 3 per `PROJECT.md`.
 - **Reverse Proxy forwarding state machine**: Scheduled for Milestone 4 per `PROJECT.md`.
-- **Dedicated CLI binaries (`cmd/http-server-min` & `cmd/http-server-full`)**: Scheduled for Milestone 2 per `PROJECT.md`.
+- **Dedicated CLI binaries (`cmd/http-server-mbt-thin` & `cmd/http-server-full`)**: Scheduled for Milestone 2 per `PROJECT.md`.
 
 ---
 

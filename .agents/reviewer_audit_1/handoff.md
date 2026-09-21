@@ -13,19 +13,19 @@
 1. **Architecture Decoupling in `server/`**:
    - `server/moon.pkg` (lines 1–28): imports only `"unmbt/http-server-mbt" @root`, `"unmbt/http-server-mbt/core"`, `"moonbitlang/async*"` packages. It contains **zero** imports of `"unmbt/http-server-mbt/tls"`. The `native-stub` array only contains `transmit_file_windows.c`, `transmit_file_linux.c`, and `transmit_file_darwin.c`.
    - `server/server.mbt` (lines 172–226): Introduces `Transport` and `pub(open) trait Acceptor` with `is_tls(Self) -> Bool = false`. `Transport::plain` wraps raw TCP and stores `raw_fd: Some(tcp.fd())`, maintaining kernel-level `TransmitFile` zero-copy.
-   - `server/server.mbt` (lines 60–78): In `with_server_at`, `@core.validate_tls(config)` runs first. If `config.has_tls()` is true and no acceptor is injected, it immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")` before binding or listening.
+   - `server/server.mbt` (lines 60–78): In `with_server_at`, `@core.validate_tls(config)` runs first. If `config.has_tls()` is true and no acceptor is injected, it immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")` before binding or listening.
 2. **Dependency Injection in `full/`**:
    - `full/moon.pkg` (lines 1–16): Imports `unmbt/http-server-mbt/server`, `unmbt/http-server-mbt/tls`, and `unmbt/http-server-mbt/core`.
    - `full/tls_acceptor.mbt` (lines 3–32): `TlsServerAcceptor` wraps `@tls.TlsAcceptor`, implements `@server.Acceptor`, sets `is_tls(_self) -> Bool { true }`, and wraps accepted sockets in `@server.Transport::custom(tls_conn, tls_conn, close_fn=...)`.
    - `full/full.mbt` (lines 5–17): `with_server_at` checks `if config.has_tls()`, constructs `TlsServerAcceptor`, and injects it into `@server.with_server_at`.
 3. **CLI Feature Partitioning**:
-   - `cmd/http-server-min/moon.pkg`: Zero `tls` or `full` imports.
-   - `cmd/http-server-min/cli.mbt` (lines 273–284): Rejects `--cert`, `--key`, `--key-passphrase` with `"TLS is not supported in min build; use full build"` and `--proxy`, `--proxy-all`, `--proxy-config` with `"Proxy is not supported in min build; use full build"`.
-   - `cmd/http-server-min/main.mbt` (lines 31–35): On CLI error, prints to stderr and calls `runtime_native_exit(1)`.
+   - `cmd/http-server-mbt-thin/moon.pkg`: Zero `tls` or `full` imports.
+   - `cmd/http-server-mbt-thin/cli.mbt` (lines 273–284): Rejects `--cert`, `--key`, `--key-passphrase` with `"TLS is not supported in thin build; use full build"` and `--proxy`, `--proxy-all`, `--proxy-config` with `"Proxy is not supported in thin build; use full build"`.
+   - `cmd/http-server-mbt-thin/main.mbt` (lines 31–35): On CLI error, prints to stderr and calls `runtime_native_exit(1)`.
 4. **C ABI Public Contract & Symbol Isolation**:
    - `c_abi/include/http_server.h` (lines 23–45): Declares strictly 5 public APIs: `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`. Exposes 6 error codes and opaque pointer `hs_server_t*`. Zero MoonBit managed types are exposed.
-   - `c_abi/min/bridge.c` & `c_abi/full/bridge.c`: Memory allocation (`calloc`), handle synchronization (`ready_event`, `stop_event`), and thread termination (`WaitForSingleObject`) strictly managed. `hs_error_copy` safely handles `buf == NULL`, `cap == 0`, `cap == 1`, truncation, and always null-terminates.
-   - `scripts/build_cabi.mbtx`: Strips `.drectve`, `.voltbl`, `.gfids` via `llvm-objcopy` and links using `.def` files (`c_abi/min/hs_min.def`, `c_abi/full/hs_full.def`).
+   - `c_abi/thin/bridge.c` & `c_abi/full/bridge.c`: Memory allocation (`calloc`), handle synchronization (`ready_event`, `stop_event`), and thread termination (`WaitForSingleObject`) strictly managed. `hs_error_copy` safely handles `buf == NULL`, `cap == 0`, `cap == 1`, truncation, and always null-terminates.
+   - `scripts/build_cabi.mbtx`: Strips `.drectve`, `.voltbl`, `.gfids` via `llvm-objcopy` and links using `.def` files (`c_abi/thin/hs_min.def`, `c_abi/full/hs_full.def`).
    - `dumpbin.exe /EXPORTS target/cabi/hs_min.dll` directly outputs:
      `5 number of functions`, `5 number of names`: `hs_abi_version`, `hs_error_copy`, `hs_server_destroy`, `hs_server_start`, `hs_server_stop`.
    - `dumpbin.exe /SYMBOLS target/cabi/hs_min_static.lib` matched against `"mbedtls"` and `"psa_"` returns 0 results.
@@ -43,7 +43,7 @@
    - Observation 1 proves `server/moon.pkg` has 0 dependencies on `tls` and 0 MbedTLS C stubs.
    - Observation 1 & 2 prove `server/` relies purely on `Acceptor` trait abstraction and plain TCP wrappers that maintain `TransmitFile` zero-copy.
    - Observation 2 proves `full/` acts as an external dependency injection module, cleanly supplying `TlsServerAcceptor` without coupling the core engine.
-   - Observation 3 proves `http-server-min` refuses TLS/Proxy options at the CLI boundary with exit code 1 before socket binding.
+   - Observation 3 proves `http-server-mbt-thin` refuses TLS/Proxy options at the CLI boundary with exit code 1 before socket binding.
    - **Inference**: Architecture decoupling is fully and cleanly achieved.
 
 2. **Requirement 2 (C ABI Contract & Safety)**:
@@ -76,7 +76,7 @@
 
 ## 4. Conclusion
 
-The implementation across `server/`, `full/`, `cmd/http-server-min/`, `cmd/http-server-full/`, `c_abi/`, and `scripts/build_cabi.mbtx` complies with all design specifications (D-07, D-08, D-11) and user requirements (R1). The code exhibits zero compiler warnings, 100% test pass rate (230/230 tests), clean symbol isolation, memory safety, and robust decoupling.
+The implementation across `server/`, `full/`, `cmd/http-server-mbt-thin/`, `cmd/http-server-full/`, `c_abi/`, and `scripts/build_cabi.mbtx` complies with all design specifications (D-07, D-08, D-11) and user requirements (R1). The code exhibits zero compiler warnings, 100% test pass rate (230/230 tests), clean symbol isolation, memory safety, and robust decoupling.
 
 **Verdict**: **APPROVE**
 

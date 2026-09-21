@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:09:00Z
 
 ## Mission
-Investigate TLS decoupling, transport abstraction design, dependency graph, and test organization for min/full layered packaging and proxy readiness in http-server-mbt.
+Investigate TLS decoupling, transport abstraction design, dependency graph, and test organization for thin/full layered packaging and proxy readiness in http-server-mbt.
 
 ## 🔒 My Identity
 - Archetype: explorer

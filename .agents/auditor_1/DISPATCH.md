@@ -11,7 +11,7 @@ worker_impl_1 has implemented the C ABI export pipeline, .mbtx build driver scri
 
 Your Objectives:
 Perform a strict forensic integrity verification across all newly created and modified files:
-1. Inspect `c_abi/include/http_server.h`, `c_abi/min/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, and `testdata/c_consumer/`:
+1. Inspect `c_abi/include/http_server.h`, `c_abi/thin/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, and `testdata/c_consumer/`:
    - Check for CHEATING, hardcoded return values, dummy/stub implementations, or mock results designed to pass tests without genuine execution.
    - Verify that `hs_abi_version()` calculates/returns the genuine version number defined in the specification (`0x00010000`).
    - Verify that `hs_server_start` parses genuine JSON, binds an actual socket, and starts an actual server.

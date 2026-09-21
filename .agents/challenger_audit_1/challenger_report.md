@@ -1,6 +1,6 @@
 # Empirical Robustness, Boundary & Adversarial Challenge Report
 
-- **Target System**: `http-server-mbt` (min & full CLI packaging, C ABI export pipeline)
+- **Target System**: `http-server-mbt` (thin & full CLI packaging, C ABI export pipeline)
 - **Role**: `challenger_audit_1` (Independent Robustness & Boundary Challenger)
 - **Date**: 2026-09-19
 - **Platform**: Windows 11 (x64) Native
@@ -12,10 +12,10 @@
 
 As an independent empirical challenger, 4 critical domains were aggressively stress-tested using custom adversarial test harnesses, MSVC `dumpbin`, and CLI execution:
 
-1. **C ABI Edge Cases & Fuzzing**: Tested NULL pointers (config, out_server, err_buf, handle), 25 distinct malformed JSON inputs, extreme ports (-1, -65535, 65536, 99999, overflow integers), invalid roots, min unsupported features, and negative TLS combinations (cert without key, key without cert, missing files, corrupted PEM files). **Result**: All inputs safely rejected with designated error codes (`HS_ERR_INVALID_ARG`, `HS_ERR_CONFIG`, `HS_ERR_IO`, `HS_ERR_UNSUPPORTED`), **0 crashes, 0 segfaults, 0 memory corruptions**.
+1. **C ABI Edge Cases & Fuzzing**: Tested NULL pointers (config, out_server, err_buf, handle), 25 distinct malformed JSON inputs, extreme ports (-1, -65535, 65536, 99999, overflow integers), invalid roots, thin unsupported features, and negative TLS combinations (cert without key, key without cert, missing files, corrupted PEM files). **Result**: All inputs safely rejected with designated error codes (`HS_ERR_INVALID_ARG`, `HS_ERR_CONFIG`, `HS_ERR_IO`, `HS_ERR_UNSUPPORTED`), **0 crashes, 0 segfaults, 0 memory corruptions**.
 2. **State Machine Lifecycle & Re-entry**: Tested NULL handle operations, double stop, triple stop, destroy without prior stop, sequential multi-cycle start/stop/destroy. **Result**: Full idempotence and clean handle teardown in sequential operations. Multi-thread concurrency boundary identified and documented.
 3. **Symbol Isolation Audit (dumpbin)**: Inspected `hs_min.dll` and `hs_full.dll` exports and `hs_min_static.lib` symbols. **Result**: Both DLLs export strictly the 5 specified `hs_*` functions with 0 `main` and 0 `moonbit_*` leaks. `hs_min_static.lib` contains **exactly 0** `mbedtls_*` or `psa_*` symbols out of 37,067 total symbols.
-4. **CLI Unsupported Options Rejection**: Tested `http-server-min` against `--cert`, `--key`, `--key-passphrase`, `--proxy`, `-P`, `--proxy-all`, `--proxy-config`, invalid ports, missing root directory, and mutual exclusion (`--spa` + `--try-files`). **Result**: All rejected immediately before TCP binding with exit code 1, actionable stderr messages, and **0 lingering ports**.
+4. **CLI Unsupported Options Rejection**: Tested `http-server-mbt-thin` against `--cert`, `--key`, `--key-passphrase`, `--proxy`, `-P`, `--proxy-all`, `--proxy-config`, invalid ports, missing root directory, and mutual exclusion (`--spa` + `--try-files`). **Result**: All rejected immediately before TCP binding with exit code 1, actionable stderr messages, and **0 lingering ports**.
 
 ---
 
@@ -78,7 +78,7 @@ File Type: DLL
           4    3 00006080 hs_server_start
           5    4 00006230 hs_server_stop
 ```
-- **Analysis**: Exactly 5 functions exported; identical API signature between min and full.
+- **Analysis**: Exactly 5 functions exported; identical API signature between thin and full.
 
 #### 1.3 `target/cabi/hs_min_static.lib` Cryptographic Symbol Isolation
 - Commands:
@@ -198,19 +198,19 @@ All 8 TLS and Proxy options strictly rejected on `hs_min.dll` with `HS_ERR_UNSUP
 
 ---
 
-### 4. CLI Rejection Testing (`http-server-min`)
+### 4. CLI Rejection Testing (`http-server-mbt-thin`)
 
-Executed against `cmd/http-server-min`:
+Executed against `cmd/http-server-mbt-thin`:
 
 | Command Option | Exit Code | Stderr Output | Lingering Ports | Verdict |
 |---|---|---|---|---|
-| `--cert test.crt` | **1** | `error: TLS is not supported in min build; use full build` | None | **PASS** |
-| `--key test.key` | **1** | `error: TLS is not supported in min build; use full build` | None | **PASS** |
-| `--key-passphrase pass` | **1** | `error: TLS is not supported in min build; use full build` | None | **PASS** |
-| `--proxy http://127.0.0.1` | **1** | `error: Proxy is not supported in min build; use full build` | None | **PASS** |
-| `-P http://127.0.0.1` | **1** | `error: Proxy is not supported in min build; use full build` | None | **PASS** |
-| `--proxy-all` | **1** | `error: Proxy is not supported in min build; use full build` | None | **PASS** |
-| `--proxy-config proxy.json` | **1** | `error: Proxy is not supported in min build; use full build` | None | **PASS** |
+| `--cert test.crt` | **1** | `error: TLS is not supported in thin build; use full build` | None | **PASS** |
+| `--key test.key` | **1** | `error: TLS is not supported in thin build; use full build` | None | **PASS** |
+| `--key-passphrase pass` | **1** | `error: TLS is not supported in thin build; use full build` | None | **PASS** |
+| `--proxy http://127.0.0.1` | **1** | `error: Proxy is not supported in thin build; use full build` | None | **PASS** |
+| `-P http://127.0.0.1` | **1** | `error: Proxy is not supported in thin build; use full build` | None | **PASS** |
+| `--proxy-all` | **1** | `error: Proxy is not supported in thin build; use full build` | None | **PASS** |
+| `--proxy-config proxy.json` | **1** | `error: Proxy is not supported in thin build; use full build` | None | **PASS** |
 | `--port 0` | **1** | `error: invalid port '0': port must be an integer between 1 and 65535` | None | **PASS** |
 | `--port 65536` | **1** | `error: invalid port '65536': port must be an integer between 1 and 65535` | None | **PASS** |
 | `--port 99999` | **1** | `error: invalid port '99999': port must be an integer between 1 and 65535` | None | **PASS** |

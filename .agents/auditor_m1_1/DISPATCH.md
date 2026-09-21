@@ -1,6 +1,6 @@
 ## 2026-09-18T12:42:07Z
 
-You are the Forensic Auditor for Milestone 1 of the `min` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
+You are the Forensic Auditor for Milestone 1 of the `thin` & `full` layered packaging, TLS decoupling, and Proxy readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\auditor_m1_1`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 

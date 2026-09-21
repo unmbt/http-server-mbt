@@ -1,7 +1,7 @@
 # 综合审计签署报告（Unified Audit Sign-Off Report）
 
 **项目名称**: `http-server-mbt`  
-**审计目标**: `min` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestones 1~3，commits `9cabfb9` 与 `a5c3edf`）  
+**审计目标**: `thin` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestones 1~3，commits `9cabfb9` 与 `a5c3edf`）  
 **审计日期**: 2026-09-19  
 **协调编排**: `orchestrator_audit_1`  
 **总体门禁裁决**: **全票通过 (UNANIMOUS PASS: APPROVE / APPROVE / CLEAN)**
@@ -13,7 +13,7 @@
 依据 `ORIGINAL_REQUEST.md` 及 `DISPATCH.md` 规范要求，编排器调度了 3 位相互独立的专业子智能体（审查员、对抗挑战者、法医审计员），对 Milestone 1~3（核心架构解耦、双版本 CLI 打包、以及 C ABI 动静态库导出流水线）进行了全方位、多视角的独立检验。
 
 所有验收指标均达到 100% 满分标准：
-1. **架构彻底解耦 (R1)**：`server/` 完全剥离加密依赖（0 MbedTLS C 桩代码、0 `tls` 依赖）；`full/` 纯粹通过 `TlsServerAcceptor` 依赖注入；`http-server-min` 编译体积降低 ~29%，非法配置在监听前拦截并退出码 1。
+1. **架构彻底解耦 (R1)**：`server/` 完全剥离加密依赖（0 MbedTLS C 桩代码、0 `tls` 依赖）；`full/` 纯粹通过 `TlsServerAcceptor` 依赖注入；`http-server-mbt-thin` 编译体积降低 ~29%，非法配置在监听前拦截并退出码 1。
 2. **对抗边界坚固 (R2)**：51 项高强度对抗测试用例全部通过，NULL 指针、25 类畸形 JSON、溢出端口、非法 TLS 组合均精准安全返回错误码，**0 崩溃、0 段错误、0 panic、0 内存越界**；生命周期操作具备完全幂等性；`dumpbin /EXPORTS` 确认 DLL 严格仅暴露 5 项 `hs_*` 导出符号且 0 `main` 泄漏；`dumpbin /SYMBOLS` 严格确认 `hs_min_static.lib` 包含 0 `mbedtls_*` / 0 `psa_*` 符号。
 3. **SDD 规范与门禁合规 (R3)**：`docs/proposal.md`、`docs/design.md`（D-07, D-08, D-11）与 `docs/tasks.md`（T-020, T-027）严格保持一致性；`moon check --target native` 保持 **0 errors, 0 warnings**；`moon test --target native` 全仓 **230 / 230 测试 100% PASS**；`scripts/build_cabi.mbtx` 自动化生成全部 6 项产物且 4 组独立 C 消费者测试 100% PASS；真实实现无桩代码，严格无 `git push`。
 
@@ -60,7 +60,7 @@
   - `dumpbin /EXPORTS target/cabi/hs_min.dll` 与 `hs_full.dll`：导出函数数量严格为 5，仅包含 5 个公共 `hs_*` 符号，**无 `main` 符号、无 `moonbit_*` 运行时符号**。
   - `dumpbin /SYMBOLS target/cabi/hs_min_static.lib`：扫描全部 37,067 行符号表，`mbedtls` 与 `psa_` 匹配数为 **0**。
 - **CLI 参数拦截验证**：
-  - 向 `cmd/http-server-min` 传入 `--cert`、`--key`、`--key-passphrase`、`--proxy`、`-P`、`--proxy-all`、`--proxy-config`，全部以**退出码 1** 立即终止，标准错误输出清晰的操作提示（如 `error: TLS is not supported in min build; use full build`），无任何端口残留。
+  - 向 `cmd/http-server-mbt-thin` 传入 `--cert`、`--key`、`--key-passphrase`、`--proxy`、`-P`、`--proxy-all`、`--proxy-config`，全部以**退出码 1** 立即终止，标准错误输出清晰的操作提示（如 `error: TLS is not supported in thin build; use full build`），无任何端口残留。
 
 ### 3. R3 SDD 规范一致性与全量门禁审计（Auditor: `78544f51-5d81-40cc-8a83-25ed30fcde49`）
 
@@ -97,8 +97,8 @@
 | **C ABI 审查** | 严格 5 项 `hs_*` API，0 托管对象跨 ABI 泄漏，生命周期清晰 | **已通过** | Reviewer / Auditor 审查 |
 | **对抗模糊** | NULL、非法 JSON、极端端口、非法 TLS 输入安全报错，0 崩溃 | **已通过** | Challenger 51 项对抗测试 |
 | **状态机重入** | 多次 start/stop/destroy 调用幂等安全，无悬挂指针 | **已通过** | Challenger 状态机重入测试 |
-| **符号隔离** | 动态库导出严格 5 个 `hs_*`，无 `main`；min 静态库零 MbedTLS | **已通过** | Challenger / Auditor `dumpbin` 实测 |
-| **CLI 拦截** | `http-server-min` 不支持参数严格退出码 1 且无端口残留 | **已通过** | Challenger CLI 冒烟实测 |
+| **符号隔离** | 动态库导出严格 5 个 `hs_*`，无 `main`；thin 静态库零 MbedTLS | **已通过** | Challenger / Auditor `dumpbin` 实测 |
+| **CLI 拦截** | `http-server-mbt-thin` 不支持参数严格退出码 1 且无端口残留 | **已通过** | Challenger CLI 冒烟实测 |
 | **SDD 规范** | `design.md` 与 `tasks.md` 规范与状态记录 100% 准确闭环 | **已通过** | Auditor 规范核验 |
 | **构建流水线** | `build_cabi.mbtx` 产出 6 产物，4 个 C 消费者 100% PASS | **已通过** | Auditor / Reviewer 实测 |
 | **静态检查** | `moon check --target native` 保持 0 errors, 0 warnings | **已通过** | Auditor 实测（47 个任务） |

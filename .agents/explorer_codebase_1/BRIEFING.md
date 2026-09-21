@@ -27,11 +27,11 @@ Investigate existing MoonBit codebase architecture to determine how to cleanly b
   3. MoonBit exports functions via `pkgtype(kind: "foreign_library")` and `#export_name("...")`. Generated C has no `main()`, only `moonbit_init()`.
   4. While `moon build` fails on Native during the final exe link step for `foreign_library`, the `.c` and `.obj` are successfully generated and can be linked via `scripts/build_cabi.mbtx`.
   5. Stripping `.drectve` from runtime dependency objects using `objcopy --remove-section=.drectve` achieves 100% pure export tables in MSVC DLLs with only `hs_*` symbols.
-  6. Sub-packages `c_abi/min` and `c_abi/full` with header `c_abi/include/http_server.h` is the cleanest package architecture.
+  6. Sub-packages `c_abi/thin` and `c_abi/full` with header `c_abi/include/http_server.h` is the cleanest package architecture.
 - **Unexplored areas**: None within the scope of this investigation.
 
 ## Key Decisions Made
-- Recommended package structure: `c_abi/` containing `include/http_server.h`, `min/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`), and `full/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`).
+- Recommended package structure: `c_abi/` containing `include/http_server.h`, `thin/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`), and `full/` (`moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`).
 - Recommended lifecycle model: Background owner thread per server instance managed by C bridge.
 - Recommended symbol isolation: Strip embedded `/EXPORT` directives from runtime dependencies.
 

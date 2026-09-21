@@ -1,6 +1,6 @@
 # http-server-mbt 重构设计
 
-版本：5。日期：2026-09-18。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；增补 CLI 与 C ABI（动态库与静态库）的 min（纯静态 HTTP、零加密 C 依赖）与 full（集成 MbedTLS TLS 与代理能力）双版本打包规范；D-11 增补 MoonBit 对象 .drectve 剥离与 .def 白名单符号隔离机制。版本 4 内容保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
+版本：5。日期：2026-09-18。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；增补 CLI 与 C ABI（动态库与静态库）的 thin（纯静态 HTTP、零加密 C 依赖）与 full（集成 MbedTLS TLS 与代理能力）双版本打包规范；D-11 增补 MoonBit 对象 .drectve 剥离与 .def 白名单符号隔离机制。版本 4 内容保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
 
 **实施前**：阅读 `moonbit-agent-guide`；Native FFI/C ABI 工作另须阅读 `moonbit-c-binding`，按本地工具链核实导出、所有权和链接能力。不要直接修改 `.mooncakes/` 中的依赖缓存。
 
@@ -267,15 +267,15 @@ Native C ABI 由库创建并管理内部 owner 线程，同一 runtime 的托管
 |---|---|
 | 精简 CLI | 静态 HTTP、缓存/Range/预压缩、目录、安全策略、BaseURL/回退；裁去 TLS、代理和 WebSocket，相关参数报“此构建不支持”，不能静默忽略 |
 | 完整 CLI | 包含全部兼容能力、TLS/HTTP(S) 代理/WebSocket；完整兼容验收只对该形态声明 |
-| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 min（零加密依赖，产物 hs_min.dll / libhs_min.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
-| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 min（零加密依赖，产物 hs_min_static.lib / libhs_min.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
+| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 thin（零加密依赖，产物 hs_min.dll / libhs_min.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
+| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 thin（零加密依赖，产物 hs_min_static.lib / libhs_min.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
 | Node 包 | `.node` 静态链接引擎，附 JS/TypeScript 适配；按 OS/架构/libc 分发，不要求额外引擎动态库，见 D-12 |
 | wasm-gc | 实验 `.wasm`、宿主接口/适配与运行示例；需要 WasmGC 宿主，不属于无运行时单机 Native 产物 |
 | Mooncakes 模块 | `unmbt/http-server-mbt` 可发布源码与必要资源；静态 API、完整 server、可移植 core 分包，独立模块可引入，见 D-14 |
 | Linux 静态包 | musl、MoonBit Native runtime 与第三方依赖一同链接，无 PT_INTERP/DT_NEEDED；不得在首次 TLS/DNS 时动态加载额外库 |
 | macOS 独立包 | 允许系统 libSystem 等框架；第三方 TLS/runtime 随构建链接，不依赖 Homebrew 或用户安装动态库 |
 | Windows 独立包 | CRT 策略避免要求用户安装额外 redistributable；仅依赖目标系统自带 DLL；DLL 与宿主不能跨 CRT 交叉 free |
-| Docker min/full | 分别封装精简/完整 Linux 静态 CLI；默认 Distroless static nonroot 基础层，保留 scratch 变体；功能、标签与验收见 D-15 |
+| Docker thin/full | 分别封装精简/完整 Linux 静态 CLI；默认 Distroless static nonroot 基础层，保留 scratch 变体；功能、标签与验收见 D-15 |
 
 TLS 选用源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0 子模块，Apache-2.0/GPL-2.0 双许可、采用 Apache-2.0），T-002/T-012 固定补丁版本、tarball SHA-256、最小化构建配置和许可证，并验证三平台可链接性；不继承当前 async Unix 动态加载 OpenSSL 的实现，也不要求用户安装任何 TLS 运行库。版本 5 变更理由（替代原 OpenSSL 3 决策，经用户 2026-09-13 确认）：源码随包经 moon native-stub 直接编译，无预编译产物与外部 `-l` 链接依赖（实测依赖包声明的 cc-link-flags 不传播到最终链接，moonbitlang/moon#1595）；PSA Crypto 为唯一加密 API 且 RNG 由 PSA 托管，无需 entropy/ctr_drbg 接线；组件更小、嵌入与三平台静态分发更可控。引入方式为 `scripts/vendor_tls.mbtx` 可复现引入：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 TLS/X.509/PSA 源码树（排除 net_sockets 等），对 `mbedtls_config.h` 追加托管 `#undef` 覆盖（禁用 NET/TIMING/FS_IO/ITS 文件/密钥存储/NV seed 等），证书过期检查所需 `MBEDTLS_HAVE_TIME_DATE` 保留；PSA `crypto_config.h` 的最小化裁剪由测试守护逐步收紧。socket 系统调用不进 C 层：TLS 经 `mbedtls_ssl_set_bio` 自定义回调桥接到 async 事件循环，WANT_READ/WANT_WRITE 映射为异步等待，PSA 初始化在进程内幂等执行一次。TLS 握手、证书/私钥/passphrase、上游 SNI、主机名与证书校验纳入测试；`secure=false` 仅在显式配置时关闭上游验证。
 
@@ -324,7 +324,7 @@ MoonBit 版本、C 编译器、目标 triple、TLS 与资源哈希、链接选�
 | N-14 | Node 导入、Promise/流式正文/Next、背压/AbortSignal、空闲主循环响应、多 napi_env/Worker 清理、重复实例/关闭、支持 Node 版本及各平台预构建命中/不支持目标报错 | R-N09 / T-028 |
 | N-15 | wasm-gc 真实构建/装载、宿主能力缺失、异步完成/取消竞态、目录多块与文件 token 回收；共享配置/路由/缓存/Range/渲染案例对照 Native，未支持能力明确报错 | R-N10 / T-029 |
 | N-16 | 独立 MoonBit 消费模块从候选包/已发布 registry 引入；公共类型/方法可用、StaticEngine 无监听和 CLI 副作用、GET/HEAD/Range/目录/Next/BaseURL/SPA，native-stub/资源齐全，core 的 wasm-gc 导入不拉入 Native I/O | R-N11 / T-030 |
-| N-17 | Distroless/scratch × min/full 的功能矩阵、镜像内 CLI 哈希、非 root/只读挂载、无 shell 启动、外部 HTTP 就绪探测、SIGTERM 排空、错误配置、full TLS/代理/WebSocket、min 拒绝裁去功能；分别报告基础层/镜像体积 | R-N12、R-N02 / T-022、T-025 |
+| N-17 | Distroless/scratch × thin/full 的功能矩阵、镜像内 CLI 哈希、非 root/只读挂载、无 shell 启动、外部 HTTP 就绪探测、SIGTERM 排空、错误配置、full TLS/代理/WebSocket、thin 拒绝裁去功能；分别报告基础层/镜像体积 | R-N12、R-N02 / T-022、T-025 |
 | N-18 | GitHub Actions 三平台真实构建/运行/打包和消费验证、原版及迁移分母、失败 job 阻止发布、缺失 artifact/必需测试阻止完成、正确 runner 架构、干净缓存可复现；本机阶段与最终三平台结果分开 | R-N13 / T-031、T-032、T-025、T-026 |
 | N-19 | 两种托管模式均不手动推进循环；启动就绪/预检失败、请求异步完成/背压、跨线程命令、停止与提交竞态、关闭自动排空、多实例隔离、无关闭后回调；MoonBit/C/Node/Python 与 wasm-gc 适配的各自上下文合法 | R-N14 / T-002、T-015、T-016、T-020、T-021、T-028～T-030 |
 | N-20 | 下载期间原地同长度改写/增长/截断、路径替换/删除、Range/预压缩/TLS、检测迟到与在途取消；FILE_CHANGED 不作 EOF、写入不等待下载、自动重试丢弃旧内容并从头请求、If-Range 不跨版本拼接、元数据缓存失效 | R-N15 / T-033 |
@@ -342,12 +342,12 @@ T-002 验证路径为：固定支持 C 生成的工具链/编译模式 → 导�
 
 同一探针还须验证 D-07 的托管启动/关闭：库内部 owner 的创建与初始化、跨线程 C 命令队列、完成通知、自动排空及多实例引用。C ABI 静态/动态库与 MoonBit 直接消费分别验证；不把宿主已有 runtime 的托管值迁到库新建线程。无法实现托管时记录阻塞并修正内部方案，不能改成要求用户手动轮询来通过验收。
 
-正式静态产物与动态库共用 C 头文件（`c_abi/include/http_server.h`）、hs_* 版本、错误码及 D-07 所有权。动态库与静态库均提供 min 与 full 双版本：
-- **min 版本**：基于 `c_abi/min`，仅包含纯静态 HTTP 服务，零加密与 MbedTLS C 依赖；Windows 产物为动态库 `hs_min.dll`（配套 import library `hs_min.lib`）与静态归档 `hs_min_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。
+正式静态产物与动态库共用 C 头文件（`c_abi/include/http_server.h`）、hs_* 版本、错误码及 D-07 所有权。动态库与静态库均提供 thin 与 full 双版本：
+- **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，零加密与 MbedTLS C 依赖；Windows 产物为动态库 `hs_min.dll`（配套 import library `hs_min.lib`）与静态归档 `hs_min_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。
 - **full 版本**：基于 `c_abi/full`，集成 MbedTLS TLS 传输层与反向代理能力；Windows 产物为动态库 `hs_full.dll`（配套 import library `hs_full.lib`）与静态归档 `hs_full_static.lib`。
 
 构建流水线通过纯 MoonBit 脚本 `scripts/build_cabi.mbtx` 驱动：
-1. 编译 `c_abi/min` 与 `c_abi/full` 产出目标 `.obj` 对象文件并按排除规则暂存（过滤测试对象与无关包）。
+1. 编译 `c_abi/thin` 与 `c_abi/full` 产出目标 `.obj` 对象文件并按排除规则暂存（过滤测试对象与无关包）。
 2. **符号隔离与导出控制**：MoonBit 编译器会在对象文件的 `.drectve` 段注入 `#pragma comment(linker, "/EXPORT:...")` 指令，导致 `link.exe /DLL` 默认泄露内部运行时函数与 CLI `main`；构建脚本通过 `llvm-objcopy --remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids` 预先清洗对象文件，并配合 MSVC 模块定义文件（`hs_min.def`、`hs_full.def`）白名单强制约束，确保动态库严格仅导出 5 项公共 `hs_*` 符号（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`），严禁暴露任何内部符号或 `main`。
 3. **静态库与导入库隔离**：Windows MSVC 的静态归档命名为 `hs_*_static.lib`，与动态库生成的 import library `hs_*.lib` 明确区分，避免调用方误将导入库当作静态库链接。
 4. **独立消费者验收**：在 `testdata/c_consumer/` 下建立独立的 C 消费者测试程序（`test_dynamic_min.c`, `test_static_min.c`, `test_dynamic_full.c`, `test_static_full.c`），经由 MSVC `cl.exe` 分别独立编译链接并运行，验证 ABI 版本读取、服务启动/停止/销毁与 TLS 预检拦截。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
@@ -407,20 +407,20 @@ npm 包包含 JS/类型声明、平台预构建选择和缺失目标诊断；Lin
 
 T-030 用干净临时消费模块验证候选包内容，避免工作区缓存或未打包文件掩盖缺失资源；实际发行后再从 registry 按固定版本拉取重复验证。候选包可构建、已发布、发布后可拉取是三个不同结果。本次只建立规范，不执行 `moon publish`；后续公共 API/包路径破坏变更必须有版本与迁移说明，不能覆盖已发布版本。Native 支持与 wasm-gc 实验范围分别写入包文档。
 
-## D-15 Docker min/full 与 Distroless
+## D-15 Docker thin/full 与 Distroless
 
 镜像功能档位与 CLI 构建档位一一对应，初始容器目标为 `linux/amd64`。默认基础层使用官方 [Distroless](https://github.com/GoogleContainerTools/distroless) static nonroot 系列，实施时核实可用发行版并固定 tag、digest 和许可证；不在规范中假定一个未验证的镜像版本。两个档位均保留 scratch 变体，以继续满足最小镜像交付。Distroless 不自带业务功能，也不替代静态链接检查。
 
 | 功能档位 | 默认镜像标签约定 | scratch 变体 | 内容与验收 |
 |---|---|---|---|
-| min | `min`、`<version>-min` | `min-scratch`、`<version>-min-scratch` | 精简 CLI：静态 HTTP、缓存/Range/预压缩、目录、安全、BaseURL/回退；TLS、代理、WebSocket 参数明确报不支持 |
+| thin | `thin`、`<version>-thin` | `thin-scratch`、`<version>-thin-scratch` | 精简 CLI：静态 HTTP、缓存/Range/预压缩、目录、安全、BaseURL/回退；TLS、代理、WebSocket 参数明确报不支持 |
 | full | `full`、`<version>-full` | `full-scratch`、`<version>-full-scratch` | 完整 CLI：全部原版兼容能力及新增路由，包含静态 TLS 依赖与 D-08 信任根策略 |
 
-标签前的镜像仓库地址在实施时按真实项目归属配置，不编造 registry；版本标签对应固定提交与内容 digest，移动标签只指向已验证版本。同档位在两种基础层使用同一已验收 Linux 静态 CLI，核对文件哈希，不为缩小镜像私自裁剪 full。基础镜像自带证书不改变 full 内嵌信任根和显式 CA 覆盖规则；min 不链接 TLS，即使基础层包含 CA 数据也不会启用 TLS。
+标签前的镜像仓库地址在实施时按真实项目归属配置，不编造 registry；版本标签对应固定提交与内容 digest，移动标签只指向已验证版本。同档位在两种基础层使用同一已验收 Linux 静态 CLI，核对文件哈希，不为缩小镜像私自裁剪 full。基础镜像自带证书不改变 full 内嵌信任根和显式 CA 覆盖规则；thin 不链接 TLS，即使基础层包含 CA 数据也不会启用 TLS。
 
 采用多阶段构建或等价的已校验 artifact 装配，最终层只含所需 CLI、资源和基础层文件，不携带编译器、包管理器、Node/Python 或构建缓存。两种基础层均使用数值 UID/GID 65532、默认端口 8080、exec 形式 ENTRYPOINT，站点 root 与证书/密钥只读挂载，日志写 stdout/stderr；无挂载且无有效 root 时按配置契约清楚失败。容器可在只读根文件系统运行，需要临时写入的功能必须声明有界 tmpfs 用途，不能隐式写站点目录。
 
-就绪和健康检查由外部 HTTP 驱动或编排器完成，不能依赖镜像内存在 shell/curl；SIGTERM 发给作为 PID 1 的 CLI 并按超时排空退出。N-17 在 Linux Actions runner 实际启动四种组合，验证 GET/HEAD/Range、目录/BaseURL/回退、非 root 文件权限、配置错误及关闭；full 另跑适用的 TLS、代理、WebSocket 行为，min 跑裁剪拒绝测试。容器网络/文件系统不支持某条内核传输路径时须记录实际降级；Docker 镜像测试不代替 macOS/Windows Native 测试。
+就绪和健康检查由外部 HTTP 驱动或编排器完成，不能依赖镜像内存在 shell/curl；SIGTERM 发给作为 PID 1 的 CLI 并按超时排空退出。N-17 在 Linux Actions runner 实际启动四种组合，验证 GET/HEAD/Range、目录/BaseURL/回退、非 root 文件权限、配置错误及关闭；full 另跑适用的 TLS、代理、WebSocket 行为，thin 跑裁剪拒绝测试。容器网络/文件系统不支持某条内核传输路径时须记录实际降级；Docker 镜像测试不代替 macOS/Windows Native 测试。
 
 构建清单包含源码提交、CLI 哈希、基础层 digest、架构、功能档位和实际 artifact 信息，不设镜像或 CLI 体积目标。推送和发布门槛由 D-16 工作流实现，候选镜像可运行与已推送到 registry 分开记录。
 
@@ -441,8 +441,8 @@ T-030 用干净临时消费模块验证候选包内容，避免工作区缓存�
 |---|---|---|
 | 原版基线与迁移兼容 | 三平台；固定原版结果、42 文件的 C/CC/CE 迁移明细和 AD/跳过原因 | 原版已知缺陷单列；完整 Native 适用迁移案例全部通过，不静默减少分母 |
 | Native 检查和资源安全 | 三平台；共享单元/HTTP/CLI/中间件、TLS/代理/WebSocket、安全/取消/背压、平台 I/O | `moon check`、`moon test --target native`，接口生成/格式差异检查；ASan/UBSan 或平台适用内存/句柄检查、sendfile/TransmitFile 实际路径 |
-| Native 构建与消费 | 三平台；min/full CLI、静态/动态库、C/Python/Rust 示例、Node 22/24 预构建与 Mooncakes 候选包 | release 产物在对应 OS/CPU 实际运行；ELF/Mach-O/PE 依赖检查、静态链接、ABI/生命周期和干净外部消费 |
-| Linux Docker | Linux runner；Distroless/scratch × min/full 镜像、digest/体积/资源报告 | N-17；对实际待发布镜像运行测试，不把只构建 Dockerfile 当作通过 |
+| Native 构建与消费 | 三平台；thin/full CLI、静态/动态库、C/Python/Rust 示例、Node 22/24 预构建与 Mooncakes 候选包 | release 产物在对应 OS/CPU 实际运行；ELF/Mach-O/PE 依赖检查、静态链接、ABI/生命周期和干净外部消费 |
+| Linux Docker | Linux runner；Distroless/scratch × thin/full 镜像、digest/体积/资源报告 | N-17；对实际待发布镜像运行测试，不把只构建 Dockerfile 当作通过 |
 | 实验后端 | Linux io_uring 可用/受限场景；三平台 Node 宿主的 wasm-gc 适用测试 | N-07/N-15；可用路径真实执行，受限路径验证降级/错误，不以未实现或空测试通过 |
 | 状态机故障注入/模糊测试 | 三平台 PR 回放固定语料与有界随机用例，手动触发更长探索，保留种子/最小复现/错误日志 | N-21；协议及生命周期不变量、关闭/文件变更/取消竞态通过；测试超时、崩溃及 sanitizer 错误按失败记录 |
 | 发行汇总 | 三平台候选产物、Linux 镜像及 npm/Mooncakes 包清单、哈希和运行链接 | 同一源码提交、依赖与功能清单一致；必需 job、测试或 artifact 缺失/失败则阻止发布 |

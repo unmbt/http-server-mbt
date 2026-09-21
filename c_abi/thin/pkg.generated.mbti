@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "unmbt/http-server-mbt/c_abi/min"
+package "unmbt/http-server-mbt/c_abi/thin"
 
 // Values
 pub fn hs_abi_version() -> UInt

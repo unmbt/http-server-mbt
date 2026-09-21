@@ -51,7 +51,7 @@ As mandated by adversarial integrity rules, the codebase was inspected for any f
   - `PlainAcceptor` implements `Acceptor` by returning `Transport::plain(tcp)`.
 - **Preflight Validation Contract (`server/server.mbt`)**:
   - `with_server_at` enforces strict D-01 preflight validation:
-    - If `acceptor` is `None` and `config.has_tls()` is true, raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")` before binding or listening.
+    - If `acceptor` is `None` and `config.has_tls()` is true, raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")` before binding or listening.
     - If `acceptor` is `Some(acc)` and `config.has_tls()` is true while `!acc.is_tls()`, raises `@core.ConfigError::InvalidTls("TLS is not supported with plain acceptor; use full build or inject a TlsAcceptor")`.
     - Port is never bound if preflight fails; tested empirically in `server_challenger_m1_2_test.mbt` (port remains free and connect immediately fails).
 - **`full/` Package Implementation**:
@@ -128,7 +128,7 @@ As mandated by adversarial integrity rules, the codebase was inspected for any f
 
 - **Coverage Gaps**:
   - WebSocket over TLS (WSS) proxy upgrade is not supported in the stream path (`raw_tcp: None`). This is expected and documented in the design (`T-014 scope`) and will be implemented in Milestone 4.
-  - CLI binary splitting (`cmd/http-server-min` vs `cmd/http-server-full` with preflight CLI exit code 1) is scheduled for Milestone 2.
+  - CLI binary splitting (`cmd/http-server-mbt-thin` vs `cmd/http-server-full` with preflight CLI exit code 1) is scheduled for Milestone 2.
 - **Unverified Items**:
   - None within the scope of Milestone 1.
 

@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:26:30Z
 
 ## Mission
-Establish the E2E Testing Track infrastructure and design comprehensive test cases across Tiers 1-4 for the min/full packaging, TLS decoupling, and Proxy readiness project.
+Establish the E2E Testing Track infrastructure and design comprehensive test cases across Tiers 1-4 for the thin/full packaging, TLS decoupling, and Proxy readiness project.
 
 ## 🔒 My Identity
 - Archetype: test_writer

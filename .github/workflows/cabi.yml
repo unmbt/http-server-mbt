@@ -71,7 +71,7 @@ jobs:
       - name: Update Registry & Dependencies
         run: moon update
 
-      - name: Build and Verify C ABI Libraries (min & full)
+      - name: Build and Verify C ABI Libraries (thin & full)
         run: moon run scripts/build_cabi.mbtx
 
       - name: Setup Node.js (v24 LTS)

@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T12:41:00Z
 
 ## Mission
-Implement Milestone 1: Server & Core Decoupling from TLS for `min` and `full` layered packaging in `http-server-mbt`.
+Implement Milestone 1: Server & Core Decoupling from TLS for `thin` and `full` layered packaging in `http-server-mbt`.
 
 ## 🔒 My Identity
 - Archetype: worker
@@ -15,7 +15,7 @@ Implement Milestone 1: Server & Core Decoupling from TLS for `min` and `full` la
 - Introduce `Transport` struct and `Acceptor` trait in `server/server.mbt`.
 - Provide `PlainAcceptor` in `server/server.mbt`.
 - Update `with_server_at` in `server/server.mbt` to accept optional `acceptor? : &Acceptor`.
-- If `acceptor` is None and `config.has_tls()` is true, raise `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+- If `acceptor` is None and `config.has_tls()` is true, raise `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
 - If `acceptor` is None and `config.has_tls()` is false, default to `PlainAcceptor::new()`.
 - Create new package `full/` with `TlsServerAcceptor` implementing `@server.Acceptor` using `@tls.TlsAcceptor`.
 - Provide `full.with_server_at` injecting `TlsServerAcceptor` when TLS is configured.

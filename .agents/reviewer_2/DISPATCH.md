@@ -7,12 +7,12 @@ Working Directory: E:/project/moonbit/unmbt/http-server-mbt/.agents/reviewer_2
 MANDATORY: You MUST read the user request at E:/project/moonbit/unmbt/http-server-mbt/ORIGINAL_REQUEST.md before starting work.
 
 Context:
-worker_impl_1 has completed the implementation of the C ABI export pipeline (min & full), pure .mbtx build driver script, and standalone C consumer smoke tests. Read worker_impl_1's handoff report at:
+worker_impl_1 has completed the implementation of the C ABI export pipeline (thin & full), pure .mbtx build driver script, and standalone C consumer smoke tests. Read worker_impl_1's handoff report at:
 `E:/project/moonbit/unmbt/http-server-mbt/.agents/worker_impl_1/handoff.md`.
 
 Your Objectives:
 Perform a deep-dive technical review focusing on memory safety, thread synchronization, and C API compatibility:
-1. Examine `c_abi/min/bridge.c` and `c_abi/full/bridge.c`:
+1. Examine `c_abi/thin/bridge.c` and `c_abi/full/bridge.c`:
    - Inspect OS thread creation (`CreateThread`), event handles (`CreateEvent`), synchronization, and memory allocations (`malloc`/`free`).
    - Check shutdown semantics: does `hs_server_stop` avoid deadlock? Does `hs_server_destroy` handle double-free or NULL gracefully?
    - Check `hs_error_copy`: does it respect buffer capacity and prevent buffer overflow?

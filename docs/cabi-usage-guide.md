@@ -6,11 +6,11 @@
 
 ## 1. 产物规范与双版本体系
 
-项目提供 **`min`** 与 **`full`** 两种功能档位：
+项目提供 **`thin`** 与 **`full`** 两种功能档位：
 
 | 构建版本 | 特性与依赖特征 | 典型适用场景 |
 |---|---|---|
-| **`min`** | 纯静态 HTTP 文件服务；**零加密依赖、0 MbedTLS C 桩代码**；动态库 ~1.3 MB，静态库 ~4.4 MB | 内嵌静态资源服务、本地开发调试、资源受限的容器环境 |
+| **`thin`** | 纯静态 HTTP 文件服务；**零加密依赖、0 MbedTLS C 桩代码**；动态库 ~1.3 MB，静态库 ~4.4 MB | 内嵌静态资源服务、本地开发调试、资源受限的容器环境 |
 | **`full`** | 完整 HTTPS（TLS 1.2/1.3，内嵌 MbedTLS 4.2.0）与反向代理（Proxy / Proxy-All） | 生产级 HTTPS 文件站、前端 SPA 网关、API 静态混合代理 |
 
 ### 各平台产物清单
@@ -67,7 +67,7 @@ enum hs_error_code {
     HS_ERR_INVALID_ARG = 2,  /* 传入空指针或非法长度 */
     HS_ERR_IO = 3,           /* 套接字绑定或网络 I/O 异常 */
     HS_ERR_CLOSED = 4,       /* 服务已停止关闭 */
-    HS_ERR_UNSUPPORTED = 5   /* min 版本使用了 TLS 等不支持特性 */
+    HS_ERR_UNSUPPORTED = 5   /* thin 版本使用了 TLS 等不支持特性 */
 };
 
 /* 2. 启动服务 (声明式 JSON 配置) */
@@ -202,7 +202,7 @@ int main(void) {
 fn main() {
     println!("cargo:rustc-link-search=native=lib");
     
-    // 动态链接 min 库:
+    // 动态链接 thin 库:
     println!("cargo:rustc-link-lib=hs_min");
     
     // 若使用静态链接，则改为:
@@ -314,7 +314,7 @@ from ctypes import c_char_p, c_size_t, c_int32, c_uint32, c_void_p, POINTER
 def load_hs_library(variant: str = "full"):
     """
     加载 http-server-mbt 动态库。
-    variant: "full" (含 HTTPS/代理) 或 "min" (纯静态)
+    variant: "full" (含 HTTPS/代理) 或 "thin" (纯静态)
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     search_dirs = [
@@ -575,6 +575,6 @@ const server: HttpServer = createServer(config);
    - **macOS**: 加上 `-Wl,-rpath,'@executable_path/lib'`，或设置 `DYLD_LIBRARY_PATH`。
    - **Windows**: 确保 `hs_min.dll` 放置在与可执行文件同目录下，或加入系统 `PATH`。
 2. **`hs_server_start` 返回 `HS_ERR_UNSUPPORTED`（错误码 5）**：
-   - 在 `min` 版本库中配置了 `cert_file`（TLS 证书）或 `proxy`（代理转发）。请切换到 `full` 版本动态库/静态库（`hs_full`）。
+   - 在 `thin` 版本库中配置了 `cert_file`（TLS 证书）或 `proxy`（代理转发）。请切换到 `full` 版本动态库/静态库（`hs_full`）。
 3. **优雅停机与内存回收**：
    - 必须先调用 `hs_server_stop(server)` 让正在传输的请求完成并排空套接字，随后调用 `hs_server_destroy(server)` 释放实例。对同一个有效实例，`hs_server_stop` 可安全幂等重复调用。

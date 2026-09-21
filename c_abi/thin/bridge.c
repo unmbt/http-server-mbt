@@ -203,7 +203,7 @@ static int32_t parse_min_json_config(hs_server_t* s, const char* json, size_t le
         if (!parse_string_token(&p, key, sizeof(key))) return HS_ERR_CONFIG;
         if (get_char(&p) != ':') return HS_ERR_CONFIG;
 
-        // Check unsupported features in min build
+        // Check unsupported features in thin build
         if (strcmp(key, "cert_file") == 0 || strcmp(key, "key_file") == 0 ||
             strcmp(key, "key_passphrase") == 0 || strcmp(key, "ca_file") == 0 ||
             strcmp(key, "proxy") == 0 || strcmp(key, "proxy_all") == 0 ||

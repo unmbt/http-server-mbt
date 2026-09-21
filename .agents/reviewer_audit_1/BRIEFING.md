@@ -1,14 +1,14 @@
 # BRIEFING — 2026-09-19T03:37:00Z
 
 ## Mission
-Perform comprehensive, evidence-based code and architecture review and adversarial criticism of the `http-server-mbt` min/full decoupling, C ABI contracts, and build_cabi.mbtx pipeline (R1).
+Perform comprehensive, evidence-based code and architecture review and adversarial criticism of the `http-server-mbt` thin/full decoupling, C ABI contracts, and build_cabi.mbtx pipeline (R1).
 
 ## 🔒 My Identity
 - Archetype: reviewer_critic
 - Roles: reviewer, critic
 - Working directory: E:/project/moonbit/unmbt/http-server-mbt/.agents/reviewer_audit_1
 - Original parent: 9ceae8d4-617a-4975-b88f-862fef2841c5
-- Milestone: Milestone 1~3 Review (min/full CLI, C ABI, build_cabi pipeline)
+- Milestone: Milestone 1~3 Review (thin/full CLI, C ABI, build_cabi pipeline)
 - Instance: 1 of 1
 
 ## 🔒 Key Constraints
@@ -26,16 +26,16 @@ Perform comprehensive, evidence-based code and architecture review and adversari
   - `server/moon.pkg`, `server/server.mbt`, `server/transmit_file.mbt`
   - `full/moon.pkg`, `full/full.mbt`, `full/tls_acceptor.mbt`
   - `c_abi/include/http_server.h`
-  - `c_abi/min/moon.pkg`, `c_abi/min/abi.mbt`, `c_abi/min/bridge.c`, `c_abi/min/hs_min.def`
+  - `c_abi/thin/moon.pkg`, `c_abi/thin/abi.mbt`, `c_abi/thin/bridge.c`, `c_abi/thin/hs_min.def`
   - `c_abi/full/moon.pkg`, `c_abi/full/abi.mbt`, `c_abi/full/bridge.c`, `c_abi/full/hs_full.def`
-  - `cmd/http-server-min/` and `cmd/http-server-full/`
+  - `cmd/http-server-mbt-thin/` and `cmd/http-server-full/`
   - `scripts/build_cabi.mbtx`
   - `testdata/c_consumer/` (4 standalone C test programs)
-  - `docs/design.md`, `docs/tasks.md`, `docs/cli-min-full-and-cabi-handover.md`
+  - `docs/design.md`, `docs/tasks.md`, `docs/cli-thin-full-and-cabi-handover.md`
 
 ## Review Checklist
 - **Items reviewed**:
-  - Architecture decoupling (server/ zero crypto/tls, full/ dependency injection, CLI min/full options)
+  - Architecture decoupling (server/ zero crypto/tls, full/ dependency injection, CLI thin/full options)
   - C ABI contracts (5 public hs_* APIs, 0 managed types leaked, buffer safety in hs_error_copy)
   - scripts/build_cabi.mbtx (pure .mbtx, toolchain detection, .drectve stripping, .def export control)
   - Verification test suite (moon check 0 warnings, moon test 230/230 pass, C ABI pipeline pass)

@@ -27,7 +27,7 @@
 
 3. **Preflight Error Handling (`server/server.mbt`)**:
    - Lines 54–78 (`with_server_at`):
-     - When `acceptor` is `None` and `config.has_tls()` is true: raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+     - When `acceptor` is `None` and `config.has_tls()` is true: raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
      - When `acceptor` is `Some(acc)` and `config.has_tls()` is true while `!acc.is_tls()`: raises `@core.ConfigError::InvalidTls("TLS is not supported with plain acceptor; use full build or inject a TlsAcceptor")`.
      - This check executes before `@socket.TcpServer(Addr, reuse_addr=true)` at line 84, ensuring the listening socket is never created or bound when preflight fails.
    - Line 79: `defer effective_acceptor.close()` ensures lifecycle cleanup.
@@ -86,7 +86,7 @@
 ## 3. Caveats
 
 - **WSS Proxy Upgrade**: WebSocket upgrade over encrypted TLS transport (`raw_tcp: None`) is routed through `handle_stream_single_request` where upgrade is not yet implemented (slated for Milestone 4 reverse proxy scope). Plaintext WebSocket upgrade (C040) is fully functional and tested.
-- **Dedicated Split CLI Binaries**: Milestone 1 preserves CLI TLS compatibility via `cmd/http-server-mbt` calling `full`. The dedicated binaries `cmd/http-server-min` and `cmd/http-server-full` are scheduled for Milestone 2.
+- **Dedicated Split CLI Binaries**: Milestone 1 preserves CLI TLS compatibility via `cmd/http-server-mbt` calling `full`. The dedicated binaries `cmd/http-server-mbt-thin` and `cmd/http-server-full` are scheduled for Milestone 2.
 - No other caveats.
 
 ---

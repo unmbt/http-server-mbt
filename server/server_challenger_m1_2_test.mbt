@@ -52,13 +52,13 @@ async test "server challenger m1-2: preflight rejects nonexistent cert/key files
   let mut caught = false
   @server.with_server_at(config, 0, fn(_server) {
     abort(
-      "Server should never start in min build when TLS paths are configured",
+      "Server should never start in thin build when TLS paths are configured",
     )
   }) catch {
     @core.ConfigError::InvalidTls(msg) => {
       caught = true
       assert_true(
-        msg.contains("TLS is not supported in min build") &&
+        msg.contains("TLS is not supported in thin build") &&
         msg.contains("full build"),
       )
     }
@@ -82,7 +82,7 @@ async test "server challenger m1-2: preflight rejects empty string cert/key with
   }) catch {
     @core.ConfigError::InvalidTls(msg) => {
       caught = true
-      assert_true(msg.contains("TLS is not supported in min build"))
+      assert_true(msg.contains("TLS is not supported in thin build"))
     }
     err => abort("Unexpected error: \{err}")
   }

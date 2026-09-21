@@ -398,7 +398,7 @@ Integrity mode: benchmark
 > Goal: Craft prompt → get user approval → delegate to teamwork_preview
 > Requested team: 全功能多智能体团队（Full team）
 
-在 MoonBit 项目 `http-server-mbt` 中设计并实现 `min` 与 `full` 双版本分层打包机制（涵盖 CLI、C ABI 动态库与静态库导出），其中 `min` 版本解耦 `tls` 及其 MbedTLS C 桩代码，保持轻量高效与零加密依赖；`full` 版本集成当前分支已实现的 MbedTLS TLS 功能，并完成反向代理（Proxy）功能的架构设计与接口就绪，为下一步全面支持原版 `http-server` 代理特性奠定基础。
+在 MoonBit 项目 `http-server-mbt` 中设计并实现 `thin` 与 `full` 双版本分层打包机制（涵盖 CLI、C ABI 动态库与静态库导出），其中 `thin` 版本解耦 `tls` 及其 MbedTLS C 桩代码，保持轻量高效与零加密依赖；`full` 版本集成当前分支已实现的 MbedTLS TLS 功能，并完成反向代理（Proxy）功能的架构设计与接口就绪，为下一步全面支持原版 `http-server` 代理特性奠定基础。
 
 Working directory: E:/project/moonbit/unmbt/http-server-mbt
 Integrity mode: development
@@ -408,21 +408,21 @@ Integrity mode: development
 ### R1. 核心包解耦与传输抽象（Decouple Server from TLS）
 重构 `server` 与 `core` 的依赖拓扑，剥离对 `unmbt/http-server-mbt/tls` 的硬依赖。
 - 引入传输层/连接处理抽象（如 `Acceptor` 或连接生命周期处理回调），使基础静态 HTTP 服务器不直接引用 `tls` 包及其底层 100 余个 MbedTLS C 源文件。
-- `min` 版本纯粹基于静态文件服务依赖构建；`full` 版本通过依赖注入接入 TLS 传输层，并预留代理（Proxy）拦截点。
+- `thin` 版本纯粹基于静态文件服务依赖构建；`full` 版本通过依赖注入接入 TLS 传输层，并预留代理（Proxy）拦截点。
 - 保持项目既有全部 183 项测试（C001～C042 原版迁移、TLS 回环测试等）零回归。
 
 ### R2. 双版本 CLI 构建与分发（Min & Full CLI）
-建立 `min` 与 `full` 两种构建形态的 CLI 体系：
-- `min` CLI：精简构建，仅包含静态 HTTP、Range、缓存、预压缩、SPA/try-files、目录列表与 Basic Auth 等主线功能。遇到 `--cert`、`--key`、`--proxy` 等参数时，必须输出明确错误提示并以状态码 1 退出，禁止静默忽略（符合 D-08 / D-15 规范）。
+建立 `thin` 与 `full` 两种构建形态的 CLI 体系：
+- `thin` CLI：精简构建，仅包含静态 HTTP、Range、缓存、预压缩、SPA/try-files、目录列表与 Basic Auth 等主线功能。遇到 `--cert`、`--key`、`--proxy` 等参数时，必须输出明确错误提示并以状态码 1 退出，禁止静默忽略（符合 D-08 / D-15 规范）。
 - `full` CLI：完整构建，包含全部基础功能以及 TLS（`--cert`、`--key`、`--key-passphrase`）及后续代理参数。
-- 支持通过构建脚本或独立包入口构建出独立的 `min` 与 `full` 可执行文件。
+- 支持通过构建脚本或独立包入口构建出独立的 `thin` 与 `full` 可执行文件。
 
 ### R3. C ABI 动静态库双版本导出流水线（C ABI Export Pipeline）
 依据 D-07 与 D-11 的 `hs_*` 托管异步 C ABI 规范：
 - 提供基于 `.mbtx` 脚本驱动的自动化构建工具链，支持导出 C 头文件及对应产物。
-- 分别导出 `min` 与 `full` 版本的动态库（Windows `.dll`、Linux `.so`、macOS `.dylib`）与静态库（Windows `.lib`、Linux/macOS `.a`）。
+- 分别导出 `thin` 与 `full` 版本的动态库（Windows `.dll`、Linux `.so`、macOS `.dylib`）与静态库（Windows `.lib`、Linux/macOS `.a`）。
 - 导出的库不得包含 CLI main 入口，隐藏内部符号，导出符号严格限定为 `hs_*` API。
-- `min` 版本的动态/静态库不携带任何 MbedTLS 符号与对象，实现极端体积优化与无 C 加密依赖。
+- `thin` 版本的动态/静态库不携带任何 MbedTLS 符号与对象，实现极端体积优化与无 C 加密依赖。
 
 ### R4. 反向代理（Proxy）架构设计与接口就绪
 为下一步实现原版 `http-server` 的反向代理功能完成架构设计与接口准备：
@@ -432,21 +432,21 @@ Integrity mode: development
 ## Acceptance Criteria
 
 ### 依赖隔离与编译验证
-- [ ] 运行构建脚本或编译命令验证：`min` 版本编译过程中完全不参与编译 `tls` 包及其 MbedTLS C 桩代码，产物体积显著小于 `full` 版本。
+- [ ] 运行构建脚本或编译命令验证：`thin` 版本编译过程中完全不参与编译 `tls` 包及其 MbedTLS C 桩代码，产物体积显著小于 `full` 版本。
 - [ ] `moon check --target native` 在所有改动包上保持 0 错误。
 - [ ] `moon test --target native` 全量通过（既有 183 项测试零回归）。
 
 ### CLI 行为与参数校验
-- [ ] `min` CLI 独立执行验证：正常提供静态文件与 SPA 服务；传入 `--cert` 或 `--proxy` 时报错退出（exit code 1），提示当前构建不支持该功能。
+- [ ] `thin` CLI 独立执行验证：正常提供静态文件与 SPA 服务；传入 `--cert` 或 `--proxy` 时报错退出（exit code 1），提示当前构建不支持该功能。
 - [ ] `full` CLI 独立执行验证：正常加载证书并支持真实 HTTPS 请求与 TLS 1.3/1.2 协商。
 
 ### C ABI 动静态库导出
-- [ ] 运行自动化构建脚本，能成功在 Windows 本机生成 `min` 和 `full` 的动态库（`.dll`）与静态库（`.lib`）。
+- [ ] 运行自动化构建脚本，能成功在 Windows 本机生成 `thin` 和 `full` 的动态库（`.dll`）与静态库（`.lib`）。
 - [ ] 导出产物经符号检查确认具备 `hs_abi_version` 等 `hs_*` 接口，无 `main` 符号污染。
 - [ ] 提供最小 C 调用验证程序，成功链接动态库/静态库并完成初始化与 ABI 版本查询。
 
 ### 规范文档与 Proxy 设计
-- [ ] 更新 `docs/design.md`、`docs/tasks.md` 或输出专项 ADR，清晰记录 min/full 解耦设计决策与 Proxy 架构接入方案。
+- [ ] 更新 `docs/design.md`、`docs/tasks.md` 或输出专项 ADR，清晰记录 thin/full 解耦设计决策与 Proxy 架构接入方案。
 
 ## Follow-up — 2026-09-18T12:30:50Z
 
@@ -459,7 +459,7 @@ Integrity mode: development
    - 聚焦完成 Milestone 1（核心包架构解耦：server 与 tls 解耦，传输层抽象）与 Milestone 2（Min 与 Full 双版本 CLI 构建、参数校验与隔离、全量 183 项既有测试及新增 CLI 测试保障）。
    - 完成 Proxy 的架构设计与接口预留文档梳理。
 2. 【关键暂停点（PAUSE / STOP）】：
-   - 在完成 CLI 部分的 min/full 构建、测试及验证后，在准备开始做 Milestone 3（动态库与静态库导出流水线）之前，必须：
+   - 在完成 CLI 部分的 thin/full 构建、测试及验证后，在准备开始做 Milestone 3（动态库与静态库导出流水线）之前，必须：
      a. 详细记录已完成的工作内容（包括包拓扑变更、CLI 产物差异、编译与测试验证数据）；
      b. 整理动静态库导出的后续接续方案与指引文档；
       c. 立即停下来（PAUSE / STOP），向用户汇报已完成的工作与接续文档位置，暂不启动动静态库导出的实际编码与构建！
@@ -473,27 +473,27 @@ Integrity mode: development
 > Goal: Craft prompt → get user approval → delegate to teamwork_preview
 > Requested team: 全功能多智能体团队（Full team）
 
-基于已完成的架构解耦与 CLI 双版本打包基础（详见 `docs/cli-min-full-and-cabi-handover.md`），在 MoonBit 项目 `http-server-mbt` 中设计并实现 `min` 与 `full` 双版本 C ABI 动静态库导出流水线，包括纯净 `hs_*` 符号导出控制、`.mbtx` 驱动的动静态库构建脚本、以及独立的 C 语言消费程序验证。
+基于已完成的架构解耦与 CLI 双版本打包基础（详见 `docs/cli-thin-full-and-cabi-handover.md`），在 MoonBit 项目 `http-server-mbt` 中设计并实现 `thin` 与 `full` 双版本 C ABI 动静态库导出流水线，包括纯净 `hs_*` 符号导出控制、`.mbtx` 驱动的动静态库构建脚本、以及独立的 C 语言消费程序验证。
 
 Working directory: E:/project/moonbit/unmbt/http-server-mbt
 Integrity mode: development
 
 ## References
 - 规格契约与设计文档: `docs/design.md` (D-07, D-11), `docs/tasks.md` (T-020, T-027)
-- 接续交接指南: `docs/cli-min-full-and-cabi-handover.md`
+- 接续交接指南: `docs/cli-thin-full-and-cabi-handover.md`
 
 ## Requirements
 
 ### R1. C ABI 桥接层与符号纯洁性（C ABI Interface & Symbol Isolation）
 依据 D-07 与 D-11 的 `hs_*` 托管异步 C ABI 规范：
 - 创建 C 桥接包，导出纯 C 头文件（`http_server.h`）与 `hs_*` 接口（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_error_copy` 等），不暴露 MoonBit 托管对象或内部 runtime 布局。
-- 分别支持 `min`（纯静态 HTTP 服务器，零加密 C 依赖）与 `full`（集成 TLS 传输层与代理能力）两组导出实现。
-- 建立导出符号隔离控制机制（Windows 使用 `.def` 文件或显式导出标记）：确保动态库与静态库中严禁包含 CLI `main` 入口符号，严禁泄露未授权内部符号；`min` 库中绝对不包含任何 MbedTLS / PSA-Crypto 符号。
+- 分别支持 `thin`（纯静态 HTTP 服务器，零加密 C 依赖）与 `full`（集成 TLS 传输层与代理能力）两组导出实现。
+- 建立导出符号隔离控制机制（Windows 使用 `.def` 文件或显式导出标记）：确保动态库与静态库中严禁包含 CLI `main` 入口符号，严禁泄露未授权内部符号；`thin` 库中绝对不包含任何 MbedTLS / PSA-Crypto 符号。
 
 ### R2. 纯 `.mbtx` 驱动的动静态库构建流水线（Build Pipeline）
 编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器（如 clang / cl / lib.exe / llvm-ar）：
 - 自动化完成 MoonBit 对象文件编译生成与中间目录解析。
-- 构建导出 `min` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）。
+- 构建导出 `thin` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）。
 - 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。
 - 产物输出至固定发行目录（如 `target/cabi/`），并提供清晰的构建日志与产物清单。
 
@@ -528,22 +528,22 @@ Integrity mode: development
 > Goal: Craft prompt → get user approval → delegate to teamwork_preview
 > Requested team: 全功能多智能体团队（审查、对抗挑战、规范审计独立运作）
 
-对已完成的 `http-server-mbt` 项目 `min` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestone 1 ~ 3，commit `9cabfb9` 与 `a5c3edf`）进行全方位、多视角的独立代码审查（Review）、对抗挑战（Adversarial Challenge）与规范合规审计（Audit），确保无内存泄漏、无符号污染、无边界未捕获崩溃，严格契约达标。
+对已完成的 `http-server-mbt` 项目 `thin` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestone 1 ~ 3，commit `9cabfb9` 与 `a5c3edf`）进行全方位、多视角的独立代码审查（Review）、对抗挑战（Adversarial Challenge）与规范合规审计（Audit），确保无内存泄漏、无符号污染、无边界未捕获崩溃，严格契约达标。
 
 Working directory: E:/project/moonbit/unmbt/http-server-mbt
 Integrity mode: development
 
 ## References
 - 规格契约与设计文档: `docs/design.md` (D-07, D-08, D-11), `docs/tasks.md` (T-020, T-027)
-- 历史交接指南: `docs/cli-min-full-and-cabi-handover.md`
-- 核心实现包: `c_abi/`, `cmd/http-server-min/`, `cmd/http-server-full/`, `full/`, `server/`
+- 历史交接指南: `docs/cli-thin-full-and-cabi-handover.md`
+- 核心实现包: `c_abi/`, `cmd/http-server-mbt-thin/`, `cmd/http-server-full/`, `full/`, `server/`
 - 构建驱动与测试: `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
 
 ## Requirements
 
 ### R1. 多维度代码与架构独立审查（Independent Architecture & Code Review）
 - **架构解耦审查**：审查 `server/` 是否彻底解耦加密 C 依赖（`server/moon.pkg` 仅依赖基础运行时与系统 I/O，无 `tls` 依赖）；审查 `full/` 是否纯粹通过依赖注入承载 TLS Acceptor。
-- **C ABI 契约审查**：逐行审查 `c_abi/include/http_server.h`、`c_abi/min/` 与 `c_abi/full/`：
+- **C ABI 契约审查**：逐行审查 `c_abi/include/http_server.h`、`c_abi/thin/` 与 `c_abi/full/`：
   - 导出接口契约是否严格遵循 D-07 / D-11 规范（仅暴露 `hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy` 5 个公开 API）。
   - 是否有任何 MoonBit 托管对象（String, Bytes, 闭包指针）跨越 ABI 泄露给外部宿主。
   - 内存与生命周期管理：句柄分配与销毁是否具备所有权边界，错误信息拷贝是否防止缓冲区溢出。
@@ -561,7 +561,7 @@ Integrity mode: development
   - 使用 `dumpbin /EXPORTS` 严格检查 `target/cabi/hs_min.dll` 与 `target/cabi/hs_full.dll`，确认仅导出 5 个公共 `hs_*` 符号，严禁存在 CLI `main` 入口或任何 MoonBit 编译器运行时符号。
   - 使用 `dumpbin /SYMBOLS` 严格审计 `target/cabi/hs_min_static.lib`，确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
 - **CLI 拦截与退出码挑战**：
-  - 向 `http-server-min` 传入 `--cert`、`--key`、`--proxy` 等高级参数，确认严格退出状态码 1，标准错误输出可操作指引，且系统上无残留端口监听。
+  - 向 `http-server-mbt-thin` 传入 `--cert`、`--key`、`--proxy` 等高级参数，确认严格退出状态码 1，标准错误输出可操作指引，且系统上无残留端口监听。
 
 ### R3. SDD 规范合规审计与全量质量门禁（SDD Audit & Regression Gate）
 - **规范与任务一致性核验**：
@@ -582,8 +582,8 @@ Integrity mode: development
 ### 对抗挑战通过标准
 - [ ] C ABI 对抗测试通过：NULL、非法 JSON、极端端口、非法 TLS 路径输入均安全返回对应错误码，0 崩溃、0 段错误。
 - [ ] 状态机重入测试通过：多次 start/stop/destroy 调用具备幂等性与防护，无悬挂指针。
-- [ ] 符号隔离审计通过：动态库导出符号严格仅为 5 个 `hs_*`，无 `main` 符号；`min` 静态库零 MbedTLS 符号。
-- [ ] CLI 对抗测试通过：`http-server-min` 遇到不支持选项严格退出码 1 且无监听。
+- [ ] 符号隔离审计通过：动态库导出符号严格仅为 5 个 `hs_*`，无 `main` 符号；`thin` 静态库零 MbedTLS 符号。
+- [ ] CLI 对抗测试通过：`http-server-mbt-thin` 遇到不支持选项严格退出码 1 且无监听。
 
 ### SDD 审计与全仓门禁标准
 - [ ] `docs/design.md` 与 `docs/tasks.md` 规范与状态记录 100% 准确反应该实现与交付证据。

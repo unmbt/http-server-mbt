@@ -40,10 +40,10 @@
   - 确认绝对不含任何 `mbedtls_*` 或 `psa_*` 符号。
 
 ### 4. CLI 不支持选项拦截与退出码测试
-- 执行 CLI 负面测试（可直接运行二进制或 `moon run cmd/http-server-min -- ...`）：
-  - 传入 `--cert test.crt`、`--key test.key`、`--proxy http://127.0.0.1:3000`、`-P http://...`、`--proxy-all`、`--proxy-config` 等 min 构建不支持的高级参数。
+- 执行 CLI 负面测试（可直接运行二进制或 `moon run cmd/http-server-mbt-thin -- ...`）：
+  - 传入 `--cert test.crt`、`--key test.key`、`--proxy http://127.0.0.1:3000`、`-P http://...`、`--proxy-all`、`--proxy-config` 等 thin 构建不支持的高级参数。
   - 确认进程严格以退出码 1 退出。
-  - 确认 stderr 输出清晰可操作指引（包含 "not supported in min build" 等）。
+  - 确认 stderr 输出清晰可操作指引（包含 "not supported in thin build" 等）。
   - 确认系统上无残留端口监听。
 
 ## Deliverables
@@ -66,7 +66,7 @@ Your mission (R2):
 1. C ABI edge cases: Verify NULL inputs (NULL config, NULL err_buf, NULL out_server, NULL server handle), empty/malformed JSON strings, extreme ports (-1, 0, 65536, 99999), invalid bind addresses, invalid roots, negative TLS combinations (cert without key, key without cert, missing files, corrupted certs). Verify safe error codes, 0 crashes, 0 segfaults, 0 panics.
 2. State machine re-entry & lifecycle: Verify double start, double stop, destroy without start, double destroy, operations on destroyed handles.
 3. Symbol isolation audit via dumpbin: Run dumpbin /EXPORTS on target/cabi/hs_min.dll and hs_full.dll (verify only 5 hs_* symbols, no main, no runtime symbols). Run dumpbin /SYMBOLS on target/cabi/hs_min_static.lib (verify zero mbedtls_* / psa_* symbols).
-4. CLI rejection testing: Test http-server-min with unsupported options (--cert, --key, --proxy, -P, --proxy-all, --proxy-config). Verify exit code 1, actionable stderr, and zero lingering ports.
+4. CLI rejection testing: Test http-server-mbt-thin with unsupported options (--cert, --key, --proxy, -P, --proxy-all, --proxy-config). Verify exit code 1, actionable stderr, and zero lingering ports.
 
 You may write C test programs or scripts to execute these test cases and gather empirical evidence.
 

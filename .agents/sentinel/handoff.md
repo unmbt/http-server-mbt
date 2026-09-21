@@ -1,7 +1,7 @@
 # Handoff Report — Sentinel (Post-Implementation Review, Challenge & Compliance Audit Dispatch)
 
 ## Observation
-- 收到用户指令：对已完成的 `http-server-mbt` 项目 `min` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestone 1 ~ 3，commit `9cabfb9` 与 `a5c3edf`）进行全方位、多视角的独立代码审查（Review）、对抗挑战（Adversarial Challenge）与规范合规审计（Audit），确保无内存泄漏、无符号污染、无边界未捕获崩溃，严格契约达标。
+- 收到用户指令：对已完成的 `http-server-mbt` 项目 `thin` 与 `full` 双版本 CLI 打包及 C ABI 动静态库导出流水线（Milestone 1 ~ 3，commit `9cabfb9` 与 `a5c3edf`）进行全方位、多视角的独立代码审查（Review）、对抗挑战（Adversarial Challenge）与规范合规审计（Audit），确保无内存泄漏、无符号污染、无边界未捕获崩溃，严格契约达标。
 - 请求明确要求“全功能多智能体团队（审查、对抗挑战、规范审计独立运作）”。
 
 ## Logic Chain

@@ -116,16 +116,16 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-020 C ABI v1 托管异步动态库** — 状态：进行中（Windows 分项交付，2026-09-18）。需求：R-N06、R-SAFE、R-N14；设计：D-07、D-11；依赖：T-002、T-015、T-016、T-019。
   - 交付：静态/动态库及 Node 共用的异步 C 头文件、版本/错误码、跨线程命令与最终通知、chunk 所有权、自动关闭契约和三平台动态库；内部循环与托管布局不导出。
   - 验收：N-03/N-09/N-19，C 程序真实启动服务及嵌入静态引擎，无手动 poll；接纳回调次数、并发提交/关闭、输入复制/借用有效期、取消排空和卸载全部验证，导出无 CLI main/公开循环接口。
-  - Windows 分项（2026-09-18，Windows x86_64，MSVC 14.42，Moon 0.1.20260904）：`c_abi/include/http_server.h` 声明 5 项纯 C API（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`）与错误码/不透明句柄；`c_abi/min` 与 `c_abi/full` 分别实现轻量静态与全功能（TLS/代理）运行时桥接；`scripts/build_cabi.mbtx` 自动化构建生成 `target/cabi/hs_min.dll` (1.3MB) 与 `target/cabi/hs_full.dll` (2.6MB)；MSVC .def 模块定义文件与 llvm-objcopy `.drectve` 剥离确保绝对符号隔离，dumpbin 验证严格仅导出 5 项 `hs_*` 符号，0 `main`，0 `moonbit_*` 泄露；独立 C 消费者 `testdata/c_consumer/test_dynamic_min.c` 与 `testdata/c_consumer/test_dynamic_full.c` 编译并运行通过（ABI 版本 0x00010000、错误文本拷贝、TLS 预检拦截、服务启动/停止/销毁生命周期全 PASS）。Linux/macOS 分项待 CI 接入，总任务保持未勾选。
-  - 跨平台 CI 扩展（2026-09-19）：更新 `scripts/build_cabi.mbtx`，通过 `detect_target_os` 自动支持 Windows (MSVC `link.exe` + `.def`)、Linux (Clang `-shared` + ELF `version-script`) 与 macOS (Clang `-dynamiclib` + `exported_symbols_list`)；新增 `c_abi/min/hs_min.version`、`c_abi/full/hs_full.version`、`c_abi/min/hs_min_macos.syms`、`c_abi/full/hs_full_macos.syms` 确保严格导出 5 项 `hs_*` 符号；在 `.github/workflows/tls-and-lib-export.yml` 中接入 Windows、Linux、macOS 三系统矩阵自动化构建与 C consumer 测试。
+  - Windows 分项（2026-09-18，Windows x86_64，MSVC 14.42，Moon 0.1.20260904）：`c_abi/include/http_server.h` 声明 5 项纯 C API（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`）与错误码/不透明句柄；`c_abi/thin` 与 `c_abi/full` 分别实现轻量静态与全功能（TLS/代理）运行时桥接；`scripts/build_cabi.mbtx` 自动化构建生成 `target/cabi/hs_min.dll` (1.3MB) 与 `target/cabi/hs_full.dll` (2.6MB)；MSVC .def 模块定义文件与 llvm-objcopy `.drectve` 剥离确保绝对符号隔离，dumpbin 验证严格仅导出 5 项 `hs_*` 符号，0 `main`，0 `moonbit_*` 泄露；独立 C 消费者 `testdata/c_consumer/test_dynamic_min.c` 与 `testdata/c_consumer/test_dynamic_full.c` 编译并运行通过（ABI 版本 0x00010000、错误文本拷贝、TLS 预检拦截、服务启动/停止/销毁生命周期全 PASS）。Linux/macOS 分项待 CI 接入，总任务保持未勾选。
+  - 跨平台 CI 扩展（2026-09-19）：更新 `scripts/build_cabi.mbtx`，通过 `detect_target_os` 自动支持 Windows (MSVC `link.exe` + `.def`)、Linux (Clang `-shared` + ELF `version-script`) 与 macOS (Clang `-dynamiclib` + `exported_symbols_list`)；新增 `c_abi/thin/hs_min.version`、`c_abi/full/hs_full.version`、`c_abi/thin/hs_min_macos.syms`、`c_abi/full/hs_full_macos.syms` 确保严格导出 5 项 `hs_*` 符号；在 `.github/workflows/tls-and-lib-export.yml` 中接入 Windows、Linux、macOS 三系统矩阵自动化构建与 C consumer 测试。
 
 - [ ] **T-021 C 与 Python 最小集成示例** — 状态：未开始。需求：R-N06、R-N14；设计：D-07；依赖：T-020。
   - 交付：C 动态加载与 Python ctypes 的服务启动/停止、框架接入两种示例，异步通知/正文与自动排空关闭；C/Rust 静态消费归 T-027，Node 归 T-028。
   - 验收：N-19 与实际 GET/HEAD/Range、Next、分块、错误/取消、多实例关闭；无调度循环、宿主回调上下文合法、不依赖 Python GC，最终释放 chunk/句柄后才能卸载。
 
 - [ ] **T-022 独立二进制与镜像分发** — 状态：未开始。需求：R-N02、R-N08、R-N09、R-N12、R-N13；设计：D-08、D-11、D-12、D-15、D-16；依赖：T-011、T-012、T-014、T-016、T-017、T-018、T-019、T-020、T-027、T-028、T-032。
-  - 交付：精简/完整 CLI、Linux 静态 ELF、Distroless/scratch × min/full 的 Docker 构建声明、固定基础层 digest/功能标签/镜像清单；将三平台打包与 Linux 镜像验证接入 Actions。汇总库/Node target、CRT、PIC、系统库、TLS/资源许可，更新实际发布/安装说明。
-  - 验收：N-10/N-17；三平台 CLI 干净环境独立启动，四种容器组合真实执行、非 root/只读挂载/无 shell 就绪探测及 SIGTERM 排空通过。full 保留全部兼容能力，min 拒绝裁去功能；同档位 CLI 哈希一致，镜像及基础层体积另报。候选包不等于已推送，静态 archive、DLL import library 和 .node 清楚区分。
+  - 交付：精简/完整 CLI、Linux 静态 ELF、Distroless/scratch × thin/full 的 Docker 构建声明、固定基础层 digest/功能标签/镜像清单；将三平台打包与 Linux 镜像验证接入 Actions。汇总库/Node target、CRT、PIC、系统库、TLS/资源许可，更新实际发布/安装说明。
+  - 验收：N-10/N-17；三平台 CLI 干净环境独立启动，四种容器组合真实执行、非 root/只读挂载/无 shell 就绪探测及 SIGTERM 排空通过。full 保留全部兼容能力，thin 拒绝裁去功能；同档位 CLI 哈希一致，镜像及基础层体积另报。候选包不等于已推送，静态 archive、DLL import library 和 .node 清楚区分。
 
 - [ ] **T-023 可运行 io_uring 实验后端** — 状态：未开始。需求：R-N04；设计：D-05；依赖：T-016、T-017。
   - 交付：Linux 可选后端、opcode 探测、platform/auto/强制选择、实验标识与能力输出。
@@ -147,7 +147,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：三平台静态 archive、同版 C 头文件、runtime/依赖及传递链接清单、适用 PIC/CRT 构建；独立 C 与 Rust Cargo 最小消费示例，不要求 Rust 重写引擎或提供 .rlib。
   - 验收：N-13 与适用 N-09；三平台真实链接并执行 GET/HEAD/Range、Next、流式读取、取消/关闭，动态与静态结果一致。无 CLI main/重复 runtime/符号污染，MSVC 静态 .lib 与 DLL import library 可区分，PIC archive 可链接进测试共享对象；.node 实际消费在 T-028 重验。
   - Windows 分项（2026-09-18，Windows x86_64，MSVC lib.exe，Moon 0.1.20260904）：`scripts/build_cabi.mbtx` 驱动对象剥离与静态归档，成功生成 `target/cabi/hs_min_static.lib` (4.4MB) 与 `target/cabi/hs_full_static.lib` (6.9MB)；dumpbin /SYMBOLS 严格验证 `hs_min_static.lib` 中零 `mbedtls_*` / `psa_*` 符号与零 `main` 污染；独立 C 静态消费者 `testdata/c_consumer/test_static_min.c` 与 `testdata/c_consumer/test_static_full.c` 真实链接 MSVC 静态库并执行通过，断言 100% 达成。Linux/macOS archive 与 Rust Cargo 消费待后续接入，总任务保持未勾选。
-  - 跨平台静态库与多语言文档交付（2026-09-19）：更新 `scripts/build_cabi.mbtx` 支持 Linux/macOS `ar rcs` 静态归档；落地详细多语言开发指南 `docs/cabi-usage-guide.md`，提供 C/C++、Rust（RAII safe wrapper + build.rs）、Python（ctypes context manager）、Go（cgo）、Node.js（koffi）与 Bun 的完整可运行示例与静态链接系统库矩阵；CI 流水线解耦发布独立 CLI 单文件（`http-server-mbt`、`http-server-min`）与纯净 C ABI SDK 归档（`.zip` / `.tar.gz`），`scripts/install.sh` 与 `install.ps1` 默认安装完整版并新增 `--min` / `-Min` 入参支持安装精简版。
+  - 跨平台静态库与多语言文档交付（2026-09-19）：更新 `scripts/build_cabi.mbtx` 支持 Linux/macOS `ar rcs` 静态归档；落地详细多语言开发指南 `docs/cabi-usage-guide.md`，提供 C/C++、Rust（RAII safe wrapper + build.rs）、Python（ctypes context manager）、Go（cgo）、Node.js（koffi）与 Bun 的完整可运行示例与静态链接系统库矩阵；CI 流水线解耦发布独立 CLI 单文件（`http-server-mbt`、`http-server-mbt-thin`）与纯净 C ABI SDK 归档（`.zip` / `.tar.gz`），`scripts/install.sh` 与 `install.ps1` 默认安装完整版并新增 `--thin` / `-Min` 入参支持安装精简版。
 
 - [ ] **T-028 Node-API 插件与 npm 适配包** — 状态：未开始。需求：R-N09、R-SAFE、R-N14；设计：D-07、D-11、D-12；依赖：T-020、T-027。
   - 交付：静态嵌入引擎的 .node，调用库托管 hs_* 异步接口，映射 Promise/流/AbortSignal/close 和按 napi_env 清理；不在 addon 重建手动轮询线程。三平台预构建、Linux glibc/musl 区分与构建说明。
@@ -300,7 +300,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 文档版本 2 校验记录（2026-09-09，Windows，moon 0.1.20260824）：通过临时 `.mbtx` 文档检查器核对四文件的稳定编号、59 处本地链接/锚点、Markdown 围栏/行尾空白、30 项未勾选任务及依赖无环；与本地固定原版核对 42/42 测试文件、28 项公共及 2 项错误 fixtures。执行方式为 `moon run --target native <临时文档检查器.mbtx>`，另执行 `git diff --check`；检查器不作为项目源文件提交。此记录仅证明文档一致性，不是应用测试、库构建、后端或发布验证；没有运行项目 `moon info` / `moon fmt`，没有完成任何实施任务。
 
-文档版本 3 校验记录（2026-09-09，同一 Windows 工具链）：更新并运行上述临时 `.mbtx` 检查器与 `git diff --check`，核对 32 项未勾选任务、依赖无环、16 个设计章节、18 个新增测试组、稳定编号与 59 处本地链接；42/42 原版测试文件、28 项公共及 2 项错误 fixtures 覆盖保留。另人工核对 Distroless/scratch × min/full 与 CLI 档位、Windows 本机→Actions 阶段顺序、分项前置条件和最终三平台门槛。结果均通过；没有改动源码、Dockerfile 或 GitHub Actions 文件，没有执行应用测试、Docker 构建、远程 workflow 或发布。
+文档版本 3 校验记录（2026-09-09，同一 Windows 工具链）：更新并运行上述临时 `.mbtx` 检查器与 `git diff --check`，核对 32 项未勾选任务、依赖无环、16 个设计章节、18 个新增测试组、稳定编号与 59 处本地链接；42/42 原版测试文件、28 项公共及 2 项错误 fixtures 覆盖保留。另人工核对 Distroless/scratch × thin/full 与 CLI 档位、Windows 本机→Actions 阶段顺序、分项前置条件和最终三平台门槛。结果均通过；没有改动源码、Dockerfile 或 GitHub Actions 文件，没有执行应用测试、Docker 构建、远程 workflow 或发布。
 
 文档版本 4 校验记录（2026-09-10，Windows，moon 0.1.20260824）：运行临时 `http_server_sdd_validate_v4.mbtx`，核对 42/42 原版测试文件、R-N01～R-N16、D-01～D-18、N-01～N-21、T-001～T-034、CC-01～CC-28、CE-01～CE-02；34 个任务均未勾选，当前任务依赖不引用已撤出的 T-024，量化性能旧表述未出现在当前契约。另核对 66 个 Markdown 链接、偶数个代码围栏和无行尾空白，并执行 `git diff --check`；结果均通过。检查器位于系统临时目录，不作为项目源文件提交；本轮未运行源码、`moon info`、`moon fmt`、Docker、Actions 或发布验证，因此不代表功能实现完成。
 

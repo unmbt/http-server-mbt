@@ -60,7 +60,7 @@ pub async fn with_server(
 /// Preflight validation contract:
 /// - If acceptor is None:
 ///   - If config.has_tls() is true, immediately raises
-///     @core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")
+///     @core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")
 ///     BEFORE binding or listening.
 ///   - If config.has_tls() is false, uses PlainAcceptor::new().
 /// - If acceptor is Some(acc):
@@ -86,7 +86,7 @@ pub async fn with_server_at(
     None => {
       if config.has_tls() {
         raise @core.ConfigError::InvalidTls(
-          "TLS is not supported in min build; use full build",
+          "TLS is not supported in thin build; use full build",
         )
       }
       PlainAcceptor::new()

@@ -21,7 +21,7 @@ Forensic integrity audit of worker_impl_1's C ABI export pipeline, .mbtx build d
 - Updated: 2026-09-18T13:58:05Z
 
 ## Audit Scope
-- **Work product**: `c_abi/include/http_server.h`, `c_abi/min/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`, and docs updates
+- **Work product**: `c_abi/include/http_server.h`, `c_abi/thin/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`, and docs updates
 - **Profile loaded**: General Project (Integrity Forensics)
 - **Audit type**: forensic integrity check
 

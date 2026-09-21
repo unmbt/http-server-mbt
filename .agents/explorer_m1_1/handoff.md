@@ -54,7 +54,7 @@
 
 ## 2. Logic Chain
 
-1. **Premise**: To produce a `min` server build that does not compile or link any of the 109 MbedTLS C files (reducing archive size from 6.17 MB to 33 KB), `server/moon.pkg` must remove `"unmbt/http-server-mbt/tls"`.
+1. **Premise**: To produce a `thin` server build that does not compile or link any of the 109 MbedTLS C files (reducing archive size from 6.17 MB to 33 KB), `server/moon.pkg` must remove `"unmbt/http-server-mbt/tls"`.
 2. **Step 1 (Observation 1)**: Since all `@tls` references in `server` are confined to `server/server.mbt`, abstracting the connection type and connection acceptance inside `server/server.mbt` completely removes the need for `server` to import `tls`.
 3. **Step 2 (Interface Abstraction)**:
    - Defining `pub struct Transport { reader : &@io.Reader, writer : &@io.Writer, raw_fd : @types.Fd?, raw_tcp : @socket.Tcp?, close_fn : () -> Unit }` abstracts byte streaming while retaining `raw_fd` for Win32 `TransmitFile` zero-copy and `raw_tcp` for WebSocket proxy upgrade (`@websocket.from_http_server`, C040).
@@ -76,7 +76,7 @@
 ## 3. Caveats
 
 1. **CLI and C ABI Milestones**:
-   This plan focuses strictly on Milestone 1 (`server` decoupling from `tls`). Packaging the dual CLIs (`cmd/http-server-min` vs `cmd/http-server-full`) is delegated to Milestone 2. Exporting C ABI dynamic/static libraries (`scripts/build_cabi.mbtx`) is delegated to Milestone 3. Reverse proxy state machine implementation is delegated to Milestone 4.
+   This plan focuses strictly on Milestone 1 (`server` decoupling from `tls`). Packaging the dual CLIs (`cmd/http-server-mbt-thin` vs `cmd/http-server-full`) is delegated to Milestone 2. Exporting C ABI dynamic/static libraries (`scripts/build_cabi.mbtx`) is delegated to Milestone 3. Reverse proxy state machine implementation is delegated to Milestone 4.
 2. **WebSocket Upgrade Dependency on `@socket.Tcp`**:
    Upstream `moonbitlang/async/websocket` requires `@http.ServerConnection`, which is currently bound to `@socket.Tcp`. Hence, `Transport` exposes `raw_tcp : @socket.Tcp?`, allowing `handle_client` to route plaintext TCP connections through `ServerConnection` so that C040 WebSocket proxy upgrade tests remain 100% functional.
 3. **No Code Modified Outside Explorer Folder**:

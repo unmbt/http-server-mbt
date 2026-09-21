@@ -897,7 +897,7 @@ async fn verify_mbedtls_absence(tc : Toolchain, lib_path : String) -> Unit {
   guard !stdout.contains("mbedtls_") && !stdout.contains("psa_") else {
     fail_pipeline("\{lib_path} contains forbidden mbedtls or psa symbols!")
   }
-  println("  -> Verified: zero mbedtls/psa symbols in min static archive.")
+  println("  -> Verified: zero mbedtls/psa symbols in thin static archive.")
 }
 
 ///|
@@ -1037,12 +1037,12 @@ async fn main {
   }
 
   println("2. Building MoonBit packages...")
-  let test_min = @shell.Cmd("moon", ["test", "c_abi/min", "--target", "native", "--release"]).output()
+  let test_min = @shell.Cmd("moon", ["test", "c_abi/thin", "--target", "native", "--release"]).output()
   if test_min.exit_code() != 0 {
-    println("ERROR: moon test c_abi/min failed with exit code \{test_min.exit_code()}")
+    println("ERROR: moon test c_abi/thin failed with exit code \{test_min.exit_code()}")
     println("STDOUT:\n" + test_min.stdout())
     println("STDERR:\n" + test_min.stderr())
-    fail_pipeline("moon test c_abi/min failed")
+    fail_pipeline("moon test c_abi/thin failed")
   }
   let test_full = @shell.Cmd("moon", ["test", "c_abi/full", "--target", "native", "--release"]).output()
   if test_full.exit_code() != 0 {
@@ -1057,18 +1057,18 @@ async fn main {
     Linux | MacOS => ".o"
   }
   try {
-    ignore(@shell.Cmd("moon", ["build", "c_abi/min", "--target", "native", "--release"]).output())
+    ignore(@shell.Cmd("moon", ["build", "c_abi/thin", "--target", "native", "--release"]).output())
   } catch {
     _ => ()
   }
-  let min_obj = "_build/native/release/build/c_abi/min/min\{ext}"
-  let min_bridge = "_build/native/release/build/c_abi/min/bridge\{ext}"
-  if !file_exists(min_obj) && file_exists("_build/native/release/build/c_abi/min/min.c") {
-    println("Compiling min.c to min\{ext}...")
-    compile_c_file(tc, "_build/native/release/build/c_abi/min/min.c", min_obj)
+  let min_obj = "_build/native/release/build/c_abi/thin/thin\{ext}"
+  let min_bridge = "_build/native/release/build/c_abi/thin/bridge\{ext}"
+  if !file_exists(min_obj) && file_exists("_build/native/release/build/c_abi/thin/thin.c") {
+    println("Compiling thin.c to thin\{ext}...")
+    compile_c_file(tc, "_build/native/release/build/c_abi/thin/thin.c", min_obj)
   }
   if !file_exists(min_obj) || !file_exists(min_bridge) {
-    fail_pipeline("moon build c_abi/min failed to generate \{min_obj} or \{min_bridge}")
+    fail_pipeline("moon build c_abi/thin failed to generate \{min_obj} or \{min_bridge}")
   }
 
   try {
@@ -1098,9 +1098,9 @@ async fn main {
     @fs.read_file("c_abi/include/http_server.h").binary(),
   )
 
-  println("4. Building min variant (zero crypto, static HTTP server)...")
+  println("4. Building thin variant (zero crypto, static HTTP server)...")
   build_variant(
-    "min",
+    "thin",
     tc,
     ["/cmd/", "/build/tls/", "/full/", "/c_abi/full/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
   )
@@ -1109,7 +1109,7 @@ async fn main {
   build_variant(
     "full",
     tc,
-    ["/cmd/", "/c_abi/min/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
+    ["/cmd/", "/c_abi/thin/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
   )
 
   let (dyn_min, stat_min, dyn_full, stat_full) = match target_os {

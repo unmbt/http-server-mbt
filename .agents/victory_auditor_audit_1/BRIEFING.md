@@ -49,8 +49,8 @@ Independently audit and verify the claimed completion of Milestones 1~3 (commits
   - Unpushed commit integrity: verified ahead 2, zero remote push.
   - Architecture decoupling: verified server/moon.pkg has zero crypto/tls.
   - C ABI leakage: verified 0 MoonBit runtime objects leaked in http_server.h.
-  - Symbol pollution: verified DLLs have only 5 hs_* symbols, 0 main; min static lib has 0 mbedtls/psa symbols.
-  - CLI rejection: verified http-server-min rejects --cert, --key, --proxy with exit code 1.
+  - Symbol pollution: verified DLLs have only 5 hs_* symbols, 0 main; thin static lib has 0 mbedtls/psa symbols.
+  - CLI rejection: verified http-server-mbt-thin rejects --cert, --key, --proxy with exit code 1.
   - Build & test veracity: independent execution confirmed 230/230 tests pass, build_cabi 4/4 C tests pass.
 - **Vulnerabilities found**: None.
 - **Untested angles**: Linux / macOS Native C ABI builds (scheduled for subsequent cross-platform CI matrix tasks T-032 / T-025).

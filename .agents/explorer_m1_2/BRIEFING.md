@@ -1,14 +1,14 @@
 # BRIEFING — 2026-09-18T12:24:00Z
 
 ## Mission
-Formulate the exact implementation plan for TLS dependency injection and full server integration for Milestone 1 of the min/full layered packaging project.
+Formulate the exact implementation plan for TLS dependency injection and full server integration for Milestone 1 of the thin/full layered packaging project.
 
 ## 🔒 My Identity
 - Archetype: explorer
 - Roles: investigation, synthesis
 - Working directory: E:\project\moonbit\unmbt\http-server-mbt\.agents\explorer_m1_2
 - Original parent: 4e28988c-0fb8-4c25-808e-968dbd1ae0f2
-- Milestone: Milestone 1 (min & full layered packaging, TLS decoupling)
+- Milestone: Milestone 1 (thin & full layered packaging, TLS decoupling)
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement
@@ -31,7 +31,7 @@ Formulate the exact implementation plan for TLS dependency injection and full se
   - Zero of the 75 tests in `server/` use TLS; all 5 TLS tests live in `tls/loopback_test.mbt`.
   - Placing TLS acceptor integration in new top-level package `full/` avoids circular dependency between `server` and `tls` when reverse proxy client TLS is added in M4.
   - `Transport` struct (`reader`, `writer`, `raw_fd`, `raw_tcp`, `close_fn`) and `pub(open) trait Acceptor` completely abstract the stream.
-  - Preflight validation in `server.with_server_at`: if `config.has_tls()` is true and `acceptor` is omitted, immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in min build; use full build")`.
+  - Preflight validation in `server.with_server_at`: if `config.has_tls()` is true and `acceptor` is omitted, immediately raises `@core.ConfigError::InvalidTls("TLS is not supported in thin build; use full build")`.
 - **Unexplored areas**: None for M1 scope.
 
 ## Key Decisions Made

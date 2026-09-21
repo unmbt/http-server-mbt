@@ -16,14 +16,14 @@ Direct observations from authoritative specifications and local environment prob
 - **`ORIGINAL_REQUEST.md` (Follow-up — 2026-09-18T13:08:02Z)**:
   - **R1. C ABI Interface & Symbol Isolation**:
     > "创建 C 桥接包，导出纯 C 头文件（`http_server.h`）与 `hs_*` 接口（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_error_copy` 等），不暴露 MoonBit 托管对象或内部 runtime 布局。"
-    > "分别支持 `min`（纯静态 HTTP 服务器，零加密 C 依赖）与 `full`（集成 TLS 传输层与代理能力）两组导出实现。"
-    > "建立导出符号隔离控制机制（Windows 使用 `.def` 文件或显式导出标记）：确保动态库与静态库中严禁包含 CLI `main` 入口符号，严禁泄露未授权内部符号；`min` 库中绝对不包含任何 MbedTLS / PSA-Crypto 符号。"
+    > "分别支持 `thin`（纯静态 HTTP 服务器，零加密 C 依赖）与 `full`（集成 TLS 传输层与代理能力）两组导出实现。"
+    > "建立导出符号隔离控制机制（Windows 使用 `.def` 文件或显式导出标记）：确保动态库与静态库中严禁包含 CLI `main` 入口符号，严禁泄露未授权内部符号；`thin` 库中绝对不包含任何 MbedTLS / PSA-Crypto 符号。"
   - **R2. Build Pipeline**:
-    > "编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器... 构建导出 `min` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）... 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。"
+    > "编写自动化构建驱动脚本（`scripts/build_cabi.mbtx`），驱动本地编译器与归档器... 构建导出 `thin` 版本的动态库（Windows `hs_min.dll` + `hs_min.lib`）与静态库（Windows `hs_min_static.lib`）... 构建导出 `full` 版本的动态库（Windows `hs_full.dll` + `hs_full.lib`）与静态库（Windows `hs_full_static.lib`）。"
   - **R3. C Consumer Smoke Tests**:
     > "在 `testdata/c_consumer/` 创建独立的 C 测试程序... 验证调用 `hs_abi_version()` 正确返回预期版本号，验证服务配置与生命周期调度无崩溃、无内存访问违规... 全仓既有 228 项 MoonBit 测试持续保持 100% 通过（0 回归、0 警告）。"
 
-- **`docs/cli-min-full-and-cabi-handover.md` (Lines 70–130)**:
+- **`docs/cli-thin-full-and-cabi-handover.md` (Lines 70–130)**:
   - Definitive `http_server.h` C declaration:
     ```c
     #ifndef HTTP_SERVER_H
@@ -104,9 +104,9 @@ Direct observations from authoritative specifications and local environment prob
   - `nm.exe` (GNU Binutils 2.39) located at `E:\Program Files\mingw64\bin\nm.exe`.
   - `ar.exe` (GNU Binutils 2.39) located at `E:\Program Files\mingw64\bin\ar.exe`.
 - **Executable vs Library Object Generation**:
-  - Probed `_build/native/debug/build/cmd/http-server-min/http-server-min.obj` using `nm`:
+  - Probed `_build/native/debug/build/cmd/http-server-mbt-thin/http-server-mbt-thin.obj` using `nm`:
     Discovered `0000000000248560 T main`.
-    When building `cmd/http-server-min` (which declares `pkgtype(kind: "executable")`), MoonBit emits a C `main()` wrapper calling `moonbit_runtime_init()` and `moonbit_init()`.
+    When building `cmd/http-server-mbt-thin` (which declares `pkgtype(kind: "executable")`), MoonBit emits a C `main()` wrapper calling `moonbit_runtime_init()` and `moonbit_init()`.
   - If a package is built as a library (no `pkgtype(kind: "executable")`), it does not emit `main()`, which is mandatory for static and dynamic library linking to prevent symbol collision with consumer code.
 
 ---
@@ -129,10 +129,10 @@ Direct observations from authoritative specifications and local environment prob
          hs_error_copy
      ```
    - This ensures the DLL export directory contains *only* the 5 approved functions.
-3. **`min` vs `full` Decoupling**:
-   - `min` build must compile without `tls` or `full` packages. Probing confirmed `server` is already decoupled from `tls`.
-   - `min` dynamic and static libraries must contain 0 occurrences of `mbedtls_*` or `psa_*` symbols.
-   - When JSON config passes `cert_file` or `proxy` to `hs_server_start` under `min` build, the server must fail before listening and return `HS_ERR_UNSUPPORTED` (or `HS_ERR_CONFIG`), matching CLI min behavior.
+3. **`thin` vs `full` Decoupling**:
+   - `thin` build must compile without `tls` or `full` packages. Probing confirmed `server` is already decoupled from `tls`.
+   - `thin` dynamic and static libraries must contain 0 occurrences of `mbedtls_*` or `psa_*` symbols.
+   - When JSON config passes `cert_file` or `proxy` to `hs_server_start` under `thin` build, the server must fail before listening and return `HS_ERR_UNSUPPORTED` (or `HS_ERR_CONFIG`), matching CLI thin behavior.
    - `full` build integrates `tls` (MbedTLS 4.2.0 + PSA-Crypto) and proxy configuration, supporting HTTPS and upstream proxying.
 4. **Lifecycle & Managed Event Loop Contract**:
    - D-07 mandates that host applications NEVER manually pump, poll, or drive the event loop.
@@ -152,19 +152,19 @@ Direct observations from authoritative specifications and local environment prob
 
 | # | Category | Feature | Description | Inputs | Outputs | Error Behavior | Discovered Via |
 |---|----------|---------|-------------|--------|---------|----------------|----------------|
-| 1 | Version Query | `hs_abi_version` | Returns 32-bit integer version `(major << 16) \| minor`. Constant `0x00010000` for v1.0. | `void` | `uint32_t` version code | Never fails. Safe to call anytime. | `docs/cli-min-full-and-cabi-handover.md` L103, D-07 |
-| 2 | Server Lifecycle | `hs_server_start` | Spawns library-managed event loop, binds socket, starts HTTP server. | `const char* json_config`, `size_t config_len`, `hs_server_t** out_server` | `int32_t` status code, `*out_server` handle | Returns `HS_ERR_INVALID_ARG` if `out_server==NULL`; `HS_ERR_CONFIG` on bad JSON or conflicting options; `HS_ERR_UNSUPPORTED` on TLS in `min`; `HS_ERR_IO` on bind failure. | `docs/cli-min-full-and-cabi-handover.md` L120, D-07 |
-| 3 | Server Lifecycle | `hs_server_stop` | Stops accepting connections and drains in-flight requests gracefully. | `hs_server_t* server` | `int32_t` status code | Returns `HS_ERR_INVALID_ARG` if `server==NULL`; `HS_ERR_CLOSED` if already closed. Idempotent on stopped servers. | `docs/cli-min-full-and-cabi-handover.md` L121, D-07 |
-| 4 | Server Lifecycle | `hs_server_destroy` | Destroys server instance, cancels any remaining tasks, frees memory and synchronization primitives. | `hs_server_t* server` | `void` | If `server==NULL`, safe no-op. Automatically drains if not previously stopped. | `docs/cli-min-full-and-cabi-handover.md` L122, D-07 |
-| 5 | Diagnostics | `hs_error_copy` | Copies static human-readable description of error code into caller buffer. | `int32_t code`, `char* buf`, `size_t cap` | `size_t` string length (excluding NUL) | If `buf==NULL \|\| cap==0`, returns required length without writing (query mode). If buffer too small, truncates safely with trailing `\0`. | `docs/cli-min-full-and-cabi-handover.md` L123, D-07 |
-| 6 | Handle Types | `hs_server_t` | Opaque handle representing a running or stopped server instance. | N/A | Pointer handle | Internal layout is hidden from C caller; contains server context, background thread handle, and state. | `docs/cli-min-full-and-cabi-handover.md` L107, D-07 |
-| 7 | Handle Types | `hs_engine_t` | Opaque handle representing an embedded static engine without socket. | N/A | Pointer handle | Internal layout hidden; reserved for middleware and request embedding. | `docs/cli-min-full-and-cabi-handover.md` L106, D-07 |
-| 8 | Error Taxonomy | `enum hs_error_code` | Enumeration of error codes: `HS_OK=0`, `HS_ERR_CONFIG=1`, `HS_ERR_INVALID_ARG=2`, `HS_ERR_IO=3`, `HS_ERR_CLOSED=4`, `HS_ERR_UNSUPPORTED=5`. | `int32_t` code | Enum integer | Stable numerical constants; future compatible extensions append positive values. | `docs/cli-min-full-and-cabi-handover.md` L110-117, D-07 |
-| 9 | ABI Header | `http_server.h` | Unified C header providing declarations, macros, calling conventions, and version constants. | Standard C99 / C++ compiler | Header file | Defines `HS_EXPORT`, include guards, `extern "C"`. | `docs/cli-min-full-and-cabi-handover.md` L83-130 |
-| 10 | ABI Macro | `HS_EXPORT` | Windows `__declspec(dllexport)` / `__declspec(dllimport)` and POSIX `__attribute__((visibility("default")))`. | Compiler preprocessor | Macro expansion | Controlled by `HS_BUILD_DLL` and `HS_STATIC`. | `docs/cli-min-full-and-cabi-handover.md` L90-96 |
-| 11 | Symbol Isolation | Windows `.def` export control | Module definition file enumerating exactly the 5 exported `hs_*` functions. | Linker `/DEF:hs_min.def` | Filtered PE export table | Bans `main` and internal runtime symbols from appearing in `.dll` exports. | `docs/cli-min-full-and-cabi-handover.md` L142, D-11 |
+| 1 | Version Query | `hs_abi_version` | Returns 32-bit integer version `(major << 16) \| minor`. Constant `0x00010000` for v1.0. | `void` | `uint32_t` version code | Never fails. Safe to call anytime. | `docs/cli-thin-full-and-cabi-handover.md` L103, D-07 |
+| 2 | Server Lifecycle | `hs_server_start` | Spawns library-managed event loop, binds socket, starts HTTP server. | `const char* json_config`, `size_t config_len`, `hs_server_t** out_server` | `int32_t` status code, `*out_server` handle | Returns `HS_ERR_INVALID_ARG` if `out_server==NULL`; `HS_ERR_CONFIG` on bad JSON or conflicting options; `HS_ERR_UNSUPPORTED` on TLS in `thin`; `HS_ERR_IO` on bind failure. | `docs/cli-thin-full-and-cabi-handover.md` L120, D-07 |
+| 3 | Server Lifecycle | `hs_server_stop` | Stops accepting connections and drains in-flight requests gracefully. | `hs_server_t* server` | `int32_t` status code | Returns `HS_ERR_INVALID_ARG` if `server==NULL`; `HS_ERR_CLOSED` if already closed. Idempotent on stopped servers. | `docs/cli-thin-full-and-cabi-handover.md` L121, D-07 |
+| 4 | Server Lifecycle | `hs_server_destroy` | Destroys server instance, cancels any remaining tasks, frees memory and synchronization primitives. | `hs_server_t* server` | `void` | If `server==NULL`, safe no-op. Automatically drains if not previously stopped. | `docs/cli-thin-full-and-cabi-handover.md` L122, D-07 |
+| 5 | Diagnostics | `hs_error_copy` | Copies static human-readable description of error code into caller buffer. | `int32_t code`, `char* buf`, `size_t cap` | `size_t` string length (excluding NUL) | If `buf==NULL \|\| cap==0`, returns required length without writing (query mode). If buffer too small, truncates safely with trailing `\0`. | `docs/cli-thin-full-and-cabi-handover.md` L123, D-07 |
+| 6 | Handle Types | `hs_server_t` | Opaque handle representing a running or stopped server instance. | N/A | Pointer handle | Internal layout is hidden from C caller; contains server context, background thread handle, and state. | `docs/cli-thin-full-and-cabi-handover.md` L107, D-07 |
+| 7 | Handle Types | `hs_engine_t` | Opaque handle representing an embedded static engine without socket. | N/A | Pointer handle | Internal layout hidden; reserved for middleware and request embedding. | `docs/cli-thin-full-and-cabi-handover.md` L106, D-07 |
+| 8 | Error Taxonomy | `enum hs_error_code` | Enumeration of error codes: `HS_OK=0`, `HS_ERR_CONFIG=1`, `HS_ERR_INVALID_ARG=2`, `HS_ERR_IO=3`, `HS_ERR_CLOSED=4`, `HS_ERR_UNSUPPORTED=5`. | `int32_t` code | Enum integer | Stable numerical constants; future compatible extensions append positive values. | `docs/cli-thin-full-and-cabi-handover.md` L110-117, D-07 |
+| 9 | ABI Header | `http_server.h` | Unified C header providing declarations, macros, calling conventions, and version constants. | Standard C99 / C++ compiler | Header file | Defines `HS_EXPORT`, include guards, `extern "C"`. | `docs/cli-thin-full-and-cabi-handover.md` L83-130 |
+| 10 | ABI Macro | `HS_EXPORT` | Windows `__declspec(dllexport)` / `__declspec(dllimport)` and POSIX `__attribute__((visibility("default")))`. | Compiler preprocessor | Macro expansion | Controlled by `HS_BUILD_DLL` and `HS_STATIC`. | `docs/cli-thin-full-and-cabi-handover.md` L90-96 |
+| 11 | Symbol Isolation | Windows `.def` export control | Module definition file enumerating exactly the 5 exported `hs_*` functions. | Linker `/DEF:hs_min.def` | Filtered PE export table | Bans `main` and internal runtime symbols from appearing in `.dll` exports. | `docs/cli-thin-full-and-cabi-handover.md` L142, D-11 |
 | 12 | Symbol Isolation | CLI `main` Prohibition | Ensuring C ABI library packages do not contain `main()` entrypoint. | Source package layout | Clean object files | Eliminates "multiple definition of 'main'" when linking into C consumers. | `ORIGINAL_REQUEST.md` L9, D-11, local nm probe |
-| 13 | Build Pipeline | `scripts/build_cabi.mbtx` | Automated build driver producing 6 distinct artifacts: 2 `.dll`, 2 import `.lib`, 2 static `.lib`. | Toolchain (`moon`, `gcc`/`clang`, `ar`/`lib`) | `target/cabi/` binaries | Logs step-by-step progress, audits exported symbols, verifies 0 crypto symbols in min. | `ORIGINAL_REQUEST.md` L82-87, Handover L145-160 |
+| 13 | Build Pipeline | `scripts/build_cabi.mbtx` | Automated build driver producing 6 distinct artifacts: 2 `.dll`, 2 import `.lib`, 2 static `.lib`. | Toolchain (`moon`, `gcc`/`clang`, `ar`/`lib`) | `target/cabi/` binaries | Logs step-by-step progress, audits exported symbols, verifies 0 crypto symbols in thin. | `ORIGINAL_REQUEST.md` L82-87, Handover L145-160 |
 | 14 | C Smoke Test | `testdata/c_consumer/` | Standalone C program linking both dynamic and static variants of `hs_min`. | `http_server.h`, `hs_min.lib` / `hs_min_static.lib` | Executable returning 0 | Asserts `hs_abi_version() == 0x00010000`, tests start/stop/destroy lifecycle. | `ORIGINAL_REQUEST.md` L89-93, Handover L162-178 |
 
 ---
@@ -180,7 +180,7 @@ Direct observations from authoritative specifications and local environment prob
 | 5 | `hs_server_start` | Out of range port (e.g. `port=99999` or negative) | Fails preflight validation, returns `HS_ERR_CONFIG` (1); no socket bound. |
 | 6 | `hs_server_start` | Port already in use by another process | TCP socket bind fails, returns `HS_ERR_IO` (3); `*out_server` set to `NULL`. |
 | 7 | `hs_server_start` | Ephemeral port (`port=0`) | System allocates available ephemeral port, server starts successfully (`HS_OK`). |
-| 8 | `hs_server_start` (`min` build) | JSON containing `"cert_file": "cert.pem"` or `"proxy": "http://..."` | Preflight checks intercept unsupported feature, returns `HS_ERR_UNSUPPORTED` (5); no listening socket opened. |
+| 8 | `hs_server_start` (`thin` build) | JSON containing `"cert_file": "cert.pem"` or `"proxy": "http://..."` | Preflight checks intercept unsupported feature, returns `HS_ERR_UNSUPPORTED` (5); no listening socket opened. |
 | 9 | `hs_server_stop` | `server == NULL` | Immediate return of `HS_ERR_INVALID_ARG` (2). |
 | 10 | `hs_server_stop` | Calling `stop` on an already stopped server | Idempotent; returns `HS_OK` (0) without error or hang. |
 | 11 | `hs_server_stop` | Active HTTP requests in-flight during `stop` | Stops accepting new connections; waits up to timeout (5000ms) for requests to complete, then completes stop. |
@@ -201,7 +201,7 @@ Direct observations from authoritative specifications and local environment prob
 2. **Read-Only Scope**:
    In strict accordance with the Specification Miner role, no production code, scripts, or headers have been modified or created outside `.agents/spec_miner_survey_1/`.
 3. **MbedTLS Symbol Isolation**:
-   In `min` build, `server` package is completely decoupled from `tls`. However, during link time, `scripts/build_cabi.mbtx` must verify via `nm` that no `mbedtls_*` or `psa_*` symbols are linked into `hs_min.dll` or `hs_min_static.lib`.
+   In `thin` build, `server` package is completely decoupled from `tls`. However, during link time, `scripts/build_cabi.mbtx` must verify via `nm` that no `mbedtls_*` or `psa_*` symbols are linked into `hs_min.dll` or `hs_min_static.lib`.
 
 ---
 
@@ -232,11 +232,11 @@ The specification for Milestone 3 (C ABI Dynamic/Static Export Pipeline, Symbol 
 To independently verify these findings and contracts:
 
 1. **Inspect Handover & Design Docs**:
-   - `docs/cli-min-full-and-cabi-handover.md` (Sections 1, 2, 3, 4).
+   - `docs/cli-thin-full-and-cabi-handover.md` (Sections 1, 2, 3, 4).
    - `docs/design.md` (D-07 lines 214–261, D-11 lines 337–350).
    - `docs/tasks.md` (T-002, T-020, T-027).
 2. **Inspect Symbol Cleanliness via `nm`**:
-   - Run `nm <binary> | Select-String "main"` to verify presence in `http-server-min.obj` and verify that library packages do not export `main`.
+   - Run `nm <binary> | Select-String "main"` to verify presence in `http-server-mbt-thin.obj` and verify that library packages do not export `main`.
 3. **Inspect Toolchain Availability**:
    - `gcc --version` -> MinGW-W64 12.2.0.
    - `nm --version` -> GNU nm 2.39.

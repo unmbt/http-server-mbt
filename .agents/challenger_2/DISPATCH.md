@@ -14,7 +14,7 @@ Adversarially challenge and stress-test symbol purity, linking mechanics, and li
    - Verify that EXACTLY the 5 public `hs_*` functions are exported.
    - Verify that NO `moonbit_*` runtime symbols, compiler internals, or `main` symbols appear in the DLL export table.
 2. Inspect `target/cabi/hs_min_static.lib` and `target/cabi/hs_min.dll` for cryptographic symbols:
-   - Search for `mbedtls` and `psa_` symbols across all member objects. Verify there are 0 matches in `min`.
+   - Search for `mbedtls` and `psa_` symbols across all member objects. Verify there are 0 matches in `thin`.
 3. Challenge Static Library Linkage & Main Collision:
    - Write an independent standalone C test application defining `int main(void)` and linking against `target/cabi/hs_min_static.lib`.
    - Compile it using MSVC `cl.exe` (or `gcc.exe`).

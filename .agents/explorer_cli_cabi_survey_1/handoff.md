@@ -50,15 +50,15 @@
 
 1. **CLI Decoupling**:
    - From Observation 1: `cmd/http-server-mbt` -> `server` -> `tls`. Because `server` currently hard-imports `tls`, any executable importing `server` compiles all MbedTLS stubs.
-   - Therefore, decoupling `server` from `tls` (Phase 1) is a mandatory prerequisite for `min` CLI and `min` C library.
-   - Once `server` exposes a transport/acceptor abstraction, `cmd/http-server-min` can import `server` alone, achieving zero MbedTLS compilation.
-   - From Observation 2: In `cmd/http-server-min`, `parse_cli` can check for `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, and `--websocket`. If present, returning an error message directly triggers `runtime_native_exit(1)` in `main.mbt`, fulfilling D-08 and D-15.
+   - Therefore, decoupling `server` from `tls` (Phase 1) is a mandatory prerequisite for `thin` CLI and `thin` C library.
+   - Once `server` exposes a transport/acceptor abstraction, `cmd/http-server-mbt-thin` can import `server` alone, achieving zero MbedTLS compilation.
+   - From Observation 2: In `cmd/http-server-mbt-thin`, `parse_cli` can check for `--cert`, `--key`, `--key-passphrase`, `--proxy`, `--proxy-all`, `--proxy-options`, `--proxy-config`, and `--websocket`. If present, returning an error message directly triggers `runtime_native_exit(1)` in `main.mbt`, fulfilling D-08 and D-15.
 
 2. **C ABI Native Library Pipeline**:
    - From Observation 3: Since `moon build` cannot output native `.dll`/`.lib` directly, the build must be driven by a `.mbtx` script using `@async/shell` or `@async/process`.
    - From Observation 4: The generated C code contains `main()`. Compiling with `/Dmain=moonbit_internal_unused_main` eliminates symbol conflict. Providing `hs_init()` allows the host to safely initialize the MoonBit runtime (`moonbit_runtime_init(0, NULL); moonbit_init();`).
    - From Observation 5: Pre-including `clean_exports.h` and passing an explicit `.def` file ensures that the DLL exports strictly `hs_*` APIs without leaking internal MoonBit runtime symbols.
-   - In `min` mode, omitting MbedTLS files produces a clean static library (~150 KB) and DLL (~10 KB) without any cryptographic footprint.
+   - In `thin` mode, omitting MbedTLS files produces a clean static library (~150 KB) and DLL (~10 KB) without any cryptographic footprint.
 
 ---
 
@@ -71,15 +71,15 @@
 
 ## 4. Conclusion
 
-The build and packaging pipeline for dual CLI (`min` / `full`) and C ABI export is fully viable and verified:
-1. **CLI Layout**: Split into `cmd/http-server-min/`, `cmd/http-server-full/`, and retain `cmd/http-server-mbt/` as the default full CLI. Shared code lives in `cmd/common/`.
-2. **`min` CLI Enforcement**: Unsupported flags (`--cert`, `--key`, `--proxy`, etc.) trigger immediate `stderr` error logging and `runtime_native_exit(1)` before any network listener initializes.
+The build and packaging pipeline for dual CLI (`thin` / `full`) and C ABI export is fully viable and verified:
+1. **CLI Layout**: Split into `cmd/http-server-mbt-thin/`, `cmd/http-server-full/`, and retain `cmd/http-server-mbt/` as the default full CLI. Shared code lives in `cmd/common/`.
+2. **`thin` CLI Enforcement**: Unsupported flags (`--cert`, `--key`, `--proxy`, etc.) trigger immediate `stderr` error logging and `runtime_native_exit(1)` before any network listener initializes.
 3. **C ABI Pipeline**: Driven by `scripts/build_cabi.mbtx`.
 4. **Symbol & Main Isolation**:
    - `/Dmain=moonbit_internal_unused_main` prevents entry point collision.
    - `/FIclean_exports.h` prevents internal runtime export leakage.
    - Explicit `.def` file limits DLL export table to public `hs_*` APIs.
-   - `min` C library contains 0 MbedTLS / PSA Crypto symbols.
+   - `thin` C library contains 0 MbedTLS / PSA Crypto symbols.
 
 ---
 

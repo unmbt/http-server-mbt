@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-19T03:35:00Z
 
 ## Mission
-Conduct independent SDD consistency audit, full verification gate execution, and forensic integrity & anti-cheating audit for min/full packaging and C ABI pipelines.
+Conduct independent SDD consistency audit, full verification gate execution, and forensic integrity & anti-cheating audit for thin/full packaging and C ABI pipelines.
 
 ## 🔒 My Identity
 - Archetype: forensic_auditor
@@ -21,7 +21,7 @@ Conduct independent SDD consistency audit, full verification gate execution, and
 - Updated: not yet
 
 ## Audit Scope
-- **Work product**: C ABI dynamic/static libraries, min/full packaging, build script scripts/build_cabi.mbtx, SDD docs
+- **Work product**: C ABI dynamic/static libraries, thin/full packaging, build script scripts/build_cabi.mbtx, SDD docs
 - **Profile loaded**: General Project (development mode)
 - **Audit type**: forensic integrity check & regression gate
 

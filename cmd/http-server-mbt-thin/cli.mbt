@@ -69,7 +69,7 @@ pub fn build_command() -> @argparse.Command {
       @argparse.FlagArg(
         "proxy-all",
         long="proxy-all",
-        about="[Unsupported in min build] Proxy all requests",
+        about="[Unsupported in thin build] Proxy all requests",
       ),
     ],
     options=[
@@ -111,29 +111,29 @@ pub fn build_command() -> @argparse.Command {
       @argparse.OptionArg(
         "cert",
         long="cert",
-        about="[Unsupported in min build] TLS certificate chain file (PEM)",
+        about="[Unsupported in thin build] TLS certificate chain file (PEM)",
       ),
       @argparse.OptionArg(
         "key",
         long="key",
-        about="[Unsupported in min build] TLS private key file (PEM)",
+        about="[Unsupported in thin build] TLS private key file (PEM)",
       ),
       @argparse.OptionArg(
         "key-passphrase",
         long="key-passphrase",
         env="TLS_KEY_PASSPHRASE",
-        about="[Unsupported in min build] Passphrase for encrypted TLS private keys",
+        about="[Unsupported in thin build] Passphrase for encrypted TLS private keys",
       ),
       @argparse.OptionArg(
         "proxy",
         short='P',
         long="proxy",
-        about="[Unsupported in min build] Fallback proxy URL",
+        about="[Unsupported in thin build] Fallback proxy URL",
       ),
       @argparse.OptionArg(
         "proxy-config",
         long="proxy-config",
-        about="[Unsupported in min build] Proxy config file",
+        about="[Unsupported in thin build] Proxy config file",
       ),
     ],
     positionals=[
@@ -256,7 +256,7 @@ pub fn parse_auth(val : String) -> Result[(String, String), String] {
 }
 
 ///|
-/// Parse CLI arguments and validate configuration for http-server-min.
+/// Parse CLI arguments and validate configuration for http-server-mbt-thin.
 /// Strictly rejects TLS and Proxy options with explicit error messages (D-08 / D-15).
 pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
   let cmd = build_command()

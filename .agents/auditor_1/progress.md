@@ -7,7 +7,7 @@ Status: In Progress
 - [x] Step 1: Initialize DISPATCH.md, BRIEFING.md, and progress.md
 - [ ] Step 2: Source Code Analysis & Inspection
   - [ ] Inspect `c_abi/include/http_server.h`
-  - [ ] Inspect `c_abi/min/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`, `abi_test.mbt`
+  - [ ] Inspect `c_abi/thin/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_min.def`, `abi_test.mbt`
   - [ ] Inspect `c_abi/full/moon.pkg`, `abi.mbt`, `bridge.c`, `hs_full.def`, `abi_test.mbt`
   - [ ] Inspect `scripts/build_cabi.mbtx`
   - [ ] Inspect `testdata/c_consumer/` (all 4 C consumer tests)
@@ -21,7 +21,7 @@ Status: In Progress
   - [ ] Run `moon check --target native`
   - [ ] Run `moon test --target native` (verify 230 tests pass)
   - [ ] Clean/remove `target/cabi` artifacts or run `moon run scripts/build_cabi.mbtx` and verify real build
-  - [ ] Empirically inspect produced binaries: exports, absence of mbedtls in min, size differences
+  - [ ] Empirically inspect produced binaries: exports, absence of mbedtls in thin, size differences
   - [ ] Empirically run the compiled C consumer executables directly
 - [ ] Step 4: Edge cases & Adversarial Stress Testing
 - [ ] Step 5: Formulate Forensic Report & Handoff

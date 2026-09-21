@@ -1,7 +1,7 @@
 # DISPATCH
 
 ## 2026-09-18T12:01:35Z
-You are the Project Orchestrator for the `min` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
+You are the Project Orchestrator for the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
 
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\orchestrator_pkg_1`
 The project root is: `E:\project\moonbit\unmbt\http-server-mbt`
@@ -9,8 +9,8 @@ The authoritative user request is recorded in: `E:\project\moonbit\unmbt\http-se
 
 Please read the latest section of `ORIGINAL_REQUEST.md` (timestamp `2026-09-18T12:00:00Z`) for complete requirements:
 1. R1: Decouple Server from TLS (abstract transport / connection handling so static server does not hard-depend on `tls` package or MbedTLS C stubs; dependency injection for TLS in `full` build; zero regression on all 183 existing tests).
-2. R2: Min & Full CLI build & distribution (`min` CLI errors out with code 1 if `--cert`, `--key`, `--proxy` are given; `full` CLI supports TLS and future proxy args; separate entry points or build scripts).
-3. R3: C ABI dynamic & static library export pipeline (`.mbtx` script-driven export of `.dll`/`.so`/`.dylib` and `.lib`/`.a`; strictly `hs_*` exports with no CLI main pollution; `min` library completely free of MbedTLS symbols; minimal C verification program).
+2. R2: Min & Full CLI build & distribution (`thin` CLI errors out with code 1 if `--cert`, `--key`, `--proxy` are given; `full` CLI supports TLS and future proxy args; separate entry points or build scripts).
+3. R3: C ABI dynamic & static library export pipeline (`.mbtx` script-driven export of `.dll`/`.so`/`.dylib` and `.lib`/`.a`; strictly `hs_*` exports with no CLI main pollution; `thin` library completely free of MbedTLS symbols; minimal C verification program).
 4. R4: Reverse Proxy architecture design & interface readiness (align with original C037~C039, C041, T-013, state machine Resolving -> Proxying -> Idle, config data structures, streaming forward interface).
 5. Strict SDD workflow: update `docs/design.md`, `docs/tasks.md` / ADRs.
 6. Automation: scripts must use `.mbtx`.

@@ -1,7 +1,7 @@
 # BRIEFING — 2026-09-18T13:58:30Z
 
 ## Mission
-Review and adversarially stress-test worker_impl_1's C ABI export pipeline (min & full), pure .mbtx build driver, and C consumer smoke tests.
+Review and adversarially stress-test worker_impl_1's C ABI export pipeline (thin & full), pure .mbtx build driver, and C consumer smoke tests.
 
 ## 🔒 My Identity
 - Archetype: reviewer_and_critic
@@ -21,7 +21,7 @@ Review and adversarially stress-test worker_impl_1's C ABI export pipeline (min 
 - Updated: not yet
 
 ## Review Scope
-- **Files to review**: `c_abi/include/http_server.h`, `c_abi/min/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
+- **Files to review**: `c_abi/include/http_server.h`, `c_abi/thin/`, `c_abi/full/`, `scripts/build_cabi.mbtx`, `testdata/c_consumer/`
 - **Interface contracts**: `docs/proposal.md`, `docs/design.md` (D-07, D-11, R1, R2, R3), `ORIGINAL_REQUEST.md`
 - **Review criteria**: correctness, style, conformance, adversarial robustness, integrity check
 

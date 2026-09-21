@@ -1,6 +1,6 @@
 ## 2026-09-18T12:02:37Z
 
-You are the TLS & Transport Architecture Explorer for the `min` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
+You are the TLS & Transport Architecture Explorer for the `thin` & `full` layered packaging, TLS decoupling, and Proxy architecture readiness project in `http-server-mbt`.
 Your working directory is: `E:\project\moonbit\unmbt\http-server-mbt\.agents\explorer_tls_survey_1`
 Project root: `E:\project\moonbit\unmbt\http-server-mbt`
 
@@ -16,7 +16,7 @@ Investigate the current codebase architecture, module dependency graph, and tran
    - Identify all places where `tls` is imported or used in `server/`, `core/`, `cmd/`.
    - Identify MbedTLS C source files and stubs, where they are compiled/linked.
 3. Design the Transport / Connection Abstraction:
-   - How can `server` be completely decoupled from `tls` so that `min` build does not import `tls` or link MbedTLS C stubs?
+   - How can `server` be completely decoupled from `tls` so that `thin` build does not import `tls` or link MbedTLS C stubs?
    - What interface / trait / callback (e.g. `Acceptor`, `ConnectionHandler`, or dependency injection in `server.start(...)`) cleanly abstracts plain TCP vs TLS vs Proxy interception?
    - How can `full` server cleanly inject TLS without breaking existing behavior?
 4. Review existing 183 tests:

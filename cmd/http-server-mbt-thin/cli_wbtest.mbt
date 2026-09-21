@@ -11,8 +11,30 @@ test "http-server-mbt-thin: default arguments" {
       assert_eq(config.show_dir, true)
       assert_eq(config.cert_file, None)
       assert_eq(config.key_file, None)
+      assert_eq(config.gzip, false)
+      assert_eq(config.brotli, false)
     }
     _ => fail("expected Ok(Run)")
+  }
+}
+
+///|
+test "http-server-mbt-thin: gzip and brotli flags" {
+  match parse_cli(["-g"]) {
+    Ok(Run(config, _)) => assert_eq(config.gzip, true)
+    _ => fail("expected gzip=true with -g")
+  }
+  match parse_cli(["--gzip"]) {
+    Ok(Run(config, _)) => assert_eq(config.gzip, true)
+    _ => fail("expected gzip=true with --gzip")
+  }
+  match parse_cli(["-b"]) {
+    Ok(Run(config, _)) => assert_eq(config.brotli, true)
+    _ => fail("expected brotli=true with -b")
+  }
+  match parse_cli(["--brotli"]) {
+    Ok(Run(config, _)) => assert_eq(config.brotli, true)
+    _ => fail("expected brotli=true with --brotli")
   }
 }
 

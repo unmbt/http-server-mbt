@@ -5,7 +5,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
-  "moonbitlang/async/types",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",
   "unmbt/http-server-mbt",
@@ -23,7 +22,7 @@ pub fn parse_target_url(String) -> TargetUrl?
 
 pub async fn proxy_http_request(Server, Transport, @core.Method, Map[String, String], String, String) -> Bool
 
-pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
+pub async fn transmit_file(Int, String, Int64, Int64) -> Int
 
 pub async fn with_server(@core.Config, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
 
@@ -68,12 +67,12 @@ pub struct TargetUrl {
 pub struct Transport {
   reader : &@io.Reader
   writer : &@io.Writer
-  raw_fd : @types.Fd?
+  raw_fd : Int?
   raw_tcp : @socket.Tcp?
   close_fn : () -> Unit
 }
 pub fn Transport::close(Self) -> Unit
-pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : @types.Fd, raw_tcp? : @socket.Tcp) -> Self
+pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : Int, raw_tcp? : @socket.Tcp) -> Self
 pub fn Transport::plain(@socket.Tcp) -> Self
 pub async fn Transport::send(Self, &@io.Data) -> Bool
 

@@ -55,6 +55,18 @@ pub fn build_command() -> @argparse.Command {
       ),
       @argparse.FlagArg("cors", long="cors", about="Enable CORS headers"),
       @argparse.FlagArg(
+        "gzip",
+        short='g',
+        long="gzip",
+        about="Serve gzip files when possible [default: false]",
+      ),
+      @argparse.FlagArg(
+        "brotli",
+        short='b',
+        long="brotli",
+        about="Serve brotli files when possible [default: false]",
+      ),
+      @argparse.FlagArg(
         "log-ip",
         short='l',
         long="log-ip",
@@ -333,8 +345,10 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     None => (3600, None)
   }
 
-  // 7. CORS
+  // 7. CORS & Compression
   let cors = matches.flags.get("cors").unwrap_or(false)
+  let gzip = matches.flags.get("gzip").unwrap_or(false)
+  let brotli = matches.flags.get("brotli").unwrap_or(false)
 
   // 8. Auth
   let basic_auth = match first_value(matches, "auth") {
@@ -363,6 +377,8 @@ pub fn parse_cli(args : ArrayView[String]) -> Result[CliAction, String] {
     cache_seconds,
     cache_control,
     cors,
+    gzip,
+    brotli,
     basic_auth,
     log_ip,
     silent,

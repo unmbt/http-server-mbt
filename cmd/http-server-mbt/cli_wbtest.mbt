@@ -12,6 +12,8 @@ test "cli: default arguments" {
       assert_eq(config.cache_seconds, 3600)
       assert_eq(config.cache_control, None)
       assert_eq(config.cors, false)
+      assert_eq(config.gzip, false)
+      assert_eq(config.brotli, false)
       assert_eq(config.basic_auth, None)
       assert_eq(config.spa, false)
       assert_eq(config.try_files, None)
@@ -250,6 +252,30 @@ test "cli: cors flag" {
   match parse_cli(["--cors"]) {
     Ok(Run(config, _)) => assert_eq(config.cors, true)
     _ => fail("expected cors=true")
+  }
+}
+
+///|
+test "cli: gzip flag" {
+  match parse_cli(["-g"]) {
+    Ok(Run(config, _)) => assert_eq(config.gzip, true)
+    _ => fail("expected gzip=true with -g")
+  }
+  match parse_cli(["--gzip"]) {
+    Ok(Run(config, _)) => assert_eq(config.gzip, true)
+    _ => fail("expected gzip=true with --gzip")
+  }
+}
+
+///|
+test "cli: brotli flag" {
+  match parse_cli(["-b"]) {
+    Ok(Run(config, _)) => assert_eq(config.brotli, true)
+    _ => fail("expected brotli=true with -b")
+  }
+  match parse_cli(["--brotli"]) {
+    Ok(Run(config, _)) => assert_eq(config.brotli, true)
+    _ => fail("expected brotli=true with --brotli")
   }
 }
 

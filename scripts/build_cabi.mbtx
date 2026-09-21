@@ -630,6 +630,7 @@ async fn collect_and_stage_objects(
 ///|
 async fn build_variant(
   variant : String,
+  pkg_name : String,
   tc : Toolchain,
   excluded_keywords : Array[String],
 ) -> Unit {
@@ -638,7 +639,7 @@ async fn build_variant(
 
   match tc.target_os {
     Windows => {
-      let def_file = "c_abi/\{variant}/hs_\{variant}.def"
+      let def_file = "c_abi/\{pkg_name}/hs_\{variant}.def"
       let system_libs = [
         "kernel32.lib",
         "libcmt.lib",
@@ -705,7 +706,7 @@ async fn build_variant(
       }
     }
     Linux => {
-      let version_script = "c_abi/\{variant}/hs_\{variant}.version"
+      let version_script = "c_abi/\{pkg_name}/hs_\{variant}.version"
       let so_path = "target/cabi/libhs_\{variant}.so"
       println("Linking libhs_\{variant}.so...")
       let link_args : Array[String] = [
@@ -774,7 +775,7 @@ async fn build_variant(
       }
     }
     MacOS => {
-      let syms_file = "c_abi/\{variant}/hs_\{variant}_macos.syms"
+      let syms_file = "c_abi/\{pkg_name}/hs_\{variant}_macos.syms"
       let dylib_path = "target/cabi/libhs_\{variant}.dylib"
       println("Linking libhs_\{variant}.dylib...")
       let link_args : Array[String] = [
@@ -1100,6 +1101,7 @@ async fn main {
 
   println("4. Building thin variant (zero crypto, static HTTP server)...")
   build_variant(
+    "min",
     "thin",
     tc,
     ["/cmd/", "/build/tls/", "/full/", "/c_abi/full/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
@@ -1107,6 +1109,7 @@ async fn main {
 
   println("5. Building full variant (integrated TLS & proxy)...")
   build_variant(
+    "full",
     "full",
     tc,
     ["/cmd/", "/c_abi/thin/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],

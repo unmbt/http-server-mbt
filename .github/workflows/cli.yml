@@ -205,13 +205,21 @@ jobs:
           # 2. Test Thin container
           docker run -d --name test-thin -p 18081:8080 -v "$(pwd)/testdata/public:/data:ro" http-server-mbt:thin
           sleep 1
-          curl -sSf http://127.0.0.1:18081/hello.txt | grep -q "Hello, World!"
+          if ! curl -sSf http://127.0.0.1:18081/hello.txt | grep -q "hello moonbit"; then
+            echo "ERROR: Failed to fetch hello.txt from test-thin"
+            docker logs test-thin
+            exit 1
+          fi
           docker stop test-thin && docker rm test-thin
 
           # 3. Test Full container
           docker run -d --name test-full -p 18082:8080 -v "$(pwd)/testdata/public:/data:ro" http-server-mbt:full
           sleep 1
-          curl -sSf http://127.0.0.1:18082/hello.txt | grep -q "Hello, World!"
+          if ! curl -sSf http://127.0.0.1:18082/hello.txt | grep -q "hello moonbit"; then
+            echo "ERROR: Failed to fetch hello.txt from test-full"
+            docker logs test-full
+            exit 1
+          fi
           docker stop test-full && docker rm test-full
 
           echo "Distroless Docker images (full & thin) verified successfully!"

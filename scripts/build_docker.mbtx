@@ -194,7 +194,7 @@ async fn test_container(
   
   let success = if curl_res.exit_code() == 0 {
     let out = curl_res.stdout()
-    if out.contains("Hello, World!") || out.contains("hello") {
+    if out.contains("hello moonbit") {
       println("[PASS] Successfully received expected file content!")
       true
     } else {

@@ -70,13 +70,12 @@ http-server-mbt/
 ├── testdata/                            # 测试静态资产与 Fixtures (纯宽松开源资产)
 │   ├── public/                          # 原版测试用例映射目录 (html, js, txt, gz, br, 特殊路径等)
 │   └── fixtures/                        # 原版测试固定根目录
-├── docs/                                # 项目规划、设计、任务与进度文档
-│   ├── proposal.md                      # 重构提案与需求追踪 (R-N01 ~ R-N16)
-│   ├── design.md                        # 架构与行为设计契约 (D-01 ~ D-18)
-│   ├── tasks.md                         # 34 项实施任务与逐例测试迁移矩阵 (C001 ~ C042)
-│   ├── windows-baseline.md              # Windows 原生基线与执行证据记录
-│   └── progress.md                      # 本文档：阶段进度与任务接续指南
-└── .agents/                             # 多 Agent 协同元数据、审查记录与状态库
+└── docs/                                # 项目规划、设计、任务与进度文档
+    ├── proposal.md                      # 重构提案与需求追踪 (R-N01 ~ R-N16)
+    ├── design.md                        # 架构与行为设计契约 (D-01 ~ D-18)
+    ├── tasks.md                         # 34 项实施任务与逐例测试迁移矩阵 (C001 ~ C042)
+    ├── windows-baseline.md              # Windows 原生基线与执行证据记录
+    └── progress.md                      # 本文档：阶段进度与任务接续指南
 ```
 
 ---

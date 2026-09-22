@@ -1,1 +1,0 @@
-fn hs_abi_version () -> Int { 1 }

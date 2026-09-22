@@ -12,3 +12,4 @@ trace.json
 *.exp
 *.lib
 c_abi/node/lib/
+.agents/

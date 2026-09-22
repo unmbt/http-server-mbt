@@ -1,4 +1,0 @@
-((Ctop_fn
-  ((binder hs_abi_version) (func ((params ()) (body 1))) (ty_params_ ())
-   (is_pub_ true)
-   (attrs_ ((Tattr_export_name (name hs_abi_version) (loc_ 0:1-0:31)))))))

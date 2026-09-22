@@ -2083,4 +2083,14 @@
 #undef MBEDTLS_MEMORY_BUFFER_ALLOC_C
 #undef MBEDTLS_ENTROPY_NV_SEED
 #undef MBEDTLS_PLATFORM_NV_SEED_ALT
+/* The server only parses certificates and private keys. It never
+   creates certificates/CSRs or consumes PKCS#7 bundles. */
+#undef MBEDTLS_DEBUG_C
+#undef MBEDTLS_PKCS7_C
+#undef MBEDTLS_X509_CREATE_C
+#undef MBEDTLS_X509_CRT_WRITE_C
+#undef MBEDTLS_X509_CSR_PARSE_C
+#undef MBEDTLS_X509_CSR_WRITE_C
+#undef MBEDTLS_SSL_CACHE_C
+#undef MBEDTLS_SSL_COOKIE_C
 /* ==== http-server-mbt managed overrides (end) ==== */

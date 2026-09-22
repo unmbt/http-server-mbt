@@ -8,7 +8,7 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
-[![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
+[![Build Status](https://img.shields.io/badge/Tests-240%2F240%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-platform-support-matrix)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
@@ -19,11 +19,11 @@
 
 | Platform | Arch | Status | Core I/O & Transfer Mechanism | Verification & Quality Gates |
 | :--- | :--- | :---: | :--- | :--- |
-| **Windows** | x86_64 | **✅ Verified (Stable)** | Win32 `TransmitFile` + IOCP Overlapped asynchronous kernel zero-copy, 100ms anti-hang protection | 169/169 tests 100% PASS, 0 warnings, zero handle leaks under adversarial stress testing, verified by independent Victory Audit (Milestones 1–6 complete) |
-| **Linux** | x86_64 | **✅ Verified** | `sendfile(2)` explicit-offset kernel zero-copy + `epoll` event loop (via `moonbitlang/async`), per-chunk fstat `FILE_CHANGED` detection, `posix_fadvise` prefetch | 169/169 tests pass locally (3 stable rounds), zero-copy gate test green; CI matrix enabled (T-032); evidence in `docs/linux-baseline.md` |
-| **macOS** | arm64 / x86_64 | **✅ Verified** | Darwin `sendfile` kernel zero-copy (value-result `len`: error & bytes-sent checked together, short-write offset advance) + `kqueue` event loop (via `moonbitlang/async`), per-chunk fstat `FILE_CHANGED` detection, `F_RDADVISE` prefetch | 169/169 tests pass on GitHub Actions `macos-latest` (arm64) first run; CI matrix enabled (T-032); evidence in `docs/macos-baseline.md` |
+| **Windows** | x86_64 | **✅ Local Native verified** | Win32 `TransmitFile` + IOCP Overlapped asynchronous kernel zero-copy, 100ms anti-hang protection | 240/240 tests pass locally; release Full/Thin dependency and size audit is recorded in `docs/architecture-review.md` |
+| **Linux** | x86_64 | **🔶 Actions evidence required** | `sendfile(2)` explicit-offset path + `epoll` event loop | Platform-specific release, TLS and container evidence remains tracked by T-032/T-035 |
+| **macOS** | arm64 / x86_64 | **🔶 Actions evidence required** | Darwin `sendfile` + `kqueue` event loop | Platform-specific release, TLS and container evidence remains tracked by T-032/T-035 |
 
-> 📌 **Cross-Platform Roadmap**: All three platforms now ship native kernel zero-copy file transfer with the full 169-test gate suite green on each platform — Windows (`TransmitFile` + IOCP), Linux (`sendfile` + `epoll`), macOS (Darwin `sendfile` + `kqueue`). Per project specification (D-16), the GitHub Actions three-platform CI matrix (T-032) provides continuous verification; single-binary packaging & release (T-022) and remaining runtime tasks continue in Milestone 7.
+> 📌 **Cross-Platform Roadmap**: Windows has the current local Native evidence. Linux and macOS remain subject to the Actions matrix and release gates; a Windows run does not count as a three-platform completion.
 
 ---
 
@@ -39,14 +39,14 @@
 | **WebSocket Proxy** | Relies on third-party `http-proxy` module; unhandled socket dropouts cause connection and handle leaks | **Native full-duplex WebSocket proxy** with built-in `Upgrade` handshake, transparent bi-directional pipes & cancellation draining | Completely eliminates IOCP read-blocking deadlocks; verified **0 handle leaks** across long-running connections |
 | **Dynamic File Mutation Defense** | No protection against files being modified or truncated mid-transfer; client receives corrupted slices | **D-17 dynamic mutation defense**: tracks open file handles; aborts response immediately on detected mutation / truncation | Strictly prevents partial-write corruption, ensuring deterministic static asset distribution |
 | **Fault Injection Resilience** | Lacks automated defense testing against malformed packet fragments or Slowloris read attacks | **Built-in T-034 fault injection testing**: single-byte split writes, truncated header storms, Slowloris backpressure | Extreme resilience against chaotic network conditions; `stop_and_drain` barrier synchronization ensures zero hangs |
-| **Runtime & Deployment Footprint** | Requires heavy Node.js runtime and hundreds of `node_modules` dependencies; slow startup | **Single standalone native machine binary** compiled via MoonBit; zero runtime dependencies; millisecond startup; tiny RAM usage | Zero maintenance burden; single executable drop-in replacement |
+| **Runtime & Deployment Footprint** | Requires heavy Node.js runtime and hundreds of `node_modules` dependencies; slow startup | **Standalone native machine binary** compiled via MoonBit; no Node.js/V8/Python runtime | A single-file deployment shape with platform runtime dependencies recorded per target |
 
 ---
 
 ## ✨ Features
 
 - **Blazing Fast**: Native machine code generated by MoonBit, with kernel zero-copy file transfer on all three platforms — Windows (`TransmitFile`), Linux (`sendfile`), macOS (Darwin `sendfile`).
-- **Zero Dependencies**: Standalone single binary. No Node.js, V8, Python, or external dynamic libraries required!
+- **Standalone Native CLI**: No Node.js, V8, or Python runtime is required. Platform system DLLs remain part of the native runtime contract.
 - **Modern Routing**: BaseURL path mounting prefix, SPA fallback, and custom `--try-files` fallback strategy.
 - **Smart Pre-compression**: Dual Brotli / gzip content negotiation with gzip magic number validation.
 - **Full-Duplex Proxy**: Reverse HTTP proxy for unhandled (404) requests and WebSocket protocol upgrade bidirectional proxy.
@@ -65,7 +65,7 @@ The recommended installation method is using the MoonBit package manager to comp
 moon install unmbt/http-server-mbt/cmd/http-server-mbt
 http-server-mbt -v
 
-# Or Thin version (pure MoonBit static server, zero crypto and zero proxy dependencies)
+# Or Thin version (plaintext static server without TLS, proxy, MbedTLS or PSA)
 moon install unmbt/http-server-mbt/cmd/http-server-mbt-thin
 http-server-mbt-thin -v
 ```
@@ -78,7 +78,7 @@ If you prefer not to build from source, use the installation script for your sys
 
 Two editions are available:
 - **Full (Default)**: Full-featured static server with TLS 1.2/1.3 (HTTPS) via embedded MbedTLS and reverse/WebSocket proxy (`http-server-mbt`).
-- **Thin**: Pure MoonBit static server with zero C crypto or proxy dependencies (~30% smaller binary size, `http-server-mbt-thin`).
+- **Thin**: Plaintext static server without TLS/proxy/MbedTLS/PSA dependencies. On the measured Windows release build it is 1,602,560 bytes versus Full 3,884,544 bytes, a 58.75% reduction; the build still imports the generic runtime `bcrypt.dll` capability on Windows.
 
 #### Linux & macOS
 
@@ -86,7 +86,7 @@ Two editions are available:
 # Full version (Default)
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
 
-# Thin version (Lightweight zero-crypto variant)
+# Thin version (Lightweight plaintext variant without TLS/proxy)
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --thin
 ```
 
@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/script
 # Full version (Default)
 irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
 
-# Thin version (Lightweight zero-crypto variant)
+# Thin version (Lightweight plaintext variant without TLS/proxy)
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Thin
 ```
 
@@ -200,7 +200,7 @@ cd http-server-mbt
 moon update
 moon check --target native
 
-# Run the complete test suite (169 tests)
+# Run the complete test suite (240 tests on the current Windows baseline)
 moon test --target native
 
 # Build release executable

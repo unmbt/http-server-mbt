@@ -1,6 +1,8 @@
 # http-server-mbt 重构设计
 
-版本：5。日期：2026-09-18。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；增补 CLI 与 C ABI（动态库与静态库）的 thin（纯静态 HTTP、零加密 C 依赖）与 full（集成 MbedTLS TLS 与代理能力）双版本打包规范；D-11 增补 MoonBit 对象 .drectve 剥离与 .def 白名单符号隔离机制。版本 4 内容保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
+2026-09-22 增补：六项架构优化见 D-20 和 [架构审计](architecture-review.md)。此前“零加密 C 依赖”修正为无 TLS 后端 / 代理功能依赖，允许平台 runtime 的通用随机数系统库。
+
+版本：5。日期：2026-09-18。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；增补 CLI 与 C ABI（动态库与静态库）的 thin（纯静态 HTTP、不含 TLS/代理功能与 MbedTLS C 源）与 full（集成 MbedTLS TLS 与代理能力）双版本打包规范；D-11 增补 MoonBit 对象 .drectve 剥离与 .def 白名单符号隔离机制。版本 4 内容保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。
 
 **实施前**：阅读 `moonbit-agent-guide`；Native FFI/C ABI 工作另须阅读 `moonbit-c-binding`，按本地工具链核实导出、所有权和链接能力。不要直接修改 `.mooncakes/` 中的依赖缓存。
 
@@ -267,8 +269,8 @@ Native C ABI 由库创建并管理内部 owner 线程，同一 runtime 的托管
 |---|---|
 | 精简 CLI | 静态 HTTP、缓存/Range/预压缩、目录、安全策略、BaseURL/回退；裁去 TLS、代理和 WebSocket，相关参数报“此构建不支持”，不能静默忽略 |
 | 完整 CLI | 包含全部兼容能力、TLS/HTTP(S) 代理/WebSocket；完整兼容验收只对该形态声明 |
-| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 thin（零加密依赖，产物 hs_thin.dll / libhs_thin.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
-| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 thin（零加密依赖，产物 hs_thin_static.lib / libhs_thin.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
+| C 动态库 | 相同静态引擎及声明式 Server 配置；区分 thin（不含 TLS/代理功能及 MbedTLS C 源，产物 hs_thin.dll / libhs_thin.so）与 full（集成 MbedTLS TLS 与代理，产物 hs_full.dll / libhs_full.so）；生成独立动态库产物，不把 CLI main 链入库；运行时对象和分配释放留在库内 |
+| C 静态库 | `.a`/MSVC `.lib` 与同版 C 头文件、runtime/传递依赖清单；区分 thin（不含 TLS/代理功能及 MbedTLS C 源，产物 hs_thin_static.lib / libhs_thin.a）与 full（集成 TLS 与代理，产物 hs_full_static.lib / libhs_full.a）；与动态库相同 hs_* ABI，见 D-11 |
 | Node 包 | `.node` 静态链接引擎，附 JS/TypeScript 适配；按 OS/架构/libc 分发，不要求额外引擎动态库，见 D-12 |
 | wasm-gc | 实验 `.wasm`、宿主接口/适配与运行示例；需要 WasmGC 宿主，不属于无运行时单机 Native 产物 |
 | Mooncakes 模块 | `unmbt/http-server-mbt` 可发布源码与必要资源；静态 API、完整 server、可移植 core 分包，独立模块可引入，见 D-14 |
@@ -343,7 +345,7 @@ T-002 验证路径为：固定支持 C 生成的工具链/编译模式 → 导�
 同一探针还须验证 D-07 的托管启动/关闭：库内部 owner 的创建与初始化、跨线程 C 命令队列、完成通知、自动排空及多实例引用。C ABI 静态/动态库与 MoonBit 直接消费分别验证；不把宿主已有 runtime 的托管值迁到库新建线程。无法实现托管时记录阻塞并修正内部方案，不能改成要求用户手动轮询来通过验收。
 
 正式静态产物与动态库共用 C 头文件（`c_abi/include/http_server.h`）、hs_* 版本、错误码及 D-07 所有权。动态库与静态库均提供 thin 与 full 双版本：
-- **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，零加密与 MbedTLS C 依赖；Windows 产物为动态库 `hs_thin.dll`（配套 import library `hs_thin.lib`）与静态归档 `hs_thin_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。
+- **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，不含 TLS/代理功能及 MbedTLS C 依赖；Windows 产物为动态库 `hs_thin.dll`（配套 import library `hs_thin.lib`）与静态归档 `hs_thin_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。平台 runtime 的通用系统库不计入该功能边界。
 - **full 版本**：基于 `c_abi/full`，集成 MbedTLS TLS 传输层与反向代理能力；Windows 产物为动态库 `hs_full.dll`（配套 import library `hs_full.lib`）与静态归档 `hs_full_static.lib`。
 
 构建流水线通过纯 MoonBit 脚本 `scripts/build_cabi.mbtx` 驱动：
@@ -482,3 +484,13 @@ CLI 在监听成功后按基线 `0d3b7bb` 的 `bin/http-server` listen 回调还
 颜色开关近似原版 chalk/supports-color 语义：`FORCE_COLOR`（非 `0`/`false`）优先强制开启，其次非空 `NO_COLOR` 或 `TERM=dumb` 关闭，否则要求 stdout 为 TTY；TTY 检测由 native stub `http_server_cli_is_stdout_tty` 提供（POSIX `isatty(1)`，Windows `_isatty` 并对控制台启用 `ENABLE_VIRTUAL_TERMINAL_PROCESSING` 使 ANSI 转义在传统 conhost 可渲染）。ANSI 序列按 chalk 的 `\x1b[3xm ... \x1b[39m` 包裹各片段；非 TTY（重定向、管道、CI 捕获）输出纯文本，字节与原版禁色输出一致。silent 模式抑制横幅与停止提示，对齐原版空 logger；此前 silent 下动作回调立即返回导致服务器随即退出，属缺陷，现横幅可静默而服务持续运行。
 
 终止信号对齐原版 SIGINT/SIGTERM handler：`moonbitlang/async` 的全局取消信号（默认含 SIGINT/SIGTERM/SIGHUP/SIGBREAK）把终止转为主任务取消，取消路径打印红色 `http-server stopped.`（silent 时静默）后以退出码 0 结束，`with_server_at` 仍走停止排空；普通错误路径维持 stderr + 退出码 1。请求级访问日志（原版 `[GET] /path` 行）不属于本设计，仍由日志钩子任务承载。
+
+## D-20 Thin / Full 依赖边界与持续审计
+
+关联 R-N17 / T-035；六项问题见 [architecture-review](architecture-review.md)。Thin CLI / C ABI 依赖 `server/plain`；Full 依赖 `full` → `server` 与 `tls`。两条路径共用 core、根静态引擎、内核传输和 HTTP framing。共享包不得反向导入 `async/http`、`async/websocket`、`async/tls` 或 Full。CLI 已将 `first_value`、整数、端口、缓存和 Basic Auth 解析原语抽到无 Full/TLS 依赖的 `cmd/common`；两个入口保留本地包装以兼容现有白盒测试。banner、颜色、IP 枚举、完整命令规格和 main 仍待后续迁移与依赖审计，最终各入口只选择档位和启动函数。
+
+Full 的入站 TLS 与 HTTP/HTTPS upstream 使用 MbedTLS。`UpstreamConnector` 拥有共享客户端 TLS 配置，每次连接独立拥有 TCP/TLS 对象，失败、取消及服务关闭均释放；明文连接器不得将 `https` URL 降级为 TCP。当前 `async/websocket` 的 `wss` 仍是独立依赖路径，T-014/T-035 必须在统一 WebSocket TLS transport 前保留该限制，不能把它写成已共享 MbedTLS。N-12 覆盖显式 CA、主机名、`secure=false`、失败清理；`secure=true` 缺少 `ca_file` 时监听前明确失败，不能静默禁用校验。
+
+HTTP framing 拒绝负数/溢出长度、重复 `Content-Length`、重复 `Transfer-Encoding` 及二者同时出现。固定长度和 chunked 正文以有界缓冲消费，chunk 扩展与 trailer 不污染下一请求；解析失败关闭连接。HTTP/1.0 默认关闭、HTTP/1.1 默认保持，`Connection: close` 优先，HEAD 不输出正文。保留 idle timeout、认证、Range/预压缩及 FILE_CHANGED 终止语义。
+
+裁剪 TLS 只移除未使用的证书/CSR 创建及写入模块；保留证书/CRL 解析校验、加密私钥、TLS 1.2/1.3 和已有密码套件兼容性。配置与源码清单由 `vendor_tls.mbtx` 再生。审计 `.mbtx` 输出平台、工具链、提交、release bytes、SHA-256、动态依赖及 TLS 符号检查；D-15 的无硬性大小目标保持。通用 runtime `bcrypt.dll` 允许，但不能因此宣称零加密系统库。

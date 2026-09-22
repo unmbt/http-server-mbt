@@ -8,7 +8,7 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
-[![Build Status](https://img.shields.io/badge/Tests-169%2F169%20Pass-brightgreen)](#)
+[![Build Status](https://img.shields.io/badge/Tests-240%2F240%20Pass-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-平台支持矩阵)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
@@ -19,11 +19,11 @@
 
 | 平台 | 架构 | 状态 | 核心传输机制 | 质量门禁与测试 |
 | :--- | :--- | :---: | :--- | :--- |
-| **Windows** | x86_64 | **✅ 稳定支持 (Verified)** | Win32 `TransmitFile` + IOCP Overlapped 异步内核级零拷贝，100ms 超时防内核悬挂 | 169/169 项全量测试 100% 通过，0 警告，高压循环测试 0 句柄泄漏，通过独立 Victory Audit 终审 (M1~M6 已完成) |
-| **Linux** | x86_64 | **✅ 支持 (Verified)** | `sendfile(2)` 显式偏移内核零拷贝 + `epoll` 事件循环（moonbitlang/async 后端），每块 fstat `FILE_CHANGED` 检测、`posix_fadvise` 预取 | 169/169 测试本机通过（连续三轮稳定），零拷贝门禁转绿；CI 矩阵已启用 (T-032)；证据见 `docs/linux-baseline.md` |
-| **macOS** | arm64 / x86_64 | **✅ 支持 (Verified)** | Darwin `sendfile` 内核零拷贝（value-result `len`：错误与实际发送字节同时检查、短写推进偏移）+ `kqueue` 事件循环（moonbitlang/async 后端），每块 fstat `FILE_CHANGED` 检测、`F_RDADVISE` 预取 | 169/169 测试经 GitHub Actions `macos-latest`（arm64）首跑通过；CI 矩阵已启用 (T-032)；证据见 `docs/macos-baseline.md` |
+| **Windows** | x86_64 | **✅ 本机 Native 已验证** | Win32 `TransmitFile` + IOCP Overlapped 异步内核级零拷贝 | 当前本机 240/240 通过；Full/Thin 依赖和体积审计见 `docs/architecture-review.md` |
+| **Linux** | x86_64 | **🔶 等待 Actions 证据** | `sendfile(2)` + `epoll` | 平台发布、TLS 和容器证据由 T-032/T-035 跟踪 |
+| **macOS** | arm64 / x86_64 | **🔶 等待 Actions 证据** | Darwin `sendfile` + `kqueue` | 平台发布、TLS 和容器证据由 T-032/T-035 跟踪 |
 
-> 📌 **跨平台说明**：三平台现已全部具备原生内核零拷贝文件传输，且各自通过全量 169 项测试门禁 —— Windows（`TransmitFile` + IOCP）、Linux（`sendfile` + `epoll`）、macOS（Darwin `sendfile` + `kqueue`）。依据项目规划规范（D-16），GitHub Actions 三平台持续集成矩阵（T-032）提供持续验证；独立二进制打包发布（T-022）与剩余运行时任务在 Milestone 7 继续推进。
+> 📌 **跨平台说明**：当前可复核证据是 Windows 本机 Native。Linux/macOS 仍需 Actions 矩阵和发行门禁；Windows 结果不计作三平台整体完成。
 
 ---
 
@@ -46,7 +46,7 @@
 ## ✨ 核心特性
 
 - **极速性能**：使用 MoonBit 最前沿的 Native 后端直接编译为原生机器码，Windows（`TransmitFile`）/ Linux（`sendfile`）/ macOS（Darwin `sendfile`）三平台均开启内核零拷贝。
-- **零外部依赖**：单文件分发，无需安装 Node.js、V8、Python 或动态库解释器。
+- **独立 Native CLI**：无需安装 Node.js、V8 或 Python；平台系统 DLL 仍属于 Native 运行时依赖契约。
 - **现代路由支持**：支持 BaseURL 路径挂载前缀、SPA 路由兜底及 `--try-files` 自定义降级策略。
 - **智能预压缩协商**：优先支持 Brotli 与 gzip 双重内容协商，内建 gzip 魔数校验防损坏。
 - **全双工代理**：支持 HTTP 404 反向代理与 WebSocket 协议升级长连接双向代理。
@@ -65,7 +65,7 @@
 moon install unmbt/http-server-mbt/cmd/http-server-mbt
 http-server-mbt -v
 
-# 或 Thin 版（纯 MoonBit 静态托管，零 C 密码学与零代理依赖）
+# 或 Thin 版（明文静态托管，不含 TLS、代理、MbedTLS 或 PSA）
 moon install unmbt/http-server-mbt/cmd/http-server-mbt-thin
 http-server-mbt-thin -v
 ```
@@ -78,7 +78,7 @@ http-server-mbt-thin -v
 
 提供两种独立 CLI 二进制版本：
 - **Full（完整版，默认）**：包含完整静态文件托管、内置 MbedTLS 的 TLS 1.2/1.3 (HTTPS) 加密以及 HTTP/WebSocket 全双工反向代理（`http-server-mbt`）。
-- **Thin（精简版）**：零 C 密码学依赖，零反向代理网络依赖，纯 MoonBit 静态文件托管，体积减少约 30%（`http-server-mbt-thin`）。
+- **Thin（精简版）**：不含 TLS、代理、MbedTLS 或 PSA；Windows release 实测 1,602,560 字节，Full 为 3,884,544 字节，产物缩小约 58.75%。Windows 仍可能由通用 runtime 导入 `bcrypt.dll`，因此不宣称零系统加密库。
 
 #### Linux & macOS
 
@@ -86,7 +86,7 @@ http-server-mbt-thin -v
 # 完整版（默认）
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash
 
-# Thin 版（轻量零密码学依赖）
+# Thin 版（轻量明文版本，不含 TLS/代理）
 curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.sh | bash -s -- --thin
 ```
 
@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/unmbt/http-server-mbt/master/script
 # 完整版（默认）
 irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1 | iex
 
-# Thin 版（轻量零密码学依赖）
+# Thin 版（轻量明文版本，不含 TLS/代理）
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/unmbt/http-server-mbt/master/scripts/install.ps1))) -Thin
 ```
 
@@ -200,7 +200,7 @@ cd http-server-mbt
 moon update
 moon check --target native
 
-# 运行全套 169 项质量与安全测试
+# 运行全套测试（当前 Windows 基线为 240 项）
 moon test --target native
 
 # 编译原生 Release 二进制文件

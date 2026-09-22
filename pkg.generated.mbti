@@ -2,6 +2,7 @@
 package "unmbt/http-server-mbt"
 
 import {
+  "moonbitlang/async/types",
   "moonbitlang/core/debug",
   "unmbt/http-server-mbt/core",
 }
@@ -9,7 +10,11 @@ import {
 // Values
 pub fn escape_html(String) -> String
 
+pub fn get_handle_count() -> UInt
+
 pub fn render_directory_listing_html(String, Array[(String, Bool)], raw_query? : String?, host? : String) -> String
+
+pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
 
 pub async fn[T] with_engine(@core.Config, async (StaticEngine) -> T) -> T
 

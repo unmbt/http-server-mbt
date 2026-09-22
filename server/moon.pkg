@@ -20,11 +20,6 @@ import {
 } for "test"
 
 options(
-  "native-stub": [
-    "transmit_file_windows.c",
-    "transmit_file_linux.c",
-    "transmit_file_darwin.c",
-  ],
   link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
   targets: { "*.mbt": [ "native" ] },
 )

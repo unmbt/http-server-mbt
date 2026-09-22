@@ -1098,7 +1098,7 @@ async fn main {
     @fs.read_file("c_abi/include/http_server.h").binary(),
   )
 
-  println("4. Building thin variant (zero crypto, static HTTP server)...")
+  println("4. Building thin variant (no TLS backend, static HTTP server)...")
   build_variant(
     "thin",
     tc,

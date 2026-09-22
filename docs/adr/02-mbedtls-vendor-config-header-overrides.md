@@ -107,7 +107,7 @@
 
 * 从 `https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-4.2.0/mbedtls-4.2.0.tar.bz2` 重新下载，SHA-256 为 `2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`，与脚本 pin 及 D-08 记录一致。
 * 逐文件字节比对：vendored 282 个文件中 280 个与 tarball 完全一致；两个配置头的差异与本文声明的变换（ASCII 清洗 + 追加托管块）逐字节重建吻合。
-* 完备性：tarball 10 个拷贝子树内 280 个 `*.c`/`*.h` 文件在 vendored 树中无缺失、无多余；`tls/moon.pkg` 的 native-stub 清单（109 项）与 “vendored `*.c` − `library/net_sockets.c` + `tls_bridge.c`” 完全一致。
+* 完备性：tarball 10 个拷贝子树内 280 个 `*.c`/`*.h` 文件在 vendored 树中无缺失、无多余。初始清单（109 项）与 “vendored `*.c` − `library/net_sockets.c` + `tls_bridge.c`” 完全一致；2026-09-23 起由 T-035 的裁剪规则额外排除未使用调试、PKCS#7、CSR/证书生成和 SSL cache/cookie 源，当前生成清单为 100 项，来源与排除项均由 `scripts/vendor_tls.mbtx` 再生。
 
 ## 相关
 

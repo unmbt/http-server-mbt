@@ -1,5 +1,5 @@
 import {
-  "unmbt/http-server-mbt/server",
+  "unmbt/http-server-mbt/server/plain" @server,
   "unmbt/http-server-mbt/core",
   "moonbitlang/async",
 }

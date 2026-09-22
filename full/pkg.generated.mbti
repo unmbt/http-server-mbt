@@ -11,6 +11,8 @@ import {
 // Values
 pub async fn build_tls_acceptor(@core.Config) -> @tls.TlsAcceptor raise @core.ConfigError
 
+pub async fn build_upstream_connector(@core.Config) -> &@server.UpstreamConnector raise @core.ConfigError
+
 pub async fn new_tls_acceptor(@core.Config) -> &@server.Acceptor raise @core.ConfigError
 
 pub async fn with_server(@core.Config, async (@server.Server) -> Unit) -> Unit
@@ -25,6 +27,12 @@ pub struct TlsServerAcceptor {
 }
 pub fn TlsServerAcceptor::new(@tls.TlsAcceptor) -> Self
 pub impl @server.Acceptor for TlsServerAcceptor
+
+pub struct TlsUpstreamConnector {
+  tls_acceptor : @tls.TlsAcceptor
+}
+pub fn TlsUpstreamConnector::new(@tls.TlsAcceptor) -> Self
+pub impl @server.UpstreamConnector for TlsUpstreamConnector
 
 // Type aliases
 

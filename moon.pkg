@@ -1,5 +1,7 @@
 import {
+  "moonbitlang/async",
   "moonbitlang/async/fs",
+  "moonbitlang/async/types",
   "moonbitlang/core/encoding/utf8",
   "unmbt/http-server-mbt/core",
 }
@@ -9,5 +11,6 @@ import {
 } for "test"
 
 options(
+  "native-stub": [ "transfer_stub.c" ],
   targets: { "*.mbt": [ "native" ] },
 )

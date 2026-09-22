@@ -21,9 +21,9 @@
 - **精简版 CLI (`cmd/http-server-mbt-thin`)**：
   - **包路径**：`cmd/http-server-mbt-thin/`
   - **依赖特征**：仅依赖 `server`、`core` 与基础 I/O，**完全不依赖 `full` 或 `tls`**，编译产物 0 MbedTLS C 桩代码。
-  - **产物体积对比**（Windows Native debug）：
-    - `http-server-mbt-thin.exe`：**~3.98 MB**
-    - `http-server-mbt.exe` (含 MbedTLS)：**~5.58 MB**（体积降低约 29%，Release 剥离符号后更具优势）。
+  - **产物体积对比**（Windows Native release）：
+    - `http-server-mbt-thin.exe`：**1,602,560 bytes (当前 Windows release)**
+    - `http-server-mbt.exe` (含 MbedTLS)：**3,884,544 bytes (当前 Windows release)**（Thin 相对 Full 减少约 58.75%）。
   - **严格参数拦截**（符合 D-08 / D-15 规范）：
     - 传入 `--cert`、`--key` 或 `--key-passphrase`：报错 `error: TLS is not supported in thin build; use full build`，退出码 1。
     - 传入 `-P`、`--proxy`、`--proxy-all` 或 `--proxy-config`：报错 `error: Proxy is not supported in thin build; use full build`，退出码 1。
@@ -35,14 +35,14 @@
   - 保持原有 CLI 入口完整可用，现有测试、自动化脚本与 Docker 构建无破坏。
 
 ### 3. 全量测试与质量门禁验证
-- **测试通过率**：全仓 **228 / 228 测试 100% 全部通过（0 失败、0 回归、0 句柄泄漏）**。
+- **测试通过率**：全仓 **240 / 240 测试 100% 全部通过（0 失败、0 回归、0 句柄泄漏）**。
   - `cmd/http-server-mbt-thin`：7/7 项参数解析与非法参数拦截测试通过。
   - `cmd/http-server-full`：5/5 项 TLS 与代理参数映射测试通过。
   - `server/`：95/95 项单元、集成、零拷贝与故障注入测试通过。
   - `full/`：13/13 项真实 TLS 回环、预检拦截与句柄压力测试通过。
   - 原版 42 组迁移套件（C001～C042）持续 100% PASS。
 - **静态检查与代码风格**：
-  - `moon check --target native`：**0 错误、0 警告**。
+  - `moon check --target native`：**0 错误；该历史记录未统计当前告警**。
   - `moon info --target native`：生成规范 `.mbti` 接口描述。
   - `moon fmt`：全仓格式化对齐。
 

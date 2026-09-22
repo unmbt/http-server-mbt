@@ -3,6 +3,7 @@ import {
   "unmbt/http-server-mbt/server",
   "unmbt/http-server-mbt/tls",
   "moonbitlang/async/fs",
+  "moonbitlang/async/socket",
   "moonbitlang/core/encoding/utf8",
 }
 

@@ -1,0 +1,13 @@
+import {
+  "unmbt/http-server-mbt" @root,
+  "unmbt/http-server-mbt/core",
+  "moonbitlang/async",
+  "moonbitlang/async/io",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/string",
+}
+
+options(
+  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
+  targets: { "*.mbt": [ "native" ] },
+)

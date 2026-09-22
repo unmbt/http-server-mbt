@@ -314,3 +314,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
    - `moon test --target native server`：10 轮压力循环，10/10 全部通过（每轮 75 个测试耗时 ~8s，0 失败，0 卡死）。
    - `moon test --target native`：全仓全量包测试连续 5 轮，5/5 全部通过（每轮 178 个测试耗时 ~8s，0 失败，0 卡死）。
    - 工具链检查：`moon check --target native` 通过、`moon info --target native` 更新、`moon fmt` 格式化通过。
+
+## 6. 架构优化追加任务
+
+- [ ] **T-035 Thin / Full 架构审计与收敛** — 状态：进行中（2026-09-22）。需求：R-N17；设计：D-08、D-15、D-20；依赖：T-012、T-013、T-014、T-015、T-031、T-032。
+  - 交付：落实六项问题的架构记录；Thin 只依赖 `server/plain`，Full 统一入站/上游/WebSocket TLS 连接器；HTTP framing 共用并验证冲突长度、chunk trailer、keep-alive、HEAD 和关闭；抽取无 Full 依赖的公共 CLI；建立 Full/Thin 依赖、符号、PE/ELF/Mach-O、bytes、哈希审计。
+  - 验收：`moon check/test/info/fmt --target native`；Full/Thin release 构建；N-12 HTTPS upstream（HTTP 明文、HTTPS 握手、CA/主机名、secure=false、失败清理、502）；Windows 本机证据与 Actions 三平台证据分别记录，不能用本机结果勾选整体任务。
+  - 当前证据：Thin `1,602,560` bytes（SHA-256 `F21871E7432B5E0F678305663BBF89FCD790E1B8C3029A20E4654BABA0E7F9D0`）、Full `3,884,544` bytes（SHA-256 `79721784E4D9D012B04A908CB4C168353E89802A8F78081CE8495ACB0C3BD1D7`；Windows x86_64 release）；`moon test --target native` 为 240/240。真实 HTTPS upstream E2E、完整测试矩阵和三平台依赖审计待回填。详见 [architecture-review](architecture-review.md)。

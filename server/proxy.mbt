@@ -8,6 +8,21 @@ pub struct TargetUrl {
 } derive(Debug, Eq)
 
 ///|
+pub fn TargetUrl::scheme(self : TargetUrl) -> String {
+  self.scheme
+}
+
+///|
+pub fn TargetUrl::host(self : TargetUrl) -> String {
+  self.host
+}
+
+///|
+pub fn TargetUrl::port(self : TargetUrl) -> Int {
+  self.port
+}
+
+///|
 /// Parse an upstream target URL (e.g. "http://127.0.0.1:8080" or "http://localhost:8082/api").
 pub fn parse_target_url(url : String) -> TargetUrl? {
   let scheme = if url.has_prefix("https://") {
@@ -106,7 +121,7 @@ pub async fn load_proxy_rules(proxy_config : String?) -> Array[@core.ProxyRule] 
 /// Forward an HTTP request to an upstream proxy target URL and stream
 /// the upstream response back to the client transport.
 pub async fn proxy_http_request(
-  _server : Server,
+  server : Server,
   transport : Transport,
   meth : @core.Method,
   headers : Map[String, String],
@@ -130,16 +145,14 @@ pub async fn proxy_http_request(
     parsed.base_path + "/" + target
   }
 
-  // Connect to upstream target
-  let upstream_conn = @socket.Tcp::connect_to_host(
-    parsed.host,
-    port=parsed.port,
-  ) catch {
-    _ => {
-      let _ = send_fallback_status(transport, 502, "Bad Gateway")
-      return false
+  // The Full package injects MbedTLS for HTTPS. Thin's server package uses
+  // the plaintext connector and rejects proxy configuration before listening.
+  let upstream_conn = server.upstream_connector().connect(parsed) catch {
+      _ => {
+        let _ = send_fallback_status(transport, 502, "Bad Gateway")
+        return false
+      }
     }
-  }
   defer upstream_conn.close()
 
   // Construct HTTP/1.1 request to upstream
@@ -168,12 +181,7 @@ pub async fn proxy_http_request(
   }
   req_buf.write_string("\r\n")
 
-  let write_ok = try {
-    upstream_conn.write(req_buf.to_string())
-    true
-  } catch {
-    _ => false
-  }
+  let write_ok = upstream_conn.send(req_buf.to_string()) catch { _ => false }
   if !write_ok {
     let _ = send_fallback_status(transport, 502, "Bad Gateway")
     return false
@@ -184,7 +192,9 @@ pub async fn proxy_http_request(
   let buf = FixedArray::make(buffer_size, b'\x00')
   let mut read_any = false
   for ;; {
-    let n = upstream_conn.read(buf) catch { _ => break }
+    let n = upstream_conn.reader.read(buf, offset=0, max_len=buffer_size) catch {
+      _ => break
+    }
     if n <= 0 {
       break
     }

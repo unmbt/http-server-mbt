@@ -56,6 +56,16 @@ const MBEDTLS_CONFIG_OVERRIDES : String =
     #|#undef MBEDTLS_MEMORY_BUFFER_ALLOC_C
     #|#undef MBEDTLS_ENTROPY_NV_SEED
     #|#undef MBEDTLS_PLATFORM_NV_SEED_ALT
+    #|/* The server only parses certificates and private keys. It never
+    #|   creates certificates/CSRs or consumes PKCS#7 bundles. */
+    #|#undef MBEDTLS_DEBUG_C
+    #|#undef MBEDTLS_PKCS7_C
+    #|#undef MBEDTLS_X509_CREATE_C
+    #|#undef MBEDTLS_X509_CRT_WRITE_C
+    #|#undef MBEDTLS_X509_CSR_PARSE_C
+    #|#undef MBEDTLS_X509_CSR_WRITE_C
+    #|#undef MBEDTLS_SSL_CACHE_C
+    #|#undef MBEDTLS_SSL_COOKIE_C
     #|/* ==== http-server-mbt managed overrides (end) ==== */
   )
 
@@ -97,10 +107,21 @@ let license_files : Array[(String, String)] = [
 ]
 
 ///|
-/// Sources excluded from the compile list: MBEDTLS_NET_C is disabled, so
-/// net_sockets.c would compile to nothing anyway; excluding it keeps the
-/// module free of any socket API reference.
-let excluded_sources : Array[String] = ["library/net_sockets.c"]
+/// Sources excluded from the compile list. The corresponding feature macros
+/// are disabled above; keeping the list explicit makes the generated package
+/// auditable and avoids compiling unused certificate-generation/debug paths.
+let excluded_sources : Array[String] = [
+  "library/net_sockets.c",
+  "library/debug.c",
+  "library/pkcs7.c",
+  "library/ssl_cache.c",
+  "library/ssl_cookie.c",
+  "library/x509_create.c",
+  "library/x509_csr.c",
+  "library/x509write.c",
+  "library/x509write_crt.c",
+  "library/x509write_csr.c",
+]
 
 ///|
 /// Config headers that must be pure ASCII (MSVC C4819 under east-Asian

@@ -207,6 +207,23 @@ pub fn Config::has_tls(self : Config) -> Bool {
 }
 
 ///|
+/// Return whether configured upstream targets may require a TLS client.
+/// Inline/file proxy rules are conservatively treated as HTTPS when their
+/// configuration contains an `https://` target.
+pub fn Config::proxy_targets_include_https(self : Config) -> Bool {
+  if self.proxy is Some(url) && url.has_prefix("https://") {
+    return true
+  }
+  if self.proxy_all is Some(url) && url.has_prefix("https://") {
+    return true
+  }
+  match self.proxy_config {
+    Some(value) => value.contains("https://")
+    None => false
+  }
+}
+
+///|
 /// Validate TLS configuration pairing: enabling TLS requires both a
 /// certificate and a key (D-01). File readability and key/cert matching are
 /// verified during server startup preflight when the acceptor is built,

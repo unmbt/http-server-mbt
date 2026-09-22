@@ -183,6 +183,7 @@ pub fn Config::has_proxy(Self) -> Bool
 pub fn Config::has_tls(Self) -> Bool
 pub fn Config::has_websocket_proxy(Self) -> Bool
 pub fn Config::middleware_default(String) -> Self
+pub fn Config::proxy_targets_include_https(Self) -> Bool
 pub fn Config::validate(Self) -> Unit raise ConfigError
 
 pub(all) struct EntityTag {

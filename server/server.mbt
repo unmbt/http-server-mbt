@@ -5,6 +5,7 @@ pub struct Server {
   engine : @root.StaticEngine
   config : @core.Config
   acceptor : &Acceptor
+  upstream_connector : &UpstreamConnector
   proxy_rules : Array[@core.ProxyRule]
   mut stopped : Bool
   mut task : @async.Task[Unit]?
@@ -27,6 +28,12 @@ pub fn Server::has_upgrade_capability(self : Server) -> Bool {
 /// Return the server acceptor.
 pub fn Server::acceptor(self : Server) -> &Acceptor {
   self.acceptor
+}
+
+///|
+/// Return the configured upstream transport factory.
+pub fn Server::upstream_connector(self : Server) -> &UpstreamConnector {
+  self.upstream_connector
 }
 
 ///|
@@ -73,6 +80,26 @@ pub async fn with_server_at(
   acceptor? : &Acceptor,
   action : async (Server) -> Unit,
 ) -> Unit {
+  with_server_at_with_connector(
+    config,
+    port,
+    acceptor?,
+    upstream_connector?=None,
+    action,
+  )
+}
+
+///|
+/// Start a server with an optional upstream transport factory. The plain
+/// server leaves this unset; Full injects a factory that can create TLS client
+/// transports for HTTPS upstreams.
+pub async fn with_server_at_with_connector(
+  config : @core.Config,
+  port : Int,
+  acceptor? : &Acceptor,
+  upstream_connector? : &UpstreamConnector,
+  action : async (Server) -> Unit,
+) -> Unit {
   @core.validate_tls(config)
   let effective_acceptor : &Acceptor = match acceptor {
     Some(acc) => {
@@ -93,6 +120,11 @@ pub async fn with_server_at(
     }
   }
   defer effective_acceptor.close()
+  let effective_connector : &UpstreamConnector = match upstream_connector {
+    Some(connector) => connector
+    None => PlainUpstreamConnector::new()
+  }
+  defer effective_connector.close()
   let engine = @root.StaticEngine::new(config)
   // SO_REUSEADDR on Linux/macOS so an immediate re-bind after stop succeeds
   // through TIME_WAIT (Windows ignores this flag; libuv in the original
@@ -104,6 +136,7 @@ pub async fn with_server_at(
     engine,
     config,
     acceptor: effective_acceptor,
+    upstream_connector: effective_connector,
     proxy_rules,
     stopped: false,
     task: None,
@@ -241,6 +274,36 @@ pub(open) trait Acceptor {
 ///|
 impl Acceptor with fn is_tls(_self) -> Bool {
   false
+}
+
+///|
+/// Creates a transport for an upstream proxy target and owns any shared
+/// client-side TLS configuration for the server lifetime.
+pub(open) trait UpstreamConnector {
+  async fn connect(Self, TargetUrl) -> Transport raise Error
+  fn close(Self) -> Unit
+}
+
+///|
+pub struct PlainUpstreamConnector {}
+
+///|
+pub fn PlainUpstreamConnector::new() -> PlainUpstreamConnector {
+  PlainUpstreamConnector::{ }
+}
+
+///|
+pub impl UpstreamConnector for PlainUpstreamConnector with fn connect(
+  self,
+  target,
+) {
+  let tcp = @socket.Tcp::connect_to_host(target.host(), port=target.port())
+  Transport::plain(tcp)
+}
+
+///|
+pub impl UpstreamConnector for PlainUpstreamConnector with fn close(_self) {
+  ()
 }
 
 ///|

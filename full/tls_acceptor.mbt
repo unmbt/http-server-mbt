@@ -12,6 +12,51 @@ pub fn TlsServerAcceptor::new(
 }
 
 ///|
+/// Full-build upstream connector. Plain HTTP targets remain raw TCP; HTTPS
+/// targets use the vendored MbedTLS client with SNI and certificate checks.
+pub struct TlsUpstreamConnector {
+  tls_acceptor : @tls.TlsAcceptor
+}
+
+///|
+pub fn TlsUpstreamConnector::new(
+  tls_acceptor : @tls.TlsAcceptor,
+) -> TlsUpstreamConnector {
+  { tls_acceptor, }
+}
+
+///|
+pub impl @server.UpstreamConnector for TlsUpstreamConnector with fn connect(
+  self,
+  target,
+) {
+  let tcp = @socket.Tcp::connect_to_host(target.host(), port=target.port())
+  if target.scheme() == "https" {
+    let tls_conn = self.tls_acceptor.connect(
+      target.host(),
+      reader=tcp,
+      writer=tcp,
+    ) catch {
+      err => {
+        tcp.close()
+        raise err
+      }
+    }
+    @server.Transport::custom(tls_conn, tls_conn, close_fn=fn() {
+      tls_conn.close()
+      tcp.close()
+    })
+  } else {
+    @server.Transport::plain(tcp)
+  }
+}
+
+///|
+pub impl @server.UpstreamConnector for TlsUpstreamConnector with fn close(self) {
+  self.tls_acceptor.close()
+}
+
+///|
 pub impl @server.Acceptor for TlsServerAcceptor with fn accept(self, tcp) {
   let tls_conn = self.tls_acceptor.accept(reader=tcp, writer=tcp)
   @server.Transport::custom(tls_conn, tls_conn, close_fn=fn() {
@@ -102,4 +147,46 @@ pub async fn new_tls_acceptor(
 ) -> &@server.Acceptor raise @core.ConfigError {
   let tls_acceptor = build_tls_acceptor(config)
   TlsServerAcceptor::new(tls_acceptor)
+}
+
+///|
+/// Build the client TLS connector used by HTTPS upstream proxy targets.
+/// Verification is fail-closed unless `secure=false` is explicit.
+pub async fn build_upstream_connector(
+  config : @core.Config,
+) -> &@server.UpstreamConnector raise @core.ConfigError {
+  let ca = match config.ca_file {
+    Some(path) =>
+      @fs.read_file(path).binary() catch {
+        err =>
+          raise @core.ConfigError::InvalidTls(
+            "cannot read ca_file \{path}: \{err}",
+          )
+      }
+    None => {
+      if config.secure {
+        raise @core.ConfigError::InvalidTls(
+          "secure upstream proxy requires ca_file",
+        )
+      }
+      b""
+    }
+  }
+  let acceptor = try {
+    if ca.length() == 0 {
+      @tls.TlsAcceptor::new_client(insecure=!config.secure)
+    } else {
+      @tls.TlsAcceptor::new_client(ca~, insecure=!config.secure)
+    }
+  } catch {
+    @tls.TlsError::TlsError(code~, message~) =>
+      raise @core.ConfigError::InvalidTls(
+        "upstream TLS: \{message} (mbedtls \{code})",
+      )
+    @tls.TlsError::TlsUnexpectedEof =>
+      raise @core.ConfigError::InvalidTls(
+        "upstream TLS: connection closed during handshake",
+      )
+  }
+  TlsUpstreamConnector::new(acceptor)
 }

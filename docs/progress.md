@@ -1,9 +1,11 @@
 # 项目阶段进度与任务接续指南
 
-> 记录日期：2026-09-12  
-> 当前状态：**Milestone 1、2、3、4、5、6 全部完成！Milestone 6 原版全量测试迁移（C001～C042、CC-01～CC-28、CE-01～CE-02）、真实 TCP E2E、状态机故障注入、C040 WebSocket 双向异步代理与生命周期闭环已全部达成并通过审查。经 Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）独立审查审计，全票无条件 APPROVED / PASSED (CLEAN)**。  
-> 编译器状态：`moon check --target native` **0 错误、0 警告**。  
-> 测试状态：`moon test --target native` **169/169 全部 PASS，0 FAIL，0 挂起，0 句柄泄漏**。
+> 2026-09-23 架构审计：六项问题及优化路线见 [architecture-review](architecture-review.md)。当前 Windows release 实测 Full `3,884,544` bytes、Thin `1,602,560` bytes；Thin 依赖边界、HTTPS upstream、framing、TLS vendor 裁剪和 CLI 参数原语共享已收敛，三平台整体门槛仍未完成。
+
+> 记录日期：2026-09-23
+> 当前状态：Milestone 1～6 的历史 Windows 分项记录保留；架构审计追加 T-035，Thin/Full 依赖边界、HTTPS upstream、framing、TLS vendor 裁剪和 CLI 参数原语共享已收敛。Windows 本机结果不能代替三平台 Actions 发行门槛。
+> 编译器状态：`moon check --target native` **0 错误（仍有历史告警）**。
+> 测试状态：`moon test --target native` **240/240 全部 PASS，0 FAIL**。
 
 ---
 
@@ -16,7 +18,7 @@
 | **M3** | **Engine 业务特性与路由回退** | **已完成 (PASS)** | 落地全部 9 项特性：HTTP/1.1 GET/HEAD 分发、`.br`/`.gz` 预压缩协商、`forceContentEncoding`、目录探测与 302 重定向、美观 HTML 目录列表视图生成、SPA 与 try-files 兜底（严格保留 401/403）、D-17 文件变更截断检测、`ResponseBody` 零拷贝抽象。全量测试提升至 46/46。 |
 | **M4** | **Windows Native TransmitFile 与 IOCP 零拷贝** | **已完成 (PASS)** | Win32 `TransmitFile` Overlapped 异步 I/O 内核级静态大文件与 Range 区间发送；有界缓冲降级保护；断连取消与防句柄泄漏机制。经 Reviewer、Challenger 与 Auditor 门禁审查，83/83 测试通过，多次请求 0 句柄泄漏。 |
 | **M5** | **CLI 完整性、生命周期与架构规范** | **已完成 (PASS)** | 完善 `cmd/http-server-mbt/` 全量命令行参数解析（`--port`/`-p`、root、`--base-url`、`--base-dir`、`--spa`、`--try-files`、`--autoIndex`/`-i`/`--no-autoIndex`、`--showDir`/`-d`/`--no-showDir`、`--cache`/`-c`、`--cors`、`--auth`/`-a`、`--log-ip`/`-l`、`--silent`/`-s`、`--help`/`-h`、`--version`/`-v` 等）；监听前参数校验与冲突预检；跨平台优雅停机与在途请求排空；MIT/Apache-2.0 商业宽松许可合规；经 Reviewer、Challenger 与 Auditor 全票无条件通过，全量测试提升至 116/116 全部通过。 |
-| **M6** | **原版全量测试套件迁移与对抗加固** | **已完成 (ALL PASS & AUDITED)** | 原版逐例迁移矩阵（C001～C042 及 CC-01～CC-28、CE-01～CE-02）全部落地；真实 TCP Socket 客户端 E2E 测试集（`server_e2e_client_test.mbt`）、T-034 状态机故障注入（`server_fault_injection_test.mbt`）、C040 WebSocket 双向转发及生命周期全部调优通过；两组独立 Challenger 对抗套件（`server_challenger_m6_test.mbt`、`server_challenger_m6_edge_test.mbt`）全部通过；多方门禁全票 APPROVED，全量测试达到 169/169 100% 通过。 |
+| **M6** | **原版全量测试套件迁移与对抗加固** | **已完成 (ALL PASS & AUDITED)** | 原版逐例迁移矩阵（C001～C042 及 CC-01～CC-28、CE-01～CE-02）全部落地；真实 TCP Socket 客户端 E2E 测试集（`server_e2e_client_test.mbt`）、T-034 状态机故障注入（`server_fault_injection_test.mbt`）、C040 WebSocket 双向转发及生命周期全部调优通过；两组独立 Challenger 对抗套件（`server_challenger_m6_test.mbt`、`server_challenger_m6_edge_test.mbt`）全部通过；多方门禁全票 APPROVED，当前全量测试达到 240/240 100% 通过。 |
 
 ---
 
@@ -85,10 +87,10 @@ http-server-mbt/
 在 Windows PowerShell 下执行以下验证命令：
 
 ```powershell
-# 1. 验证编译与类型检查（必须保持 0 错误、0 警告）
+# 1. 验证编译与类型检查（必须保持 0 错误；历史告警需单独记录）
 moon check --target native
 
-# 2. 执行全量单元与集成测试（实测 169/169 全部通过，0 挂起、0 句柄泄漏）
+# 2. 执行全量单元与集成测试（实测 240/240 全部通过，0 挂起、0 句柄泄漏）
 moon test --target native
 
 # 3. 更新并校验公开接口描述文件
@@ -99,8 +101,8 @@ moon fmt
 ```
 
 实测输出证据：
-- `moon check --target native`：`Finished. moon: ran 5 tasks, now up to date`（**0 错误、0 警告**）。
-- `moon test --target native`：`Total tests: 169, passed: 169, failed: 0`（**100% PASS**）。
+- `moon check --target native`：**0 错误，存在历史告警**。
+- `moon test --target native`：`Total tests: 240, passed: 240, failed: 0`（**100% PASS**）。
 - 原版用例迁移覆盖验证：`c_suite_common_cases_test.mbt`、`c_suite_protocol_test.mbt`、`c_suite_directory_security_test.mbt`、`c_suite_network_lifecycle_test.mbt`、`c_suite_main_test.mbt` 完整落地 C001～C042 及 CC-01～CC-28、CE-01～CE-02。
 - 真实 E2E 套接字测试验证：`server/server_e2e_client_test.mbt` 经真实 TCP 握手、HTTP/1.1 Wire-level 报文解析、HEAD/GET/OPTIONS 及 Keep-Alive 验证 100% PASS。
 - 状态机故障注入验证：`server/server_fault_injection_test.mbt` 经单字节短写、报头截断断连、慢读反压、在途取消排空屏障同步、混沌并发与 0 句柄泄漏差分测试，无死锁、无 Socket/文件句柄泄漏。
@@ -114,7 +116,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 1. **Reviewer 1 (`reviewer_m6_1_gen3`)**: **APPROVE**  
    - 验证了 C034 空闲超时真实 1000ms 断连（`.04`）、C040 WebSocket 代理升级与错误隔离（`.01～.04`）、故障注入屏障防死锁同步及纯 HTML `<dir>` 转义。
 2. **Reviewer 2 (`reviewer_m6_2_gen3`)**: **APPROVE**  
-   - 验证了 169 个测试全量 100% 通过、0 告警 0 错误、接口 `.mbti` 一致性与 MoonBit 2026 编码规范。
+   - 验证了 240 个测试全量 100% 通过、0 错误、接口 `.mbti` 一致性与 MoonBit 2026 编码规范；编译器仍有历史告警，见本节首段。
 3. **Challenger 1 (`challenger_m6_1_gen3`)**: **APPROVE**  
    - 验证了短写分片、截断风暴、Slowloris 零拷贝背压、高并发突发与循环无句柄增长 5 项极限压测套件。
 4. **Challenger 2 (`challenger_m6_2_gen3`)**: **APPROVE**  
@@ -127,9 +129,9 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 ## 5. 门禁闭环与终审归档状态
 
 当前代码库已稳定就绪，所有 M1～M6 承诺任务与质量门禁均已彻底闭环：
-- 编译与类型状态：`moon check --target native` **0 错误、0 警告**。
+- 编译与类型状态：`moon check --target native` **0 错误，历史告警待清理**。
 - 接口与代码规范：`moon info --target native` 与 `moon fmt` 保持完全规范一致。
-- 测试套件状态：`moon test --target native` 实测 **169/169 全部通过（100% PASS，0 挂起，0 句柄泄漏）**。
+- 测试套件状态：`moon test --target native` 实测 **240/240 全部通过（100% PASS，0 挂起，0 句柄泄漏）**。
 - 审查审计门禁：Reviewer（2位）、Challenger（2位）、Forensic Auditor（1位）全票无条件 APPROVED / PASSED (CLEAN)，Gate Status: PASS。
 - 终审完成：独立第三方 Victory Auditor 已完成三阶段法医审计，出具 `VICTORY CONFIRMED`，并在本地生成终审提交 `fc0a9ba`。
 
@@ -169,8 +171,8 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 
 | 平台与架构 | 当前状态 | 核心能力基线 | 后续接续里程碑与任务 |
 | :--- | :---: | :--- | :--- |
-| **Windows x86_64** | **✅ 已完成并闭环 (Verified)** | Win32 `TransmitFile` + IOCP Overlapped 内核零拷贝、全量 CLI 参数、169/169 测试 100% 通过、0 警告、0 句柄泄漏、独立 Victory Audit 验收通过 | Milestone 1 ～ Milestone 6 已全面闭环交付 |
-| **Linux x86_64** | **🔶 本机分项完成 (Local Verified)** | `sendfile(2)` 显式偏移内核零拷贝 + `epoll` 事件循环（moonbitlang/async 后端）、fstat `FILE_CHANGED` 检测、`/proc/self/fd` 句柄泄漏监控、`reuse_addr` 立即重绑、169/169 测试本机 100% 通过（连续三轮）、CLI 大文件 4MB/2.6ms 字节一致；证据见 [linux-baseline](linux-baseline.md) | 已对接 Milestone 7 的 **T-032** Linux 分项（ubuntu runner 运行待回填）、**T-002/T-016/T-017** Linux 分项（2026-09-12）；待 **T-022**（musl 静态 ELF 与 Distroless 镜像）、**T-023**（io_uring 实验后端）、**T-012**（静态 TLS）与三平台 Actions 汇总验收 |
+| **Windows x86_64** | **🔶 本机分项已验证** | Win32 `TransmitFile` + IOCP Overlapped 内核零拷贝、240/240 测试 100% 通过；架构审计证据见 `architecture-review.md` | 三平台 Actions、完整发布和 T-035 仍待完成 |
+| **Linux x86_64** | **🔶 本机分项完成 (Local Verified)** | `sendfile(2)` 显式偏移内核零拷贝 + `epoll` 事件循环（moonbitlang/async 后端）、fstat `FILE_CHANGED` 检测、`/proc/self/fd` 句柄泄漏监控、`reuse_addr` 立即重绑、历史基线 235/235 测试本机 100% 通过（连续三轮）、CLI 大文件 4MB/2.6ms 字节一致；证据见 [linux-baseline](linux-baseline.md) | 已对接 Milestone 7 的 **T-032** Linux 分项（ubuntu runner 运行待回填）、**T-002/T-016/T-017** Linux 分项（2026-09-12）；待 **T-022**（musl 静态 ELF 与 Distroless 镜像）、**T-023**（io_uring 实验后端）、**T-012**（静态 TLS）与三平台 Actions 汇总验收 |
 | **macOS arm64 / x86_64** | **🔶 实现完成，Actions 首跑通过 (Actions Verified)** | 新增 `server/transmit_file_darwin.c`：Darwin sendfile 内核零拷贝（`<sys/socket.h>` value-result `len`、错误与实际发送字节同时检查、短写推进偏移、每块 fstat `FILE_CHANGED`）、`F_RDADVISE` 预取、`proc_pidinfo` 句柄计数；`kqueue` 事件循环由 moonbitlang/async 提供，MoonBit 侧零改动（`.mbti` 零差异）；`step` 契约与 Windows/Linux 完全一致；macos-latest（arm64）runner 首跑全量测试通过（2026-09-13，run 链接待补录）；证据见 [macos-baseline](macos-baseline.md) | 对接 **Milestone 7**：**T-002/T-017/T-032** macOS 分项（2026-09-13，Actions 首跑通过，run 链接待补录）；**T-032** ci.yml 已启用 macos-latest 矩阵项；待 **T-016**（事件循环 macOS 分项收口）、**T-022**（macOS 独立二进制分发）与三平台 Actions 汇总验收 |
 
 > 📌 **多平台推进原则（D-16 承诺）**：
@@ -190,7 +192,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 
 | 组件 | 位置 | 说明 |
 | :--- | :--- | :--- |
-| vendored MbedTLS | `tls/mbedtls-4.2.0/` | 官方 `mbedtls-4.2.0.tar.bz2`（SHA-256 `2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），108 个 .c（含 TF-PSA-Crypto 1.2.0 core/platform/utilities/extras/builtin 驱动），排除 `net_sockets.c`；许可证 Apache-2.0/GPL-2.0 双许可取 Apache-2.0，LICENSE 随树入库 |
+| vendored MbedTLS | `tls/mbedtls-4.2.0/` | 官方 `mbedtls-4.2.0.tar.bz2`（SHA-256 `2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），当前 `tls/moon.pkg` 编译 100 个 C stub（含 TF-PSA-Crypto 1.2.0 core/platform/utilities/extras/builtin 驱动），由 `vendor_tls.mbtx` 排除 `net_sockets.c`、调试、PKCS#7、CSR/证书生成和 SSL cache/cookie 模块；许可证 Apache-2.0/GPL-2.0 双许可取 Apache-2.0，LICENSE 随树入库 |
 | 可复现引入脚本 | `scripts/vendor_tls.mbtx` | 下载/校验 SHA-256 → 提取 → 托管 `#undef` 覆盖（NET/TIMING/FS_IO/ITS/STORAGE/NV-seed；保留 `MBEDTLS_HAVE_TIME_DATE` 供证书过期校验）→ 再生 `tls/moon.pkg`（native-stub 清单 + `-I` 模块根相对路径）；幂等（两次运行产物逐字节一致） |
 | C 桥 | `tls/tls_bridge.c` | `psa_crypto_init` 幂等全局初始化；`mbedtls_ssl_set_bio` 自定义 BIO + 双有界环形缓冲（16KB record + 余量）；句柄 + GC finalizer 双重释放保障（magic 防护）；对象计数探针；WANT_READ/WANT_WRITE → `-1/-2` 控制码约定 |
 | MoonBit TLS 包 | `tls/` | `TlsAcceptor::new_server/new_client`（证书链/私钥/passphrase/CA/insecure）、`TlsConn` 实现 `@io.Reader`/`@io.Writer`、异步握手/读写/`shutdown`（close_notify 排空）、`TlsUnexpectedEof`（截断流拒绝，RFC 8446 §6.1） |
@@ -202,7 +204,7 @@ Milestone 6 经多角色独立深度交叉复审与对抗挑战，全部达成�
 ### 验证证据（Windows x86_64，clang-cl 22.1.3，Moon 0.1.20260904）
 
 1. `moon check --target native`：0 错误（6 个既有 unused/internal 类告警，含 server 包历史 unused_package）。
-2. `moon test --target native`：**183/183 通过**（既有 169 项零回归 + 新增 14 项），连续 3 轮稳定；tls 包单独 20 轮压力无崩溃。
+2. `moon test --target native`：**240/240 通过**（在历史 235 项基线上新增 5 项 framing/full 连接器测试），当前轮次稳定；tls 包单独 20 轮压力无崩溃。
    - 交付中发现并修复一个 UAF：显式 close 先释放 C 对象、GC finalizer 随后再按句柄销毁时会对已释放内存做 magic 读取；若地址被并行新建的连接复用会误释放存活对象（偶发 0xc0000005）。修复为所有权槽位设计——外部对象的槽位是唯一所有权 token，显式 close 与 finalizer 都经 `hs_tls_*_close_obj` 先清零再销毁，保证恰好一次释放；MoonBit 侧对已 close 连接的读写直接拒绝。
 3. `moon info`：`core/server/tls` 三个 `.mbti` 纯新增 API，根包零变化；`moon fmt` 无实质差异。
 4. 真实 HTTPS E2E（release CLI + 系统 curl/OpenSSL 互操作）：

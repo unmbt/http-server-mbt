@@ -630,7 +630,6 @@ async fn collect_and_stage_objects(
 ///|
 async fn build_variant(
   variant : String,
-  pkg_name : String,
   tc : Toolchain,
   excluded_keywords : Array[String],
 ) -> Unit {
@@ -639,7 +638,7 @@ async fn build_variant(
 
   match tc.target_os {
     Windows => {
-      let def_file = "c_abi/\{pkg_name}/hs_\{variant}.def"
+      let def_file = "c_abi/\{variant}/hs_\{variant}.def"
       let system_libs = [
         "kernel32.lib",
         "libcmt.lib",
@@ -706,7 +705,7 @@ async fn build_variant(
       }
     }
     Linux => {
-      let version_script = "c_abi/\{pkg_name}/hs_\{variant}.version"
+      let version_script = "c_abi/\{variant}/hs_\{variant}.version"
       let so_path = "target/cabi/libhs_\{variant}.so"
       println("Linking libhs_\{variant}.so...")
       let link_args : Array[String] = [
@@ -775,7 +774,7 @@ async fn build_variant(
       }
     }
     MacOS => {
-      let syms_file = "c_abi/\{pkg_name}/hs_\{variant}_macos.syms"
+      let syms_file = "c_abi/\{variant}/hs_\{variant}_macos.syms"
       let dylib_path = "target/cabi/libhs_\{variant}.dylib"
       println("Linking libhs_\{variant}.dylib...")
       let link_args : Array[String] = [
@@ -1062,14 +1061,14 @@ async fn main {
   } catch {
     _ => ()
   }
-  let min_obj = "_build/native/release/build/c_abi/thin/thin\{ext}"
-  let min_bridge = "_build/native/release/build/c_abi/thin/bridge\{ext}"
-  if !file_exists(min_obj) && file_exists("_build/native/release/build/c_abi/thin/thin.c") {
+  let thin_obj = "_build/native/release/build/c_abi/thin/thin\{ext}"
+  let thin_bridge = "_build/native/release/build/c_abi/thin/bridge\{ext}"
+  if file_exists("_build/native/release/build/c_abi/thin/thin.c") {
     println("Compiling thin.c to thin\{ext}...")
-    compile_c_file(tc, "_build/native/release/build/c_abi/thin/thin.c", min_obj)
+    compile_c_file(tc, "_build/native/release/build/c_abi/thin/thin.c", thin_obj)
   }
-  if !file_exists(min_obj) || !file_exists(min_bridge) {
-    fail_pipeline("moon build c_abi/thin failed to generate \{min_obj} or \{min_bridge}")
+  if !file_exists(thin_obj) || !file_exists(thin_bridge) {
+    fail_pipeline("moon build c_abi/thin failed to generate \{thin_obj} or \{thin_bridge}")
   }
 
   try {
@@ -1079,7 +1078,7 @@ async fn main {
   }
   let full_obj = "_build/native/release/build/c_abi/full/full\{ext}"
   let full_bridge = "_build/native/release/build/c_abi/full/bridge\{ext}"
-  if !file_exists(full_obj) && file_exists("_build/native/release/build/c_abi/full/full.c") {
+  if file_exists("_build/native/release/build/c_abi/full/full.c") {
     println("Compiling full.c to full\{ext}...")
     compile_c_file(tc, "_build/native/release/build/c_abi/full/full.c", full_obj)
   }
@@ -1101,7 +1100,6 @@ async fn main {
 
   println("4. Building thin variant (zero crypto, static HTTP server)...")
   build_variant(
-    "min",
     "thin",
     tc,
     ["/cmd/", "/build/tls/", "/full/", "/c_abi/full/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
@@ -1110,24 +1108,23 @@ async fn main {
   println("5. Building full variant (integrated TLS & proxy)...")
   build_variant(
     "full",
-    "full",
     tc,
     ["/cmd/", "/c_abi/thin/", "_test.", "_wbtest.", "blackbox_test", "internal_test"],
   )
 
-  let (dyn_min, stat_min, dyn_full, stat_full) = match target_os {
+  let (dyn_thin, stat_thin, dyn_full, stat_full) = match target_os {
     Windows => ("hs_thin.dll", "hs_thin_static.lib", "hs_full.dll", "hs_full_static.lib")
     Linux => ("libhs_thin.so", "libhs_thin.a", "libhs_full.so", "libhs_full.a")
     MacOS => ("libhs_thin.dylib", "libhs_thin.a", "libhs_full.dylib", "libhs_full.a")
   }
 
   println("6. Verifying symbols and export isolation...")
-  verify_exports(tc, "target/cabi/\{dyn_min}")
+  verify_exports(tc, "target/cabi/\{dyn_thin}")
   verify_exports(tc, "target/cabi/\{dyn_full}")
-  verify_mbedtls_absence(tc, "target/cabi/\{stat_min}")
+  verify_mbedtls_absence(tc, "target/cabi/\{stat_thin}")
 
   println("7. Compiling and running standalone C consumer tests...")
-  let link_dyn_min = match target_os {
+  let link_dyn_thin = match target_os {
     Windows => "hs_thin.lib"
     Linux => "libhs_thin.so"
     MacOS => "libhs_thin.dylib"
@@ -1138,8 +1135,8 @@ async fn main {
     MacOS => "libhs_full.dylib"
   }
 
-  test_c_consumer(tc, "test_dynamic_thin", "testdata/c_consumer/test_dynamic_thin.c", link_dyn_min, false)
-  test_c_consumer(tc, "test_static_thin", "testdata/c_consumer/test_static_thin.c", stat_min, true)
+  test_c_consumer(tc, "test_dynamic_thin", "testdata/c_consumer/test_dynamic_thin.c", link_dyn_thin, false)
+  test_c_consumer(tc, "test_static_thin", "testdata/c_consumer/test_static_thin.c", stat_thin, true)
   test_c_consumer(tc, "test_dynamic_full", "testdata/c_consumer/test_dynamic_full.c", link_dyn_full, false)
   test_c_consumer(tc, "test_static_full", "testdata/c_consumer/test_static_full.c", stat_full, true)
 

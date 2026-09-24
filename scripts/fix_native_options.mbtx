@@ -1,0 +1,14 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  for path in ["moon.pkg","internal/native/moon.pkg","cmd/common/moon.pkg"] {
+    let s=@fs.read_file(path).text()
+    let parts=s.split("\noptions(").to_array()
+    guard parts.length()==3 else { fail("unexpected options: "+path) }
+    let original=parts[1].trim().to_owned()
+    let args=original[:original.length()-1].trim().to_owned()
+    @fs.write_file(path,parts[0].to_owned()+"\noptions("+args+(if args.has_suffix(",") { "" } else { "," })+"\n"+parts[2].to_owned())
+  }
+  for path in ["moon.pkg","internal/native/moon.pkg","cmd/common/moon.pkg","cmd/http-server-mbt/moon.pkg","cmd/http-server-mbt-thin/moon.pkg","core/moon.pkg","full/moon.pkg","c_abi/full/moon.pkg","c_abi/thin/moon.pkg","server/moon.pkg","server/plain/moon.pkg","tls/moon.pkg"] {
+    @fs.write_file(path,@fs.read_file(path).text().replace_all(old="${HS_",new="${build.HS_"))
+  }
+}

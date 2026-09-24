@@ -1,0 +1,40 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+
+async fn main {
+  let path = "engine.mbt"
+  let original = @fs.read_file(path).text().replace_all(old="\r\n", new="\n")
+  let start = original.find("///|\nfn header(").unwrap()
+  let mut s = original[start:].to_owned()
+  s = s.replace_all(old="pub async fn StaticEngine::handle(", new="async fn StaticEngine::plan_request(")
+  s = s.replace_all(old="-> HandleResult", new="-> PlanResult")
+  s = s.replace_all(old="-> Response {", new="-> ResponsePlan {")
+  s = s.replace_all(old="@core.ResponseBody", new="PlanBody")
+  for member in ["exists", "kind", "file_size", "mtime", "readdir"] {
+    s = s.replace_all(old="@fs.\{member}(", new="self.\{member}(")
+  }
+  s = s.replace_all(old="async fn has_gzip_magic(path : String)", new="async fn StaticEngine::has_gzip_magic(self : StaticEngine, path : String)")
+  s = s.replace_all(old="&& has_gzip_magic(p)", new="&& self.has_gzip_magic(p)")
+  s = s.replace_all(old="let lease = FileLease::acquire(chosen)\n  let file_size = self.file_size(chosen) catch { _ => 0L }\n  let (mtime_sec, _) = self.mtime(chosen) catch { _ => (0L, 0) }", new="let file = self.open_file(chosen)\n  let file_size = file.size\n  let mtime_sec = file.mtime")
+  s = s.replace_all(old="FileRegion(chosen,", new="FileRegion(file,")
+  s = s.replace_all(old="if header(request, \"range\") is Some(range_header) {", new="if header(request, \"if-range\") is None && header(request, \"range\") is Some(range_header) {")
+  s = s.replace_all(old="if lease is Some(l) && l.is_mutated() {\n    return Error(ServerError::FileChanged(chosen))\n  }", new="file.check()\n  if !(body is FileRegion(_, _, _)) { file.close() }")
+  s = s.replace_all(old="return Handled({\n        status: 304,", new="file.close()\n      return Handled({\n        status: 304,")
+  s = s.replace_all(old="let size = self.file_size(custom_404) catch { _ => 0L }", new="let file = self.open_file(custom_404)\n    let size = file.size")
+  s = s.replace_all(old="PlanBody::FileRegion(custom_404,", new="PlanBody::FileRegion(file,")
+  s = s.replace_all(old="{ status: 404, headers, body, }", new="if request.meth is Head { file.close() }\n    { status: 404, headers, body, }")
+  @fs.write_file(path, s)
+  let test_files = ["engine_test.mbt", "engine_challenger_m3_2_stress_test.mbt", "engine_security_directory_adversarial_test.mbt", "engine_consistency_test.mbt"]
+  for file in test_files {
+    let source = @fs.read_file(file).text().replace_all(old="\r\n", new="\n")
+    let out = StringBuilder()
+    for line in source.split("\n") {
+      let line = line.to_owned().replace_all(old="StaticEngine::new(", new="StaticEngine::open(").replace_all(old=".body.length()", new=".body_length()").replace_all(old=".to_bytes()", new=".to_bytes(max_bytes=16777216)")
+      out.write_string(line + "\n")
+      if line.contains("StaticEngine::open(") && line.trim_start().has_prefix("let ") {
+        let name = line.trim().split(" ").to_array()[1]
+        out.write_string("  defer \{name}.close()\n")
+      }
+    }
+    @fs.write_file(file, out.to_string())
+  }
+}

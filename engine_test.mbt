@@ -45,7 +45,8 @@ async test "static get, head and missing" {
     ..@core.Config::default("testdata/public"),
     default_ext: Some("html"),
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let get = engine.handle({
     meth: @core.Method::Get,
     target: "/hello.txt",
@@ -54,7 +55,7 @@ async test "static get, head and missing" {
   match get {
     Handled(response) => {
       assert_eq(response.status, 200)
-      assert_eq(response.body.length(), 14)
+      assert_eq(response.body_length(), 14)
       assert_true(response.headers.contains("Content-Type"))
       response.close()
     }
@@ -66,7 +67,7 @@ async test "static get, head and missing" {
     headers: Map([]),
   })
   match head {
-    Handled(response) => assert_eq(response.body.length(), 0)
+    Handled(response) => assert_eq(response.body_length(), 0)
     _ => fail("expected head")
   }
   let missing = engine.handle({
@@ -86,7 +87,8 @@ async test "range and conditional request" {
     ..@core.Config::default("testdata/public"),
     default_ext: None,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let ranged = engine.handle({
     meth: @core.Method::Get,
     target: "/hello.txt",
@@ -95,7 +97,7 @@ async test "range and conditional request" {
   let tag = match ranged {
     Handled(response) => {
       assert_eq(response.status, 206)
-      assert_eq(response.body.length(), 5)
+      assert_eq(response.body_length(), 5)
       response.headers["ETag"]
     }
     _ => fail("expected range")
@@ -114,7 +116,8 @@ async test "range and conditional request" {
 ///|
 async test "head body suppression and content length retention" {
   let config : @core.Config = @core.Config::default("testdata/public")
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let head_req = engine.handle({
     meth: @core.Method::Head,
     target: "/hello.txt",
@@ -124,8 +127,8 @@ async test "head body suppression and content length retention" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Length"], "14")
-      assert_eq(response.body.length(), 0)
-      assert_eq(response.to_bytes(), b"")
+      assert_eq(response.body_length(), 0)
+      assert_eq(response.to_bytes(max_bytes=16777216), b"")
       assert_true(response.headers.contains("ETag"))
       assert_true(response.headers.contains("Content-Type"))
     }
@@ -141,7 +144,7 @@ async test "head body suppression and content length retention" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Length"], "15")
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected handled response for HEAD index.html")
   }
@@ -150,7 +153,8 @@ async test "head body suppression and content length retention" {
 ///|
 async test "RFC 7233 byte ranges 206 and 416" {
   let config : @core.Config = @core.Config::default("testdata/public")
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Prefix range
   let r1 = engine.handle({
@@ -163,8 +167,8 @@ async test "RFC 7233 byte ranges 206 and 416" {
       assert_eq(response.status, 206)
       assert_eq(response.headers["Content-Range"], "bytes 0-4/14")
       assert_eq(response.headers["Content-Length"], "5")
-      assert_eq(response.body.length(), 5)
-      assert_eq(response.to_bytes(), b"hello")
+      assert_eq(response.body_length(), 5)
+      assert_eq(response.to_bytes(max_bytes=16777216), b"hello")
     }
     _ => fail("expected 206 prefix range")
   }
@@ -180,7 +184,7 @@ async test "RFC 7233 byte ranges 206 and 416" {
       assert_eq(response.status, 206)
       assert_eq(response.headers["Content-Range"], "bytes 6-12/14")
       assert_eq(response.headers["Content-Length"], "7")
-      assert_eq(response.to_bytes(), b"moonbit")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"moonbit")
     }
     _ => fail("expected 206 middle range")
   }
@@ -196,7 +200,7 @@ async test "RFC 7233 byte ranges 206 and 416" {
       assert_eq(response.status, 206)
       assert_eq(response.headers["Content-Range"], "bytes 6-13/14")
       assert_eq(response.headers["Content-Length"], "8")
-      assert_eq(response.to_bytes(), b"moonbit\n")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"moonbit\n")
     }
     _ => fail("expected 206 suffix range")
   }
@@ -226,7 +230,7 @@ async test "RFC 7233 byte ranges 206 and 416" {
     Handled(response) => {
       assert_eq(response.status, 416)
       assert_eq(response.headers["Content-Range"], "bytes */14")
-      assert_true(response.body.length() > 0)
+      assert_true(response.body_length() > 0)
     }
     _ => fail("expected 416 out of bounds")
   }
@@ -263,7 +267,8 @@ async test "RFC 7233 byte ranges 206 and 416" {
 ///|
 async test "RFC 7232 conditional caching (If-None-Match and If-Modified-Since)" {
   let config : @core.Config = @core.Config::default("testdata/public")
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let initial = engine.handle({
     meth: @core.Method::Get,
     target: "/hello.txt",
@@ -285,7 +290,7 @@ async test "RFC 7232 conditional caching (If-None-Match and If-Modified-Since)" 
     Handled(response) => {
       assert_eq(response.status, 304)
       assert_eq(response.headers["Content-Length"], "0")
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
       assert_eq(response.headers["ETag"], etag)
     }
     _ => fail("expected 304 ETag match")
@@ -311,7 +316,7 @@ async test "RFC 7232 conditional caching (If-None-Match and If-Modified-Since)" 
   match c3 {
     Handled(response) => {
       assert_eq(response.status, 304)
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected 304 If-Modified-Since")
   }
@@ -335,7 +340,8 @@ async test "pre-compression negotiation (.br priority and gzip magic check)" {
     brotli: true,
     gzip: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Brotli preference over gzip when client accepts both
   let r_br = engine.handle({
@@ -414,7 +420,8 @@ async test "force_content_encoding on .br and .gz" {
     ..@core.Config::default("testdata/public"),
     force_content_encoding: true,
   }
-  let engine_forced = StaticEngine::new(config_forced)
+  let engine_forced = @http-server-mbt.StaticEngine::open(config_forced)
+  defer engine_forced.close()
 
   let forced_br = engine_forced.handle({
     meth: @core.Method::Get,
@@ -455,7 +462,8 @@ async test "force_content_encoding on .br and .gz" {
     ..@core.Config::default("testdata/public"),
     force_content_encoding: false,
   }
-  let engine_normal = StaticEngine::new(config_normal)
+  let engine_normal = @http-server-mbt.StaticEngine::open(config_normal)
+  defer engine_normal.close()
   let normal_br = engine_normal.handle({
     meth: @core.Method::Get,
     target: "/bundle.js.br",
@@ -478,7 +486,8 @@ async test "directory 302 trailing slash redirect and C025 suppression" {
     auto_index: true,
     show_dir: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Subfolder without slash -> 302 redirect
   let r1 = engine.handle({
@@ -490,7 +499,7 @@ async test "directory 302 trailing slash redirect and C025 suppression" {
     Handled(response) => {
       assert_eq(response.status, 302)
       assert_eq(response.headers["Location"], "/subfolder/")
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected 302 redirect")
   }
@@ -515,7 +524,8 @@ async test "directory 302 trailing slash redirect and C025 suppression" {
     auto_index: false,
     show_dir: false,
   }
-  let engine_c025 = StaticEngine::new(config_c025)
+  let engine_c025 = @http-server-mbt.StaticEngine::open(config_c025)
+  defer engine_c025.close()
   let r_c025 = engine_c025.handle({
     meth: @core.Method::Get,
     target: "/subfolder",
@@ -536,7 +546,8 @@ async test "directory index.html resolution" {
     ..@core.Config::default("testdata/public"),
     auto_index: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let r = engine.handle({
     meth: @core.Method::Get,
     target: "/subfolder/",
@@ -546,7 +557,7 @@ async test "directory index.html resolution" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Type"], "text/html; charset=UTF-8")
-      let content = bytes_to_string(response.to_bytes())
+      let content = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(content.contains("subfolder"))
     }
     _ => fail("expected subfolder index.html")
@@ -561,7 +572,8 @@ async test "directory HTML listing view escaping and companion matching" {
     show_dir: true,
     dir_overrides_404: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Subfolder listing
   let r_sub = engine.handle({
@@ -573,7 +585,7 @@ async test "directory HTML listing view escaping and companion matching" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Type"], "text/html; charset=UTF-8")
-      let html = bytes_to_string(response.to_bytes())
+      let html = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(html.contains("Index of /subfolder/"))
       assert_true(html.contains("aname%2Baplus.txt"))
       assert_true(html.contains("aname+aplus.txt"))
@@ -591,7 +603,7 @@ async test "directory HTML listing view escaping and companion matching" {
   match r_root {
     Handled(response) => {
       assert_eq(response.status, 200)
-      let html = bytes_to_string(response.to_bytes())
+      let html = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(html.contains("[br]"))
       assert_true(html.contains("[gz]"))
       assert_true(html.contains("hello.txt"))
@@ -610,7 +622,8 @@ async test "directory listing vs custom 404 precedence (C016)" {
     show_dir: true,
     dir_overrides_404: false,
   }
-  let engine_404 = StaticEngine::new(config_404)
+  let engine_404 = @http-server-mbt.StaticEngine::open(config_404)
+  defer engine_404.close()
   let r_404 = engine_404.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -619,7 +632,7 @@ async test "directory listing vs custom 404 precedence (C016)" {
   match r_404 {
     Handled(response) => {
       assert_eq(response.status, 404)
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("Custom 404"))
     }
     _ => fail("expected custom 404 precedence")
@@ -632,7 +645,8 @@ async test "directory listing vs custom 404 precedence (C016)" {
     show_dir: true,
     dir_overrides_404: true,
   }
-  let engine_dir = StaticEngine::new(config_dir)
+  let engine_dir = @http-server-mbt.StaticEngine::open(config_dir)
+  defer engine_dir.close()
   let r_dir = engine_dir.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -641,7 +655,7 @@ async test "directory listing vs custom 404 precedence (C016)" {
   match r_dir {
     Handled(response) => {
       assert_eq(response.status, 200)
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("Index of /empty_dir/"))
     }
     _ => fail("expected directory listing precedence")
@@ -654,7 +668,8 @@ async test "SPA fallback to root index.html preserving RFC features" {
     ..@core.Config::default("testdata/public"),
     spa: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Unmatched client route falls back to root index.html
   let r_spa = engine.handle({
@@ -666,7 +681,7 @@ async test "SPA fallback to root index.html preserving RFC features" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Type"], "text/html; charset=UTF-8")
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("<h1>index</h1>"))
     }
     _ => fail("expected SPA fallback")
@@ -681,7 +696,7 @@ async test "SPA fallback to root index.html preserving RFC features" {
   match r_exist {
     Handled(response) => {
       assert_eq(response.status, 200)
-      assert_eq(response.to_bytes(), b"hello moonbit\n")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"hello moonbit\n")
     }
     _ => fail("expected direct static file")
   }
@@ -696,7 +711,7 @@ async test "SPA fallback to root index.html preserving RFC features" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Length"], "15")
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected HEAD on fallback")
   }
@@ -711,7 +726,7 @@ async test "SPA fallback to root index.html preserving RFC features" {
     Handled(response) => {
       assert_eq(response.status, 206)
       assert_eq(response.headers["Content-Range"], "bytes 0-3/15")
-      assert_eq(response.to_bytes(), b"<h1>")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"<h1>")
     }
     _ => fail("expected Range on fallback")
   }
@@ -723,7 +738,8 @@ async test "try-files fallback to custom file" {
     ..@core.Config::default("testdata/public"),
     try_files: Some("hello.txt"),
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let r = engine.handle({
     meth: @core.Method::Get,
     target: "/arbitrary/unknown/path",
@@ -733,7 +749,7 @@ async test "try-files fallback to custom file" {
     Handled(response) => {
       assert_eq(response.status, 200)
       assert_eq(response.headers["Content-Type"], "text/plain; charset=UTF-8")
-      assert_eq(response.to_bytes(), b"hello moonbit\n")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"hello moonbit\n")
     }
     _ => fail("expected try-files fallback")
   }
@@ -746,7 +762,8 @@ async test "SPA fallback STRICTLY PRESERVES 401 Unauthorized" {
     spa: true,
     basic_auth: Some(("admin", "secret")),
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Unauthenticated request to missing file returns 401, NEVER 200 index.html (C042.15)
   let r_no_auth = engine.handle({
@@ -758,7 +775,7 @@ async test "SPA fallback STRICTLY PRESERVES 401 Unauthorized" {
     Handled(response) => {
       assert_eq(response.status, 401)
       assert_eq(response.headers["WWW-Authenticate"], "Basic realm=\"\"")
-      assert_eq(response.to_bytes(), b"Access denied")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"Access denied")
     }
     _ => fail("expected 401 without auth")
   }
@@ -784,7 +801,7 @@ async test "SPA fallback STRICTLY PRESERVES 401 Unauthorized" {
   match r_good_auth {
     Handled(response) => {
       assert_eq(response.status, 200)
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("<h1>index</h1>"))
     }
     _ => fail("expected 200 with valid auth")
@@ -799,7 +816,8 @@ async test "SPA fallback STRICTLY PRESERVES 403 Forbidden" {
     base_url: "/app",
     host_whitelist: ["allowed.com"],
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Outside BaseURL returns 403 with empty body (C042.21)
   let r_outside = engine.handle({
@@ -810,7 +828,7 @@ async test "SPA fallback STRICTLY PRESERVES 403 Forbidden" {
   match r_outside {
     Handled(response) => {
       assert_eq(response.status, 403)
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected 403 outside base_url")
   }
@@ -824,7 +842,7 @@ async test "SPA fallback STRICTLY PRESERVES 403 Forbidden" {
   match r_inside {
     Handled(response) => {
       assert_eq(response.status, 200)
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("<h1>index</h1>"))
     }
     _ => fail("expected 200 inside base_url")
@@ -839,7 +857,7 @@ async test "SPA fallback STRICTLY PRESERVES 403 Forbidden" {
   match r_traversal {
     Handled(response) => {
       assert_eq(response.status, 403)
-      assert_eq(response.to_bytes(), b"Access denied")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"Access denied")
     }
     _ => fail("expected 403 path traversal")
   }
@@ -853,7 +871,7 @@ async test "SPA fallback STRICTLY PRESERVES 403 Forbidden" {
   match r_evil_host {
     Handled(response) => {
       assert_eq(response.status, 403)
-      assert_eq(response.to_bytes(), b"Access denied")
+      assert_eq(response.to_bytes(max_bytes=16777216), b"Access denied")
     }
     _ => fail("expected 403 host whitelist rejection")
   }
@@ -866,7 +884,8 @@ async test "terminal 404 when fallback file is missing on disk" {
     ..@core.Config::default("testdata/public/empty_dir"),
     spa: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let r = engine.handle({
     meth: @core.Method::Get,
     target: "/some/unmatched/route",
@@ -875,7 +894,7 @@ async test "terminal 404 when fallback file is missing on disk" {
   match r {
     Handled(response) => {
       assert_eq(response.status, 404)
-      let body = bytes_to_string(response.to_bytes())
+      let body = bytes_to_string(response.to_bytes(max_bytes=16777216))
       assert_true(body.contains("File not found"))
     }
     _ => fail("expected terminal 404")
@@ -889,7 +908,8 @@ async test "CORS preflight 204 intercepted before static routing" {
     spa: true,
     cors: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
   let r = engine.handle({
     meth: @core.Method::Other("OPTIONS"),
     target: "/any/path",
@@ -902,7 +922,7 @@ async test "CORS preflight 204 intercepted before static routing" {
       assert_true(
         response.headers["Access-Control-Allow-Methods"].contains("OPTIONS"),
       )
-      assert_eq(response.body.length(), 0)
+      assert_eq(response.body_length(), 0)
     }
     _ => fail("expected 204 CORS preflight")
   }
@@ -910,8 +930,13 @@ async test "CORS preflight 204 intercepted before static routing" {
 
 ///|
 async test "D-17 in-flight mutation lease tracking" {
-  let lease_opt = FileLease::acquire("testdata/public/hello.txt")
-  guard lease_opt is Some(lease) else { fail("expected lease") }
-  assert_eq(lease.initial_size, 14L)
-  assert_true(!lease.is_mutated())
+  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(engine) {
+    match engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]) }) {
+      Handled(response) => {
+        assert_eq(response.body_length(), 14L)
+        assert_eq(response.to_bytes(max_bytes=14), b"hello moonbit\n")
+      }
+      _ => fail("expected opened response")
+    }
+  })
 }

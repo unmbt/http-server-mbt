@@ -1,0 +1,55 @@
+name: Release verified candidates
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        type: string
+        required: true
+        description: Successful Candidate acceptance run ID
+      commit:
+        type: string
+        required: true
+        description: Full commit SHA from that run
+      tag:
+        type: string
+        required: true
+        description: Existing release tag at the same commit
+permissions:
+  contents: read
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+      - uses: hustcer/setup-moonbit@v1
+        with:
+          version: 0.1.20260920
+          core-version: 0.1.20260920
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: candidate-*
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+          path: target/verified-candidates
+      - name: Validate source run and full original release dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+          RELEASE_COMMIT: ${{ inputs.commit }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: moon run scripts/release_gate.mbtx
+      - name: Publish already-validated artifacts without rebuilding
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ inputs.commit }}
+          files: target/verified-candidates/**/*
+          fail_on_unmatched_files: true

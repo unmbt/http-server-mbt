@@ -18,7 +18,9 @@
     "index.mjs",
     "index.js",
     "index.d.ts",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "licenses"
   ],
   "repository": {
     "type": "git",
@@ -35,7 +37,7 @@
     "esm",
     "cjs"
   ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "engines": {
     "node": ">=16.13.0"
   },

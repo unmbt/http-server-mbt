@@ -15,9 +15,9 @@ const TEST_HOST : String = "localhost"
 async test "tls loopback: handshake, data exchange, clean shutdown" {
   let cert = @fs.read_file("testdata/tls/server_cert.pem").binary()
   let key = @fs.read_file("testdata/tls/server_key.pem").binary()
-  let server_acc = TlsAcceptor::new_server(cert, key)
+  let server_acc = @tls.TlsAcceptor::new_server(cert, key)
   defer server_acc.close()
-  let client_acc = TlsAcceptor::new_client(ca=cert)
+  let client_acc = @tls.TlsAcceptor::new_client(ca=cert)
   defer client_acc.close()
   // c2s: client → server; s2c: server → client
   let (c2s_r, c2s_w) = @io.pipe()
@@ -64,13 +64,13 @@ async test "tls loopback: handshake, data exchange, clean shutdown" {
 async test "tls server rejects wrong key passphrase" {
   let cert = @fs.read_file("testdata/tls/server_cert.pem").binary()
   let key = @fs.read_file("testdata/tls/server_key_enc.pem").binary()
-  try TlsAcceptor::new_server(cert, key, passphrase=b"wrong-pass") catch {
-    TlsError::TlsError(..) => ()
+  try @tls.TlsAcceptor::new_server(cert, key, passphrase=b"wrong-pass") catch {
+    @tls.TlsError::TlsError(..) => ()
     _ => fail("expected TlsError")
   } noraise {
     _ => fail("expected passphrase failure")
   }
-  try TlsAcceptor::new_server(cert, key, passphrase=b"httptest") catch {
+  try @tls.TlsAcceptor::new_server(cert, key, passphrase=b"httptest") catch {
     _ => fail("correct passphrase should parse")
   } noraise {
     acc => acc.close()
@@ -81,9 +81,9 @@ async test "tls server rejects wrong key passphrase" {
 async test "tls client verifies hostname and rejects mismatch" {
   let cert = @fs.read_file("testdata/tls/server_cert.pem").binary()
   let key = @fs.read_file("testdata/tls/server_key.pem").binary()
-  let server_acc = TlsAcceptor::new_server(cert, key)
+  let server_acc = @tls.TlsAcceptor::new_server(cert, key)
   defer server_acc.close()
-  let client_acc = TlsAcceptor::new_client(ca=cert)
+  let client_acc = @tls.TlsAcceptor::new_client(ca=cert)
   defer client_acc.close()
   // Real sockets: kernel buffering absorbs handshake flights regardless of
   // which side gives up first, so failure sequencing stays deadlock-free.
@@ -109,10 +109,10 @@ async test "tls client verifies hostname and rejects mismatch" {
         writer=client_tcp,
       )
     catch {
-      TlsError::TlsError(..) => ()
+      @tls.TlsError::TlsError(..) => ()
       _ => ()
     } noraise {
-      conn => conn.close()
+      conn => { conn.close(); fail("wrong hostname was accepted") }
     }
   }
   listener.close()
@@ -122,10 +122,10 @@ async test "tls client verifies hostname and rejects mismatch" {
 async test "tls insecure client skips verification" {
   let cert = @fs.read_file("testdata/tls/server_cert.pem").binary()
   let key = @fs.read_file("testdata/tls/server_key.pem").binary()
-  let server_acc = TlsAcceptor::new_server(cert, key)
+  let server_acc = @tls.TlsAcceptor::new_server(cert, key)
   defer server_acc.close()
   // Explicit secure=false equivalent: no CA, verification disabled (AD-09).
-  let client_acc = TlsAcceptor::new_client(insecure=true)
+  let client_acc = @tls.TlsAcceptor::new_client(insecure=true)
   defer client_acc.close()
   let listener = @socket.TcpServer(@socket.Addr::new(0, 0))
   let port = listener.addr.port()
@@ -179,12 +179,12 @@ async test "tls insecure client skips verification" {
 /// handle_leak_assert_test, the baseline is min-of-3 and the assertion waits
 /// for quiescence (a real leak keeps the count elevated forever).
 async fn tls_object_baseline() -> (Int, Int) {
-  let mut conn_base = tls_conn_count()
-  let mut acc_base = tls_acceptor_count()
+  let mut conn_base = @tls.tls_conn_count()
+  let mut acc_base = @tls.tls_acceptor_count()
   for _ in 0..<3 {
     @async.sleep(30)
-    let c = tls_conn_count()
-    let a = tls_acceptor_count()
+    let c = @tls.tls_conn_count()
+    let a = @tls.tls_acceptor_count()
     if c < conn_base {
       conn_base = c
     }
@@ -202,16 +202,16 @@ async fn assert_no_tls_object_leak(baseline : (Int, Int)) -> Unit {
   let (conn_base, acc_base) = baseline
   let step = 40
   let mut waited = 0
-  let mut conn_cur = tls_conn_count()
-  let mut acc_cur = tls_acceptor_count()
+  let mut conn_cur = @tls.tls_conn_count()
+  let mut acc_cur = @tls.tls_acceptor_count()
   while (conn_cur > conn_base || acc_cur > acc_base) && waited < 10000 {
     @async.sleep(step)
     waited += step
-    conn_cur = tls_conn_count()
-    acc_cur = tls_acceptor_count()
+    conn_cur = @tls.tls_conn_count()
+    acc_cur = @tls.tls_acceptor_count()
   }
-  assert_eq(tls_conn_count(), conn_base)
-  assert_eq(tls_acceptor_count(), acc_base)
+  assert_eq(@tls.tls_conn_count(), conn_base)
+  assert_eq(@tls.tls_acceptor_count(), acc_base)
 }
 
 //|
@@ -222,13 +222,13 @@ async test "tls leak probe" {
   let cert = @fs.read_file("testdata/tls/server_cert.pem").binary()
   let key = @fs.read_file("testdata/tls/server_key.pem").binary()
   // Failed creation must not leak either.
-  try TlsAcceptor::new_server(cert, key, passphrase=b"nope") catch {
+  try @tls.TlsAcceptor::new_server(cert, key, passphrase=b"nope") catch {
     _ => ()
   } noraise {
     acc => acc.close()
   }
-  let server_acc = TlsAcceptor::new_server(cert, key)
-  let client_acc = TlsAcceptor::new_client(ca=cert)
+  let server_acc = @tls.TlsAcceptor::new_server(cert, key)
+  let client_acc = @tls.TlsAcceptor::new_client(ca=cert)
   let listener = @socket.TcpServer(@socket.Addr::new(0, 0))
   let port = listener.addr.port()
   @async.with_task_group() <| group => {

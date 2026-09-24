@@ -4,6 +4,8 @@
 #include <string.h>
 #include "../../c_abi/include/http_server.h"
 
+#include "test_http.h"
+
 int main(void) {
     printf("[test_dynamic_thin] Testing hs_abi_version...\n");
     uint32_t ver = hs_abi_version();
@@ -67,5 +69,6 @@ int main(void) {
     hs_server_destroy(NULL);
 
     printf("[test_dynamic_thin] PASS ALL ASSERTIONS!\n");
+    test_real_http();
     return 0;
 }

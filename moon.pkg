@@ -1,9 +1,11 @@
 import {
   "moonbitlang/async",
   "moonbitlang/async/fs",
-  "moonbitlang/async/types",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/io",
   "moonbitlang/core/encoding/utf8",
   "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/internal/native",
 }
 
 import {
@@ -11,6 +13,5 @@ import {
 } for "test"
 
 options(
-  "native-stub": [ "transfer_stub.c" ],
   targets: { "*.mbt": [ "native" ] },
-)
+link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } })

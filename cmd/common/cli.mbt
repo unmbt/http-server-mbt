@@ -1,0 +1,303 @@
+///|
+/// CLI action resulting from command-line argument parsing.
+pub enum CliAction {
+  Help(String)
+  Version(String)
+  Run(@core.Config, Int)
+} derive(Debug)
+
+///|
+pub extend CliAction with Debug::{to_repr}
+
+///|
+pub extend CliAction with Show::{output}
+
+///|
+pub fn CliAction::to_string(self : CliAction) -> String {
+  match self {
+    Help(msg) => "Help(" + msg + ")"
+    Version(msg) => "Version(" + msg + ")"
+    Run(config, port) =>
+      "Run(root=" + config.root + ", port=" + port.to_string() + ")"
+  }
+}
+
+///|
+pub impl Show for CliAction with fn output(self, logger) {
+  logger.write_string(self.to_string())
+}
+
+///|
+/// Build the declarative command specification using `@argparse`.
+pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
+  @argparse.Command(
+    if thin { "http-server-mbt-thin" } else { "http-server-mbt" },
+    about=if thin { "Native static HTTP server (TLS/proxy require Full)" } else { "Native static HTTP server" },
+    version="\{server_version}",
+    disable_help_flag=true,
+    disable_version_flag=true,
+    flags=[
+      @argparse.FlagArg("help", short='h', long="help", about="Show help"),
+      @argparse.FlagArg(
+        "version",
+        short='v',
+        long="version",
+        about="Show version",
+      ),
+      @argparse.FlagArg("spa", long="spa", about="Fallback to root index.html"),
+      @argparse.FlagArg(
+        "autoIndex",
+        short='i',
+        long="autoIndex",
+        negatable=true,
+        about="Display autoIndex [default: true]",
+      ),
+      @argparse.FlagArg(
+        "showDir",
+        short='d',
+        long="showDir",
+        negatable=true,
+        about="Show directory listings [default: true]",
+      ),
+      @argparse.FlagArg("cors", long="cors", about="Enable CORS headers"),
+      @argparse.FlagArg("insecure", long="insecure", about="Explicitly disable upstream TLS certificate verification (Full)"),
+      @argparse.FlagArg("websocket", long="websocket", about="Enable WebSocket proxy upgrades (Full)"),
+      @argparse.FlagArg(
+        "gzip",
+        short='g',
+        long="gzip",
+        about="Serve gzip files when possible [default: false]",
+      ),
+      @argparse.FlagArg(
+        "brotli",
+        short='b',
+        long="brotli",
+        about="Serve brotli files when possible [default: false]",
+      ),
+      @argparse.FlagArg(
+        "log-ip",
+        short='l',
+        long="log-ip",
+        about="Log client IP address",
+      ),
+      @argparse.FlagArg(
+        "silent",
+        short='s',
+        long="silent",
+        about="Suppress log messages",
+      ),
+      @argparse.FlagArg(
+        "proxy-all",
+        long="proxy-all",
+        about="Proxy all requests (bypasses local static files)",
+      ),
+    ],
+    options=[
+      @argparse.OptionArg(
+        "port",
+        short='p',
+        long="port",
+        env="PORT",
+        about="Listen TCP port [default: 8080]",
+      ),
+      @argparse.OptionArg(
+        "base-url",
+        long="base-url",
+        about="Mount URL prefix [default: /]",
+      ),
+      @argparse.OptionArg(
+        "base-dir",
+        long="base-dir",
+        about="Alias for base-url",
+      ),
+      @argparse.OptionArg(
+        "try-files",
+        long="try-files",
+        about="Custom fallback file relative to root",
+      ),
+      @argparse.OptionArg(
+        "cache",
+        short='c',
+        long="cache",
+        allow_hyphen_values=true,
+        about="Cache duration in seconds or max-age [default: 3600]",
+      ),
+      @argparse.OptionArg(
+        "auth",
+        short='a',
+        long="auth",
+        about="Basic Auth credentials <username:password>",
+      ),
+      @argparse.OptionArg(
+        "cert",
+        long="cert",
+        about="TLS certificate chain file (PEM) — enables HTTPS",
+      ),
+      @argparse.OptionArg("key", long="key", about="TLS private key file (PEM)"),
+      @argparse.OptionArg("ca-file", long="ca-file", about="Replace embedded upstream trust roots with this PEM file (Full)"),
+      @argparse.OptionArg(
+        "key-passphrase",
+        long="key-passphrase",
+        env="TLS_KEY_PASSPHRASE",
+        about="Passphrase for encrypted TLS private keys",
+      ),
+      @argparse.OptionArg(
+        "proxy",
+        short='P',
+        long="proxy",
+        about="Fallback proxy URL for unhandled requests",
+      ),
+      @argparse.OptionArg(
+        "proxy-config",
+        long="proxy-config",
+        about="Proxy config file with route matching rules",
+      ),
+    ],
+    positionals=[
+      @argparse.PositionArg(
+        "root",
+        about="Filesystem root [default: .]",
+        num_args=@argparse.ValueRange(lower=0, upper=1),
+      ),
+    ],
+  )
+}
+
+///|
+/// Parse CLI arguments and validate configuration before server startup.
+pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAction, String] {
+  let cmd = build_command(thin~)
+  let matches = cmd.parse(argv=args) catch {
+    err => return Err(err.to_string())
+  }
+  if matches.flags.get("help") == Some(true) {
+    return Ok(CliAction::Help(cmd.render_help()))
+  }
+  if matches.flags.get("version") == Some(true) {
+    return Ok(CliAction::Version("\{server_version}"))
+  }
+
+  if thin {
+    if first_value(matches, "cert") is Some(_) || first_value(matches, "key") is Some(_) || first_value(matches, "key-passphrase") is Some(_) || first_value(matches,"ca-file") is Some(_) || matches.flags.get("insecure")==Some(true) {
+      return Err("TLS is not supported in thin build; use http-server-mbt (full build)")
+    }
+    if first_value(matches, "proxy") is Some(_) || matches.flags.get("proxy-all") == Some(true) || first_value(matches, "proxy-config") is Some(_) || matches.flags.get("websocket")==Some(true) {
+      return Err("Proxy is not supported in thin build; use http-server-mbt (full build)")
+    }
+  }
+  // 1. Port
+  let port = match first_value(matches, "port") {
+    Some(val) =>
+      match parse_port(val) {
+        Some(p) => p
+        None =>
+          return Err(
+            "invalid port '\{val}': port must be an integer between 1 and 65535",
+          )
+      }
+    None => 8080
+  }
+
+  // 2. Root positional
+  let root = first_value(matches, "root").unwrap_or(".")
+
+  // 3. Base URL / Base Dir
+  let raw_base_url = first_value(matches, "base-url")
+  let raw_base_dir = first_value(matches, "base-dir")
+  let base_url = @core.resolve_base_url(raw_base_url, raw_base_dir) catch {
+    err => return Err(err.to_string())
+  }
+
+  // 4. SPA & Try-Files
+  let spa = matches.flags.get("spa").unwrap_or(false)
+  let try_files = first_value(matches, "try-files")
+  if spa && try_files is Some(_) {
+    return Err(
+      "cannot specify both --spa and --try-files (mutual exclusion violation)",
+    )
+  }
+
+  // 5. autoIndex & showDir
+  let auto_index = matches.flags.get("autoIndex").unwrap_or(true)
+  let show_dir = matches.flags.get("showDir").unwrap_or(true)
+
+  // 6. Cache
+  let (cache_seconds, cache_control) = match first_value(matches, "cache") {
+    Some(val) =>
+      match parse_cache(val) {
+        Ok(c) => c
+        Err(err) => return Err(err)
+      }
+    None => (3600, None)
+  }
+
+  // 7. CORS & Compression
+  let cors = matches.flags.get("cors").unwrap_or(false)
+  let gzip = matches.flags.get("gzip").unwrap_or(false)
+  let brotli = matches.flags.get("brotli").unwrap_or(false)
+
+  // 8. Auth
+  let basic_auth = match first_value(matches, "auth") {
+    Some(val) =>
+      match parse_auth(val) {
+        Ok(a) => Some(a)
+        Err(err) => return Err(err)
+      }
+    None => None
+  }
+
+  // 9. Logging
+  let log_ip = matches.flags.get("log-ip").unwrap_or(false)
+  let silent = matches.flags.get("silent").unwrap_or(false)
+
+  // 10. TLS (D-08): cert+key enable HTTPS serving; passphrase may come from
+  // the TLS_KEY_PASSPHRASE environment variable or the CLI option.
+  let cert_file = first_value(matches, "cert")
+  let key_file = first_value(matches, "key")
+  let key_passphrase = first_value(matches, "key-passphrase")
+
+  // 11. Proxy arguments
+  let proxy = first_value(matches, "proxy")
+  let proxy_all_flag = matches.flags.get("proxy-all").unwrap_or(false)
+  if proxy_all_flag && proxy is None {
+    return Err("--proxy-all requires --proxy to be configured")
+  }
+  let proxy_all = if proxy_all_flag { proxy } else { None }
+  let proxy_config = first_value(matches, "proxy-config")
+
+  // 12. Construct Config
+  let mut config = @core.Config::default(root)
+  config = {
+    ..config,
+    port,
+    base_url,
+    spa,
+    try_files,
+    auto_index,
+    show_dir,
+    cache_seconds,
+    cache_control,
+    cors,
+    gzip,
+    brotli,
+    basic_auth,
+    log_ip,
+    silent,
+    cert_file,
+    key_file,
+    key_passphrase,
+    ca_file:first_value(matches,"ca-file"),
+    secure:!matches.flags.get("insecure").unwrap_or(false),
+    websocket:matches.flags.get("websocket").unwrap_or(false),
+    proxy,
+    proxy_all,
+    proxy_config,
+  }
+
+  // 13. Core Validation
+  config.validate() catch {
+    err => return Err(err.to_string())
+  }
+
+  Ok(CliAction::Run(config, port))
+}

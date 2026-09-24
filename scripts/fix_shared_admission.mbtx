@@ -1,0 +1,17 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  for path in ["server/server.mbt","server/plain/plain.mbt"] {
+    let source=@fs.read_file(path).text()
+    let start=source.find("          if !@native.try_acquire_connection()").unwrap()
+    let end=source[start:].find("          clients.spawn_bg").unwrap()+start
+    let replacement=
+      #|          // Pause while the shared owner is full. Concurrent listeners may
+      #|          // already have an accept pending: recheck atomically before
+      #|          // allocating any protocol/TLS state and close excess sockets.
+      #|          if !@native.connection_available() { @async.sleep(10); continue }
+      #|          let (tcp,_)=listener.accept()
+      #|          if !@native.try_acquire_connection() { tcp.close(); continue }
+      #|
+    @fs.write_file(path,source[:start].to_owned()+replacement+source[end:].to_owned())
+  }
+}

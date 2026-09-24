@@ -1,0 +1,42 @@
+// R-N02 / D-08: release CLIs, dependency audits and no rebuild during release.
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs", "moonbitlang/async@0.21.3/shell", "moonbitlang/core/env" }
+async fn main {
+  let windows=@env.get_env_var("OS")==Some("Windows_NT")
+  let os=if windows { "windows" } else { @shell.Cmd("uname",["-s"]).output().stdout().trim().to_owned().to_lower() }
+  let arch=if windows { "amd64" } else { @shell.Cmd("uname",["-m"]).output().stdout().trim().to_owned().replace_all(old="x86_64",new="amd64").replace_all(old="aarch64",new="arm64") }
+  let platform=(if os=="darwin" { "macos" } else { os })+"-"+arch
+  let env : Map[String,String]=Map([])
+  if os=="linux" {
+    let cc=@shell.Cmd("musl-gcc",["--version"]).output();cc.check()
+    env["MOON_CC"]="musl-gcc"
+    env["HTTP_SERVER_STATIC_MUSL"]="1"
+  }
+  @shell.Cmd("moon",["build","cmd/http-server-mbt","cmd/http-server-mbt-thin","--target","native","--release","--deny-warn","--target-dir","target/cli-build"],env~).run()
+  if !@fs.exists("target/candidate/cli") { @fs.mkdir("target/candidate/cli",recursive=true) }
+  for name in ["http-server-mbt","http-server-mbt-thin"] {
+    let source="target/cli-build/native/release/build/cmd/\{name}/\{name}.exe"
+    let destination="target/candidate/cli/\{name}-\{platform}"+(if windows { ".exe" } else { "" })
+    @fs.write_file(destination,@fs.read_file(source))
+    if !windows { @shell.Cmd("chmod",["+x",destination]).run() }
+    let version=@shell.Cmd(source,["--version"]).output();version.check()
+    assert_eq(version.stdout().trim(),"0.3.4")
+    @shell.Cmd(source,["--help"]).run()
+    if name.has_suffix("-thin") {
+      for flags in [["--cert","missing.pem"],["--key","missing.pem"],["--key-passphrase","pass"],["--proxy","http://localhost:1"],["--proxy-all"],["--proxy-config","rules.json"]] {
+        let result=@shell.Cmd(source,flags).output()
+        if result.exit_code()!=1 { fail("Thin did not reject "+flags.join(" ")) }
+      }
+    }
+    let dependencies=if windows {
+      let result=@shell.Cmd("llvm-readobj",["--coff-imports",source]).output();result.check();result.stdout()
+    } else if os=="linux" {
+      let program=@shell.Cmd("readelf",["-l",source]).output();program.check()
+      let dynamic=@shell.Cmd("readelf",["-d",source]).output();dynamic.check()
+      if program.stdout().contains("INTERP") || dynamic.stdout().contains("NEEDED") { fail("Linux CLI must have neither PT_INTERP nor DT_NEEDED") }
+      program.stdout()+dynamic.stdout()
+    } else {
+      let result=@shell.Cmd("otool",["-L",source]).output();result.check();result.stdout()
+    }
+    @fs.write_file(destination+".dependencies.txt",dependencies)
+  }
+}

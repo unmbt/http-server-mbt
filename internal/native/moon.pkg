@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/types",
+  "moonbitlang/core/encoding/utf8",
+}
+
+options("native-stub": ["native.c"],
+  targets: { "*.mbt": ["native"] },
+link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } })

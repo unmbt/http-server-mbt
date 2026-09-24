@@ -8,5 +8,5 @@ pkgtype(kind: "foreign_library")
 
 options(
   "native-stub": [ "bridge.c" ],
-  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
+  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } },
 )

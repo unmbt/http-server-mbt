@@ -10,9 +10,9 @@
 //
 
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @fs,
-  "moonbitlang/async/shell" @shell,
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs" @fs,
+  "moonbitlang/async@0.21.3/shell" @shell,
   "moonbitlang/core/env" @env,
 }
 
@@ -367,7 +367,11 @@ async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
       ]
       let objcopy_exe = match find_existing(objcopy_candidates) {
         Some(p) => p
-        None => ""
+        None => {
+          let probe=@shell.Cmd("llvm-objcopy",["--version"]).output()
+          probe.check()
+          "llvm-objcopy"
+        }
       }
 
       {
@@ -457,6 +461,7 @@ async fn compile_c_file(tc : Toolchain, c_src : String, obj_dst : String) -> Uni
     if res.exit_code() != 0 {
       println("Failed to compile \{c_src}:\n\{res.stderr()}")
     }
+    res.check()
   } else {
     let args : Array[String] = [
       "-c",
@@ -475,6 +480,7 @@ async fn compile_c_file(tc : Toolchain, c_src : String, obj_dst : String) -> Uni
     if res.exit_code() != 0 {
       println("Failed to compile \{c_src}:\n\{res.stderr()}")
     }
+    res.check()
   }
 }
 
@@ -515,8 +521,7 @@ async fn find_c_source_for_obj(src : String, tc : Toolchain) -> String {
       if home != "" {
         let async_root = home + "/.moon/cache/deps/v1/sources/moonbitlang/async"
         if file_exists(async_root) {
-          let vers = @fs.readdir(async_root) catch { _ => [] }
-          for ver in vers {
+          for ver in ["0.21.3"] {
             let cand = async_root + "/\{ver}/src/\{sub_c}"
             if file_exists(cand) {
               return cand
@@ -568,7 +573,7 @@ async fn collect_and_stage_objects(
 
   let matched_objs : Array[String] = []
   @fs.walk(
-    "_build/native/release/build",
+    "target/cabi-build/native/release/build",
     fn(dir, files) {
       for name in files {
         if name.has_suffix(".obj") || name.has_suffix(".o") {
@@ -608,12 +613,8 @@ async fn collect_and_stage_objects(
           "--remove-section=.gfids",
           dst,
         ],
-      ).output() catch {
-        _ => continue
-      }
-      if res.exit_code() != 0 {
-        println("Warning: llvm-objcopy exited with \{res.exit_code()} on \{dst}")
-      }
+      ).output()
+      res.check()
     } else if target_os == Linux && (src.contains("runtime-") || src.contains(".mooncakes")) {
       let c_src = find_c_source_for_obj(src, tc)
       if c_src != "" {
@@ -865,7 +866,7 @@ async fn verify_exports(tc : Toolchain, dylib_path : String) -> Unit {
       fail_pipeline("\{dylib_path} leaks internal symbols or main!\n\{stdout}")
     }
   } else {
-    let nm_args = if tc.target_os == Linux { ["-D", dylib_path] } else { ["-g", dylib_path] }
+    let nm_args = if tc.target_os == Linux { ["-D", "--defined-only", dylib_path] } else { ["-gU", dylib_path] }
     let out = @shell.Cmd(tc.sym_exe, nm_args).output()
     if out.exit_code() != 0 {
       fail_pipeline("nm failed on \{dylib_path}: \{out.stderr()}")
@@ -881,6 +882,18 @@ async fn verify_exports(tc : Toolchain, dylib_path : String) -> Unit {
     guard !stdout.contains(" main") && !stdout.contains(" _main") else {
       fail_pipeline("\{dylib_path} leaks main symbol!\n\{stdout}")
     }
+    let exported : Set[String]=Set([])
+    for line in stdout.split("\n") {
+      let fields=line.split(" ").filter(s => s!="").to_array()
+      if fields.length()<3 { continue }
+      let symbol=fields.last().unwrap().split("@").next().unwrap().to_owned()
+      let symbol=if tc.target_os==MacOS && symbol.has_prefix("_") { symbol[1:].to_owned() } else { symbol }
+      // ELF version-script namespace markers are not exported code/data.
+      if fields[fields.length()-2]=="A" { continue }
+      exported.add(symbol)
+    }
+    assert_eq(exported.length(),5)
+    for symbol in ["hs_abi_version","hs_server_start","hs_server_stop","hs_server_destroy","hs_error_copy"] { assert_true(exported.contains(symbol)) }
   }
   println("  -> Verified: strictly hs_* exports, zero symbol leaks.")
 }
@@ -1036,15 +1049,25 @@ async fn main {
     println("  Moon Lib: \{tc.moon_lib_dir}")
   }
 
+  // Start with an empty, repository-contained object inventory. Removed
+  // source files must never survive as stale library members.
+  for dir in ["target/cabi-build","target/cabi"] {
+    if file_exists(dir) {
+      let root=normalize_path(@fs.realpath("."))
+      let resolved=normalize_path(@fs.realpath(dir))
+      assert_eq(resolved,root+"/"+dir)
+      @fs.rmdir(resolved,recursive=true)
+    }
+  }
   println("2. Building MoonBit packages...")
-  let test_min = @shell.Cmd("moon", ["test", "c_abi/thin", "--target", "native", "--release"]).output()
+  let test_min = @shell.Cmd("moon", ["test", "c_abi/thin", "--target", "native", "--release", "--target-dir", "target/cabi-build"]).output()
   if test_min.exit_code() != 0 {
     println("ERROR: moon test c_abi/thin failed with exit code \{test_min.exit_code()}")
     println("STDOUT:\n" + test_min.stdout())
     println("STDERR:\n" + test_min.stderr())
     fail_pipeline("moon test c_abi/thin failed")
   }
-  let test_full = @shell.Cmd("moon", ["test", "c_abi/full", "--target", "native", "--release"]).output()
+  let test_full = @shell.Cmd("moon", ["test", "c_abi/full", "--target", "native", "--release", "--target-dir", "target/cabi-build"]).output()
   if test_full.exit_code() != 0 {
     println("ERROR: moon test c_abi/full failed with exit code \{test_full.exit_code()}")
     println("STDOUT:\n" + test_full.stdout())
@@ -1056,31 +1079,23 @@ async fn main {
     Windows => ".obj"
     Linux | MacOS => ".o"
   }
-  try {
-    ignore(@shell.Cmd("moon", ["build", "c_abi/thin", "--target", "native", "--release"]).output())
-  } catch {
-    _ => ()
-  }
-  let thin_obj = "_build/native/release/build/c_abi/thin/thin\{ext}"
-  let thin_bridge = "_build/native/release/build/c_abi/thin/bridge\{ext}"
-  if file_exists("_build/native/release/build/c_abi/thin/thin.c") {
+  emit_foreign_c(tc,"thin")
+  let thin_obj = "target/cabi-build/native/release/build/c_abi/thin/thin\{ext}"
+  let thin_bridge = "target/cabi-build/native/release/build/c_abi/thin/bridge\{ext}"
+  if file_exists("target/cabi-build/native/release/build/c_abi/thin/thin.c") {
     println("Compiling thin.c to thin\{ext}...")
-    compile_c_file(tc, "_build/native/release/build/c_abi/thin/thin.c", thin_obj)
+    compile_c_file(tc, "target/cabi-build/native/release/build/c_abi/thin/thin.c", thin_obj)
   }
   if !file_exists(thin_obj) || !file_exists(thin_bridge) {
     fail_pipeline("moon build c_abi/thin failed to generate \{thin_obj} or \{thin_bridge}")
   }
 
-  try {
-    ignore(@shell.Cmd("moon", ["build", "c_abi/full", "--target", "native", "--release"]).output())
-  } catch {
-    _ => ()
-  }
-  let full_obj = "_build/native/release/build/c_abi/full/full\{ext}"
-  let full_bridge = "_build/native/release/build/c_abi/full/bridge\{ext}"
-  if file_exists("_build/native/release/build/c_abi/full/full.c") {
+  emit_foreign_c(tc,"full")
+  let full_obj = "target/cabi-build/native/release/build/c_abi/full/full\{ext}"
+  let full_bridge = "target/cabi-build/native/release/build/c_abi/full/bridge\{ext}"
+  if file_exists("target/cabi-build/native/release/build/c_abi/full/full.c") {
     println("Compiling full.c to full\{ext}...")
-    compile_c_file(tc, "_build/native/release/build/c_abi/full/full.c", full_obj)
+    compile_c_file(tc, "target/cabi-build/native/release/build/c_abi/full/full.c", full_obj)
   }
   if !file_exists(full_obj) || !file_exists(full_bridge) {
     fail_pipeline("moon build c_abi/full failed to generate \{full_obj} or \{full_bridge}")
@@ -1173,4 +1188,25 @@ async fn main {
     println("  - \{art} (\{size} bytes)")
   }
   println("==================================================================")
+}
+
+///|
+// T-002: this pinned toolchain emits Native foreign-library C but still attempts
+// an executable link. Accept only its documented missing-entrypoint diagnostic;
+// C compilation, controlled library linking and real consumers must all succeed.
+async fn emit_foreign_c(tc : Toolchain,variant : String) -> Unit {
+  let generated="target/cabi-build/native/release/build/c_abi/"+variant+"/"+variant+".c"
+  if file_exists(generated) { @fs.remove(generated) }
+  let result=@shell.Cmd("moon",["build","c_abi/"+variant,"--target","native","--release","--deny-warn","--target-dir","target/cabi-build"]).output()
+  if result.exit_code()!=0 {
+    let diagnostic=result.stdout()+result.stderr()
+    let expected=match tc.target_os {
+      Windows => diagnostic.contains("LNK1561")
+      Linux => diagnostic.contains("undefined reference to `main'") || diagnostic.contains("undefined symbol: main")
+      MacOS => diagnostic.contains("_main") && diagnostic.contains("Undefined symbols for architecture")
+    }
+    if !expected || !file_exists(generated) { println(diagnostic);result.check() }
+    println("T-002: verified known foreign-library executable-link limitation for "+variant)
+  }
+  if !file_exists(generated) { fail_pipeline("foreign-library C was not generated") }
 }

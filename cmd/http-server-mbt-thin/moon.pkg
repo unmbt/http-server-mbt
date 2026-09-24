@@ -1,29 +1,8 @@
 import {
   "unmbt/http-server-mbt/cmd/common",
   "unmbt/http-server-mbt/server/plain" @server,
-  "unmbt/http-server-mbt/core",
   "moonbitlang/async",
-  "moonbitlang/async/stdio",
-  "moonbitlang/async/fs",
-  "moonbitlang/core/env",
-  "moonbitlang/core/argparse",
-  "moonbitlang/core/encoding/utf8",
 }
-
 pkgtype(kind: "executable")
 
-rule(
-  name: "gen_version",
-  command: "moon run scripts/gen_version.mbtx $input $output",
-)
-
-dev_build(
-  rule: "gen_version",
-  input: "../../moon.mod",
-  output: "generated_version.mbt",
-)
-
-options(
-  "native-stub": [ "local_ips.c", "tty.c" ],
-  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
-)
+options(link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "cc-link-flags": "${build.HS_CLI_LINK}" } })

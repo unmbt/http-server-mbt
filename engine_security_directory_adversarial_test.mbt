@@ -55,7 +55,8 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
     spa: true,
     basic_auth: Some(("admin", "secret")),
   }
-  let engine_spa = StaticEngine::new(config_spa)
+  let engine_spa = @http-server-mbt.StaticEngine::open(config_spa)
+  defer engine_spa.close()
 
   // Probe 1.1: Missing Auth on missing route -> MUST be 401, NOT 200 index.html
   let r1 = engine_spa.handle({
@@ -67,7 +68,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
     Handled(res) => {
       assert_eq(res.status, 401)
       assert_eq(res.headers["WWW-Authenticate"], "Basic realm=\"\"")
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 401 on missing route without auth")
   }
@@ -104,7 +105,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r4 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 401 on wrong password")
   }
@@ -141,7 +142,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r7 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "13")
       assert_eq(res.headers["WWW-Authenticate"], "Basic realm=\"\"")
     }
@@ -154,7 +155,8 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
     try_files: Some("hello.txt"),
     basic_auth: Some(("user", "pass")),
   }
-  let engine_try = StaticEngine::new(config_try)
+  let engine_try = @http-server-mbt.StaticEngine::open(config_try)
+  defer engine_try.close()
 
   // Probe 2.1: Missing Auth on try-files unmatched path -> 401, NEVER 200 hello.txt
   let r8 = engine_try.handle({
@@ -165,7 +167,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r8 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 401 on try_files without auth")
   }
@@ -180,7 +182,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r9 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "hello moonbit\n")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "hello moonbit\n")
     }
     _ => fail("expected 200 hello.txt with valid auth")
   }
@@ -193,7 +195,8 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
     spa: true,
     base_url: "/app",
   }
-  let engine_spa = StaticEngine::new(config_spa)
+  let engine_spa = @http-server-mbt.StaticEngine::open(config_spa)
+  defer engine_spa.close()
 
   // Probe 1: Prefix collision /application outside /app mount -> 403 with empty body
   let r1 = engine_spa.handle({
@@ -204,7 +207,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "0")
     }
     _ => fail("expected 403 outside base_url")
@@ -219,7 +222,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 on prefix collision")
   }
@@ -233,7 +236,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 on /")
   }
@@ -247,7 +250,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
   match r4 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 on HEAD outside base_url")
   }
@@ -258,7 +261,8 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
     try_files: Some("hello.txt"),
     base_url: "/app",
   }
-  let engine_try = StaticEngine::new(config_try)
+  let engine_try = @http-server-mbt.StaticEngine::open(config_try)
+  defer engine_try.close()
   let r5 = engine_try.handle({
     meth: @core.Method::Get,
     target: "/application/foo",
@@ -267,7 +271,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 OutsideBaseUr
   match r5 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 on try_files outside base_url")
   }
@@ -279,7 +283,8 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
     ..@core.Config::default("testdata/public"),
     spa: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Probe 1: Simple dot-dot traversal -> 403
   let r1 = engine.handle({
@@ -290,7 +295,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 403 on traversal")
   }
@@ -304,7 +309,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 403 on percent traversal")
   }
@@ -318,7 +323,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 403 on uppercase percent traversal")
   }
@@ -376,7 +381,7 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r8 {
     Handled(res) => {
       assert_eq(res.status, 400)
-      assert_eq(adv_bytes_to_string(res.to_bytes()), "Bad Request")
+      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Bad Request")
     }
     _ => fail("expected 400 on malformed URI")
   }
@@ -400,7 +405,8 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     ..@core.Config::default("testdata/public/empty_dir"),
     spa: true,
   }
-  let engine_spa = StaticEngine::new(config_spa)
+  let engine_spa = @http-server-mbt.StaticEngine::open(config_spa)
+  defer engine_spa.close()
 
   let r1 = engine_spa.handle({
     meth: @core.Method::Get,
@@ -411,7 +417,7 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     Handled(res) => {
       assert_eq(res.status, 404)
       assert_true(
-        adv_bytes_to_string(res.to_bytes()).contains("File not found"),
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains("File not found"),
       )
     }
     _ => fail("expected terminal 404")
@@ -421,7 +427,8 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     ..@core.Config::default("testdata/public"),
     try_files: Some("nonexistent_fallback.html"),
   }
-  let engine_try = StaticEngine::new(config_try)
+  let engine_try = @http-server-mbt.StaticEngine::open(config_try)
+  defer engine_try.close()
 
   let r2 = engine_try.handle({
     meth: @core.Method::Get,
@@ -432,7 +439,7 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     Handled(res) => {
       assert_eq(res.status, 404)
       assert_true(
-        adv_bytes_to_string(res.to_bytes()).contains("File not found"),
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains("File not found"),
       )
     }
     _ => fail("expected terminal 404 for try_files")
@@ -447,7 +454,8 @@ async test "adversarial: C025 404 suppression on directories without trailing sl
     auto_index: false,
     show_dir: false,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Probe 1: Request to existing directory /subfolder -> MUST return 404, NEVER 302!
   let r1 = engine.handle({
@@ -483,7 +491,8 @@ async test "adversarial: C025 404 suppression on directories without trailing sl
     auto_index: true,
     show_dir: false,
   }
-  let engine_auto = StaticEngine::new(config_auto)
+  let engine_auto = @http-server-mbt.StaticEngine::open(config_auto)
+  defer engine_auto.close()
   let r3 = engine_auto.handle({
     meth: @core.Method::Get,
     target: "/subfolder",
@@ -503,7 +512,8 @@ async test "adversarial: C025 404 suppression on directories without trailing sl
     auto_index: false,
     show_dir: true,
   }
-  let engine_show = StaticEngine::new(config_show)
+  let engine_show = @http-server-mbt.StaticEngine::open(config_show)
+  defer engine_show.close()
   let r4 = engine_show.handle({
     meth: @core.Method::Get,
     target: "/subfolder",
@@ -525,7 +535,8 @@ async test "adversarial: Directory redirect preserves query and percent-encoding
     auto_index: true,
     show_dir: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Probe 1: Directory with space and percent encoding: /subdir_with%20space -> /subdir_with%20space/
   let r1 = engine.handle({
@@ -537,7 +548,7 @@ async test "adversarial: Directory redirect preserves query and percent-encoding
     Handled(res) => {
       assert_eq(res.status, 302)
       assert_eq(res.headers["Location"], "/subdir_with%20space/")
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 302 redirect for percent-encoded directory")
   }
@@ -562,7 +573,8 @@ async test "adversarial: Directory redirect preserves query and percent-encoding
     base_url: "/app",
     auto_index: true,
   }
-  let engine_base = StaticEngine::new(config_base)
+  let engine_base = @http-server-mbt.StaticEngine::open(config_base)
+  defer engine_base.close()
   let r3 = engine_base.handle({
     meth: @core.Method::Get,
     target: "/app/subfolder?k=v",
@@ -586,7 +598,8 @@ async test "adversarial: Directory listing HTML escaping and XSS defense (C023)"
     show_dir: true,
     dir_overrides_404: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Probe 1: C023 query string encoding preservation in directory listing href
   // Request: /subfolder/?a=1&b=2
@@ -599,7 +612,7 @@ async test "adversarial: Directory listing HTML escaping and XSS defense (C023)"
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(html.contains("href=\"../?a=1&#x26;b=2\""))
       assert_true(!html.contains("href=\"../?a=1&b=2\""))
     }
@@ -616,7 +629,7 @@ async test "adversarial: Directory listing HTML escaping and XSS defense (C023)"
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       // Raw <script> must NEVER be present!
       assert_true(!html.contains("<script>"))
       assert_true(html.contains("&#x3C;script&#x3E;"))
@@ -634,7 +647,7 @@ async test "adversarial: Directory listing HTML escaping and XSS defense (C023)"
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(!html.contains("<script>evil()</script>"))
       assert_true(
         html.contains("attacker.com&#x3C;script&#x3E;evil()&#x3C;/script&#x3E;"),
@@ -651,7 +664,8 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
     ..@core.Config::default("testdata/public"),
     try_files: Some("missing_fallback.html"),
   }
-  let engine_try = StaticEngine::new(config_try)
+  let engine_try = @http-server-mbt.StaticEngine::open(config_try)
+  defer engine_try.close()
   let r1 = engine_try.handle({
     meth: @core.Method::Head,
     target: "/unmatched/path",
@@ -660,7 +674,7 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "18")
       assert_eq(res.headers["Content-Type"], "text/plain; charset=UTF-8")
     }
@@ -671,7 +685,8 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
   let config_custom : @core.Config = {
     ..@core.Config::default("testdata/public"),
   }
-  let engine_custom = StaticEngine::new(config_custom)
+  let engine_custom = @http-server-mbt.StaticEngine::open(config_custom)
+  defer engine_custom.close()
   let r2 = engine_custom.handle({
     meth: @core.Method::Head,
     target: "/nonexistent/route",
@@ -680,7 +695,7 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       let expected_len = (@fs.file_size("testdata/public/404.html") catch {
         _ => 0L
       }).to_string()
@@ -697,7 +712,8 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
     show_dir: true,
     dir_overrides_404: true,
   }
-  let engine_dir = StaticEngine::new(config_dir)
+  let engine_dir = @http-server-mbt.StaticEngine::open(config_dir)
+  defer engine_dir.close()
   let r3 = engine_dir.handle({
     meth: @core.Method::Head,
     target: "/empty_dir/",
@@ -706,10 +722,10 @@ async test "adversarial: HEAD request behavior on Terminal 404, Custom 404, and 
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Type"], "text/html; charset=UTF-8")
-      let cl = res.headers["Content-Length"]
-      assert_true(cl.length() > 0 && cl != "0")
+      // D-06: HEAD does not produce the unknown-length directory body.
+      assert_eq(res.headers.get("Content-Length"), None)
     }
     _ => fail("expected HEAD directory listing")
   }
@@ -725,7 +741,8 @@ async test "adversarial: SPA precedence over Custom 404 for existing empty direc
     dir_overrides_404: false,
     spa: true,
   }
-  let engine_spa_dir = StaticEngine::new(config_spa_dir)
+  let engine_spa_dir = @http-server-mbt.StaticEngine::open(config_spa_dir)
+  defer engine_spa_dir.close()
   let r = engine_spa_dir.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -734,7 +751,7 @@ async test "adversarial: SPA precedence over Custom 404 for existing empty direc
   match r {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let body = adv_bytes_to_string(res.to_bytes())
+      let body = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(body.contains("Index of /empty_dir/"))
     }
     _ => fail("expected 200 directory listing in SPA mode over custom 404")
@@ -751,7 +768,8 @@ async test "adversarial: Dotfile hiding and visibility in empty_dir (.gitkeep)" 
     dir_overrides_404: true,
     show_dotfiles: false,
   }
-  let engine_hide = StaticEngine::new(config_hide)
+  let engine_hide = @http-server-mbt.StaticEngine::open(config_hide)
+  defer engine_hide.close()
   let r1 = engine_hide.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -760,7 +778,7 @@ async test "adversarial: Dotfile hiding and visibility in empty_dir (.gitkeep)" 
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(!html.contains(".gitkeep"))
     }
     _ => fail("expected 200 directory listing hiding .gitkeep")
@@ -774,7 +792,8 @@ async test "adversarial: Dotfile hiding and visibility in empty_dir (.gitkeep)" 
     dir_overrides_404: true,
     show_dotfiles: true,
   }
-  let engine_show = StaticEngine::new(config_show)
+  let engine_show = @http-server-mbt.StaticEngine::open(config_show)
+  defer engine_show.close()
   let r2 = engine_show.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -783,7 +802,7 @@ async test "adversarial: Dotfile hiding and visibility in empty_dir (.gitkeep)" 
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(html.contains(".gitkeep"))
     }
     _ => fail("expected 200 directory listing showing .gitkeep")
@@ -798,7 +817,8 @@ async test "adversarial: Root directory listing suppresses parent link while sub
     show_dir: true,
     dir_overrides_404: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // Root "/" directory listing must NOT have ".."
   let r_root = engine.handle({
@@ -809,7 +829,7 @@ async test "adversarial: Root directory listing suppresses parent link while sub
   match r_root {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(!html.contains("href=\"../\""))
     }
     _ => fail("expected 200 on root without parent link")
@@ -824,7 +844,7 @@ async test "adversarial: Root directory listing suppresses parent link while sub
   match r_sub {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let html = adv_bytes_to_string(res.to_bytes())
+      let html = adv_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(html.contains("href=\"../\""))
     }
     _ => fail("expected 200 on subfolder with parent link")

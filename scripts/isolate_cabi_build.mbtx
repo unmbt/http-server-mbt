@@ -1,0 +1,7 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  let path="scripts/build_cabi.mbtx"
+  let s=@fs.read_file(path).text().replace_all(old="_build/native/release/build",new="target/cabi-build/native/release/build")
+    .replace_all(old="\"--target\", \"native\", \"--release\"",new="\"--target\", \"native\", \"--release\", \"--target-dir\", \"target/cabi-build\"")
+  @fs.write_file(path,s)
+}

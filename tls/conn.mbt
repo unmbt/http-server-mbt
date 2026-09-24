@@ -18,6 +18,8 @@ pub struct TlsConn {
   rb : @io.ReaderBuffer
   in_scratch : FixedArray[Byte]
   out_scratch : FixedArray[Byte]
+  input_gate : @async.Mutex
+  output_gate : @async.Mutex
   mut closed : Bool
 }
 
@@ -55,6 +57,8 @@ fn TlsConn::create(
     rb: @io.ReaderBuffer::new(),
     in_scratch: FixedArray::make(RECORD_CAP, b'\x00'),
     out_scratch: FixedArray::make(DRAIN_CAP, b'\x00'),
+    input_gate: @async.Mutex(),
+    output_gate: @async.Mutex(),
     closed: false,
   }
 }
@@ -67,6 +71,7 @@ pub async fn TlsAcceptor::accept(
   writer~ : &@io.Writer,
 ) -> TlsConn {
   let conn = TlsConn::create(self.handle, b"", reader, writer)
+  errdefer conn.close()
   conn.handshake()
   conn
 }
@@ -86,6 +91,7 @@ pub async fn TlsAcceptor::connect(
     reader,
     writer,
   )
+  errdefer conn.close()
   conn.handshake()
   conn
 }
@@ -114,6 +120,9 @@ async fn TlsConn::handshake(self : TlsConn) -> Unit {
 ///|
 /// Drain pending ciphertext from the bridge ring to the underlying writer.
 async fn TlsConn::drain_output(self : TlsConn) -> Unit {
+  self.output_gate.acquire()
+  defer self.output_gate.release()
+  guard !self.closed else { raise TlsUnexpectedEof }
   for ;; {
     let pending = tls_output_pending_c(self.handle)
     guard pending > 0 else { return }
@@ -128,10 +137,14 @@ async fn TlsConn::drain_output(self : TlsConn) -> Unit {
 /// Pull one chunk of ciphertext from the underlying reader into the bridge
 /// input ring. Returns false when the transport reached EOF.
 async fn TlsConn::feed_input(self : TlsConn) -> Bool {
+  self.input_gate.acquire()
+  defer self.input_gate.release()
+  guard !self.closed else { raise TlsUnexpectedEof }
   let space = tls_in_space_c(self.handle)
   guard space > 0 else { return true }
   let cap = @cmp.minimum(space, self.in_scratch.length())
   let n = self.reader.read(self.in_scratch, offset=0, max_len=cap)
+  guard !self.closed else { raise TlsUnexpectedEof }
   if n <= 0 {
     return false
   }
@@ -164,6 +177,17 @@ pub async fn TlsConn::shutdown(self : TlsConn) -> Bool {
   }
   let _ = self.drain_output() catch { _ => return false }
   clean
+}
+///|
+/// Send close_notify without consuming peer input; safe alongside one reader.
+pub async fn TlsConn::shutdown_write(self : TlsConn) -> Bool {
+  if self.closed { return false }
+  for ;; {
+    let result=tls_shutdown_c(self.handle)
+    if result==0 { self.drain_output();return true }
+    if result!= -2 { return false }
+    self.drain_output()
+  }
 }
 
 ///|
@@ -251,3 +275,10 @@ pub impl @io.Writer for TlsConn with fn write_once(self, buf, offset~, len~) {
     }
   }
 }
+
+
+///|
+pub extend TlsConn with @moonbitlang/async/io.Reader::{read, read_some, _direct_read, drop, read_all, read_until, read_exactly, _get_internal_buffer}
+
+///|
+pub extend TlsConn with @moonbitlang/async/io.Writer::{write_once, write, write_reader}

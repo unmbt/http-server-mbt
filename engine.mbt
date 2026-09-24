@@ -1,163 +1,4 @@
 ///|
-/// A static file engine. It never opens a listener by itself.
-pub struct StaticEngine {
-  config : @core.Config
-  mime_registry : @core.MimeRegistry
-}
-
-///|
-/// Run a static engine inside a managed asynchronous scope.
-pub async fn[T] with_engine(
-  config : @core.Config,
-  handler : async (StaticEngine) -> T,
-) -> T {
-  let engine = StaticEngine::new(config)
-  handler(engine)
-}
-
-///|
-/// The result of handling a request.
-pub(all) enum HandleResult {
-  Handled(Response)
-  Next
-  Error(ServerError)
-}
-
-///|
-/// Response headers and body selected by the engine.
-pub struct Response {
-  status : Int
-  headers : Map[String, String]
-  body : @core.ResponseBody
-} derive(Debug)
-
-///|
-/// Read a bounded slice from the response body. `offset` outside the body returns empty bytes.
-pub async fn Response::read(
-  self : Response,
-  offset? : Int = 0,
-  max_len? : Int = 65536,
-) -> Bytes {
-  match self.body {
-    Empty => b""
-    Bytes(bytes) => {
-      if offset < 0 || offset >= bytes.length() || max_len <= 0 {
-        return b""
-      }
-      let end = if offset + max_len > bytes.length() {
-        bytes.length()
-      } else {
-        offset + max_len
-      }
-      bytes[offset:end].to_owned()
-    }
-    FileRegion(path, file_offset, file_length) => {
-      if offset < 0 || offset.to_int64() >= file_length || max_len <= 0 {
-        return b""
-      }
-      let read_pos = file_offset + offset.to_int64()
-      let remaining = file_length - offset.to_int64()
-      let chunk_len = if remaining < max_len.to_int64() {
-        remaining.to_int()
-      } else {
-        max_len
-      }
-      try {
-        let cur_size = @fs.file_size(path)
-        if cur_size < read_pos + chunk_len.to_int64() {
-          return b""
-        }
-        let file = @fs.open(path, mode=ReadOnly)
-        defer file.close()
-        file.read_exactly_at(chunk_len, position=read_pos)
-      } catch {
-        _ => b""
-      }
-    }
-  }
-}
-
-///|
-/// Convert the full response body into Bytes.
-pub async fn Response::to_bytes(self : Response) -> Bytes {
-  match self.body {
-    Empty => b""
-    Bytes(b) => b
-    FileRegion(_, _, length) => self.read(offset=0, max_len=length.to_int())
-  }
-}
-
-///|
-/// Release response resources. In-memory responses are already owned, so this is idempotent.
-pub fn Response::close(self : Response) -> Unit {
-  ignore(self)
-}
-
-///|
-/// Errors returned by the static engine.
-pub suberror ServerError {
-  InvalidRequest(String)
-  Forbidden(String)
-  Io(String)
-  FileChanged(String)
-} derive(Debug)
-
-///|
-pub fn ServerError::invalid_request(message : String) -> ServerError {
-  InvalidRequest(message)
-}
-
-///|
-pub fn ServerError::forbidden(message : String) -> ServerError {
-  Forbidden(message)
-}
-
-///|
-pub fn ServerError::io(message : String) -> ServerError {
-  Io(message)
-}
-
-///|
-/// File state observation lease for D-17 in-flight mutation detection.
-pub struct FileLease {
-  path : String
-  initial_size : Int64
-  initial_mtime : (Int64, Int)
-} derive(Debug)
-
-///|
-/// Acquire a file lease observing current size and modification time.
-pub async fn FileLease::acquire(path : String) -> FileLease? {
-  try {
-    let initial_size = @fs.file_size(path)
-    let initial_mtime = @fs.mtime(path)
-    Some({ path, initial_size, initial_mtime, })
-  } catch {
-    _ => None
-  }
-}
-
-///|
-/// Check if the leased file has changed on disk.
-pub async fn FileLease::is_mutated(self : FileLease) -> Bool {
-  try {
-    let cur_size = @fs.file_size(self.path)
-    let cur_mtime = @fs.mtime(self.path)
-    cur_size != self.initial_size || cur_mtime != self.initial_mtime
-  } catch {
-    _ => true
-  }
-}
-
-///|
-/// Construct an engine after validating its configuration.
-pub fn StaticEngine::new(config : @core.Config) -> StaticEngine {
-  let mime_registry = @core.MimeRegistry::new()
-  mime_registry.set_all(config.mime_types)
-  { config, mime_registry, }
-}
-
-///|
 fn header(request : @core.Request, name : String) -> String? {
   let wanted = name.to_lower()
   for key, value in request.headers {
@@ -265,14 +106,16 @@ fn check_accepts_encoding(accept_header : String, encoding : String) -> Bool {
 }
 
 ///|
-async fn has_gzip_magic(path : String) -> Bool {
+async fn StaticEngine::has_gzip_magic(self : StaticEngine, path : String) -> Bool {
   try {
-    let f = @fs.open(path, mode=ReadOnly)
+    let f = self.open_file(path)
     defer f.close()
-    let bytes = f.read_exactly_at(2, position=0L)
+    if f.size < 2L { return false }
+    let bytes = f.read(0L, 2)
     bytes.length() == 2 && bytes[0] == b'\x1f' && bytes[1] == b'\x8b'
   } catch {
-    _ => false
+    @native.NativeError::Missing => false
+    e => raise e
   }
 }
 
@@ -385,18 +228,9 @@ fn compare_entries(a : ListingEntry, b : ListingEntry) -> Int {
 }
 
 ///|
-fn render_directory_html(
-  title_path : String,
-  entries : Array[ListingEntry],
-  raw_query : String?,
-  host : String,
-) -> String {
+fn listing_header(title_path : String, _raw_query : String?) -> String {
   let buf = StringBuilder()
   let enc_title = escape_html(title_path)
-  let q_suffix = match raw_query {
-    Some(q) if q.length() > 0 => "?" + escape_html(q)
-    _ => ""
-  }
 
   buf.write_string("<!doctype html>\n<html>\n<head>\n")
   buf.write_string("  <meta charset=\"utf-8\">\n")
@@ -416,9 +250,15 @@ fn render_directory_html(
   buf.write_string("<h1>Index of " + enc_title + "</h1>\n")
   buf.write_string("<table>\n")
 
-  for entry in entries {
+  buf.to_string()
+}
+
+///|
+fn listing_row(entry : ListingEntry, raw_query : String?) -> String {
+  let buf = StringBuilder()
+  let q_suffix = match raw_query { Some(q) if q.length() > 0 => "?" + escape_html(q); _ => "" }
     if entry.is_companion {
-      continue
+      return buf.to_string()
     }
     if entry.name == ".." {
       buf.write_string("<tr>")
@@ -430,7 +270,7 @@ fn render_directory_html(
         "\">../</a></td>",
       )
       buf.write_string("</tr>\n")
-      continue
+      return buf.to_string()
     }
     let encoded_name = encode_path_segment(entry.name)
     let href = if entry.is_dir {
@@ -470,13 +310,27 @@ fn render_directory_html(
       )
     }
     buf.write_string("</td></tr>\n")
-  }
 
+  buf.to_string()
+}
+
+///|
+fn listing_footer(host : String) -> String {
+  let buf = StringBuilder()
   buf.write_string("</table>\n")
   buf.write_string(
     "<br><address>http-server running @ " + escape_html(host) + "</address>\n",
   )
   buf.write_string("</body></html>")
+  buf.to_string()
+}
+
+///|
+fn render_directory_html(title_path : String, entries : Array[ListingEntry], raw_query : String?, host : String) -> String {
+  let buf = StringBuilder()
+  buf.write_string(listing_header(title_path, raw_query))
+  for entry in entries { buf.write_string(listing_row(entry, raw_query)) }
+  buf.write_string(listing_footer(host))
   buf.to_string()
 }
 
@@ -512,7 +366,7 @@ pub fn render_directory_listing_html(
 fn StaticEngine::make_terminal_404_response(
   self : StaticEngine,
   request : @core.Request,
-) -> Response {
+) -> ResponsePlan {
   let text = "File not found. :("
   let body_bytes = @utf8.encode(text)
   let headers : Map[String, String] = Map([
@@ -521,9 +375,9 @@ fn StaticEngine::make_terminal_404_response(
   ])
   @core.apply_security_headers(headers, self.config, request.meth)
   let body = if request.meth is Head {
-    @core.ResponseBody::Empty
+    PlanBody::Empty
   } else {
-    @core.ResponseBody::Bytes(body_bytes)
+    PlanBody::Bytes(body_bytes)
   }
   { status: 404, headers, body, }
 }
@@ -532,25 +386,28 @@ fn StaticEngine::make_terminal_404_response(
 async fn StaticEngine::make_404_response(
   self : StaticEngine,
   request : @core.Request,
-) -> Response {
+) -> ResponsePlan {
   let custom_404 = normalize_root_join(self.config.root, "404.html")
   let has_404_html = try
-    @fs.exists(custom_404) && @fs.kind(custom_404) is @fs.FileKind::Regular
+    self.exists(custom_404) && self.kind(custom_404) is @fs.FileKind::Regular
   catch {
-    _ => false
+    @native.NativeError::Missing => false
+    e => raise e
   }
   if has_404_html {
-    let size = @fs.file_size(custom_404) catch { _ => 0L }
+    let file = self.open_file(custom_404)
+    let size = file.size
     let headers : Map[String, String] = Map([
       ("Content-Type", "text/html; charset=UTF-8"),
       ("Content-Length", size.to_string()),
     ])
     @core.apply_security_headers(headers, self.config, request.meth)
     let body = if request.meth is Head {
-      @core.ResponseBody::Empty
+      PlanBody::Empty
     } else {
-      @core.ResponseBody::FileRegion(custom_404, 0L, size)
+      PlanBody::FileRegion(file, 0L, size)
     }
+    if request.meth is Head { file.close() }
     { status: 404, headers, body, }
   } else {
     self.make_terminal_404_response(request)
@@ -559,18 +416,18 @@ async fn StaticEngine::make_404_response(
 
 ///|
 /// Resolve and read one static request.
-pub async fn StaticEngine::handle(
+async fn StaticEngine::plan_request(
   self : StaticEngine,
   request : @core.Request,
-) -> HandleResult {
+) -> PlanResult {
   // 1. Evaluate security policies (Host whitelist, Basic Auth, OPTIONS preflight)
   let sec_decision = @core.evaluate_security_policies(self.config, request)
   match sec_decision {
     Unauthorized(headers, body) => {
       let b = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(body)
+        PlanBody::Bytes(body)
       }
       headers["Content-Type"] = "text/plain; charset=UTF-8"
       headers["Content-Length"] = body.length().to_string()
@@ -578,9 +435,9 @@ pub async fn StaticEngine::handle(
     }
     Forbidden(headers, body) => {
       let b = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(body)
+        PlanBody::Bytes(body)
       }
       headers["Content-Type"] = "text/plain; charset=UTF-8"
       headers["Content-Length"] = body.length().to_string()
@@ -588,7 +445,7 @@ pub async fn StaticEngine::handle(
     }
     Preflight(headers) => {
       headers["Content-Length"] = "0"
-      return Handled({ status: 204, headers, body: @core.ResponseBody::Empty, })
+      return Handled({ status: 204, headers, body: PlanBody::Empty, })
     }
     Proceed => ()
   }
@@ -609,9 +466,9 @@ pub async fn StaticEngine::handle(
       ])
       @core.apply_security_headers(headers, self.config, request.meth)
       let body = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(body_bytes)
+        PlanBody::Bytes(body_bytes)
       }
       return Handled({ status: 200, headers, body, })
     }
@@ -629,7 +486,7 @@ pub async fn StaticEngine::handle(
       // D-04 & C042.21: 403 Forbidden with empty body
       let headers : Map[String, String] = Map([("Content-Length", "0")])
       @core.apply_security_headers(headers, self.config, request.meth)
-      return Handled({ status: 403, headers, body: @core.ResponseBody::Empty, })
+      return Handled({ status: 403, headers, body: PlanBody::Empty, })
     }
     Err(@core.PathError::TraversalForbidden(_)) => {
       let body_bytes = @utf8.encode("Access denied")
@@ -639,9 +496,9 @@ pub async fn StaticEngine::handle(
       ])
       @core.apply_security_headers(headers, self.config, request.meth)
       let body = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(body_bytes)
+        PlanBody::Bytes(body_bytes)
       }
       return Handled({ status: 403, headers, body, })
     }
@@ -653,9 +510,9 @@ pub async fn StaticEngine::handle(
       ])
       @core.apply_security_headers(headers, self.config, request.meth)
       let body = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(body_bytes)
+        PlanBody::Bytes(body_bytes)
       }
       return Handled({ status: 400, headers, body, })
     }
@@ -677,9 +534,10 @@ pub async fn StaticEngine::handle(
 
   // 4. Directory Handling
   let is_dir = try
-    @fs.exists(path) && @fs.kind(path) is @fs.FileKind::Directory
+    self.exists(path) && self.kind(path) is @fs.FileKind::Directory
   catch {
-    _ => false
+    @native.NativeError::Missing => false
+    e => raise e
   }
 
   if is_dir {
@@ -696,7 +554,7 @@ pub async fn StaticEngine::handle(
         ("Content-Length", "0"),
       ])
       @core.apply_security_headers(headers, self.config, request.meth)
-      return Handled({ status: 302, headers, body: @core.ResponseBody::Empty, })
+      return Handled({ status: 302, headers, body: PlanBody::Empty, })
     }
 
     // Directory request with trailing slash
@@ -709,9 +567,10 @@ pub async fn StaticEngine::handle(
       if self.config.brotli && check_accepts_encoding(accept, "br") {
         let p = index_candidate + ".br"
         let p_exists = try
-          @fs.exists(p) && @fs.kind(p) is @fs.FileKind::Regular
+          self.exists(p) && self.kind(p) is @fs.FileKind::Regular
         catch {
-          _ => false
+          @native.NativeError::Missing => false
+          e => raise e
         }
         if p_exists {
           dir_file_chosen = Some((p, index_candidate, Some("br")))
@@ -723,21 +582,23 @@ pub async fn StaticEngine::handle(
         check_accepts_encoding(accept, "gzip") {
         let p = index_candidate + ".gz"
         let p_exists = try
-          @fs.exists(p) && @fs.kind(p) is @fs.FileKind::Regular
+          self.exists(p) && self.kind(p) is @fs.FileKind::Regular
         catch {
-          _ => false
+          @native.NativeError::Missing => false
+          e => raise e
         }
-        if p_exists && has_gzip_magic(p) {
+        if p_exists && self.has_gzip_magic(p) {
           dir_file_chosen = Some((p, index_candidate, Some("gzip")))
         }
       }
 
       if dir_file_chosen is None {
         let p_exists = try
-          @fs.exists(index_candidate) &&
-          @fs.kind(index_candidate) is @fs.FileKind::Regular
+          self.exists(index_candidate) &&
+          self.kind(index_candidate) is @fs.FileKind::Regular
         catch {
-          _ => false
+          @native.NativeError::Missing => false
+          e => raise e
         }
         if p_exists {
           dir_file_chosen = Some((index_candidate, index_candidate, None))
@@ -756,22 +617,33 @@ pub async fn StaticEngine::handle(
       if !self.config.dir_overrides_404 && !self.config.has_fallback() {
         let root_404 = normalize_root_join(self.config.root, "404.html")
         let has_404 = try
-          @fs.exists(root_404) && @fs.kind(root_404) is @fs.FileKind::Regular
+          self.exists(root_404) && self.kind(root_404) is @fs.FileKind::Regular
         catch {
-          _ => false
+          @native.NativeError::Missing => false
+          e => raise e
         }
         if has_404 {
           return Handled(self.make_404_response(request))
         }
       }
 
+      // D-06: admit all metadata before building a listing. An unconsumed
+      // listing retains its reservation, so slow clients cannot grow memory.
+      if request.meth is Head {
+        let headers : Map[String,String]=Map([("Content-Type","text/html; charset=UTF-8")])
+        @core.apply_security_headers(headers,self.config,request.meth)
+        return Handled({status:200,headers,body:Empty})
+      }
+      let mut metadata_charge=request.target.length()*32+16384
+      self.runtime.reserve(directory=true,metadata_charge)
+      let mut retained=false
+      defer { if !retained { self.runtime.release(directory=true,metadata_charge) } }
       // Render HTML directory listing
-      let dir_names = @fs.readdir(
+      let (dir_names,name_charge) = self.readdir(
         path,
         include_hidden=self.config.show_dotfiles,
-      ) catch {
-        _ => []
-      }
+      )
+      metadata_charge += name_charge
 
       let entries : Array[ListingEntry] = []
       let name_map : Map[String, ListingEntry] = Map([])
@@ -781,17 +653,14 @@ pub async fn StaticEngine::handle(
           continue
         }
         let child_path = path + "/" + name
-        let is_child_dir = try (@fs.kind(child_path) is @fs.FileKind::Directory) catch {
-          _ => false
+        let child = self.open_file(child_path) catch {
+          @native.NativeError::Missing => continue
+          e => raise e
         }
-        let size = if is_child_dir {
-          0L
-        } else {
-          @fs.file_size(child_path) catch {
-            _ => 0L
-          }
-        }
-        let (mtime_sec, _) = @fs.mtime(child_path) catch { _ => (0L, 0) }
+        let is_child_dir = child.kind == 2
+        let size = if is_child_dir { 0L } else { child.size }
+        let mtime_sec = child.mtime
+        child.close()
         let entry : ListingEntry = {
           name,
           is_dir: is_child_dir,
@@ -867,20 +736,16 @@ pub async fn StaticEngine::handle(
       } else {
         raw_path + "/"
       }
-      let html = render_directory_html(
-        display_title, final_entries, raw_query, host,
-      )
-      let html_bytes = @utf8.encode(html)
       let headers : Map[String, String] = Map([
         ("Content-Type", "text/html; charset=UTF-8"),
-        ("Content-Length", html_bytes.length().to_string()),
       ])
       @core.apply_security_headers(headers, self.config, request.meth)
       let body = if request.meth is Head {
-        @core.ResponseBody::Empty
+        PlanBody::Empty
       } else {
-        @core.ResponseBody::Bytes(html_bytes)
+        PlanBody::Listing({ entries: final_entries, title: display_title, query: raw_query, host, stage: 0, index: 0, pending: b"", position: 0, metadata_charge })
       }
+      retained=true
       return Handled({ status: 200, headers, body, })
     }
 
@@ -899,9 +764,10 @@ pub async fn StaticEngine::handle(
   if self.config.force_content_encoding {
     if path.has_suffix(".br") && path.length() > 3 {
       let exists = try
-        @fs.exists(path) && @fs.kind(path) is @fs.FileKind::Regular
+        self.exists(path) && self.kind(path) is @fs.FileKind::Regular
       catch {
-        _ => false
+        @native.NativeError::Missing => false
+        e => raise e
       }
       if exists {
         let represented = path[:path.length() - 3].to_owned()
@@ -909,9 +775,10 @@ pub async fn StaticEngine::handle(
       }
     } else if path.has_suffix(".gz") && path.length() > 3 {
       let exists = try
-        @fs.exists(path) && @fs.kind(path) is @fs.FileKind::Regular
+        self.exists(path) && self.kind(path) is @fs.FileKind::Regular
       catch {
-        _ => false
+        @native.NativeError::Missing => false
+        e => raise e
       }
       if exists {
         let represented = path[:path.length() - 3].to_owned()
@@ -926,9 +793,10 @@ pub async fn StaticEngine::handle(
     check_accepts_encoding(accept, "br") {
     let p = path + ".br"
     let exists = try
-      @fs.exists(p) && @fs.kind(p) is @fs.FileKind::Regular
+      self.exists(p) && self.kind(p) is @fs.FileKind::Regular
     catch {
-      _ => false
+      @native.NativeError::Missing => false
+      e => raise e
     }
     if exists {
       file_candidate = Some((p, path, Some("br")))
@@ -941,11 +809,12 @@ pub async fn StaticEngine::handle(
     check_accepts_encoding(accept, "gzip") {
     let p = path + ".gz"
     let exists = try
-      @fs.exists(p) && @fs.kind(p) is @fs.FileKind::Regular
+      self.exists(p) && self.kind(p) is @fs.FileKind::Regular
     catch {
-      _ => false
+      @native.NativeError::Missing => false
+      e => raise e
     }
-    if exists && has_gzip_magic(p) {
+    if exists && self.has_gzip_magic(p) {
       file_candidate = Some((p, path, Some("gzip")))
     }
   }
@@ -953,9 +822,10 @@ pub async fn StaticEngine::handle(
   // 5d. Direct regular file
   if file_candidate is None {
     let exists = try
-      @fs.exists(path) && @fs.kind(path) is @fs.FileKind::Regular
+      self.exists(path) && self.kind(path) is @fs.FileKind::Regular
     catch {
-      _ => false
+      @native.NativeError::Missing => false
+      e => raise e
     }
     if exists {
       file_candidate = Some((path, path, None))
@@ -967,9 +837,10 @@ pub async fn StaticEngine::handle(
     if !@core.has_file_extension(path) {
       let p = path + "." + ext
       let exists = try
-        @fs.exists(p) && @fs.kind(p) is @fs.FileKind::Regular
+        self.exists(p) && self.kind(p) is @fs.FileKind::Regular
       catch {
-        _ => false
+        @native.NativeError::Missing => false
+        e => raise e
       }
       if exists {
         file_candidate = Some((p, p, None))
@@ -991,10 +862,11 @@ pub async fn StaticEngine::handle(
       .unwrap_or("index.html")
     let fallback_path = normalize_root_join(self.config.root, fallback_target)
     let fallback_exists = try
-      @fs.exists(fallback_path) &&
-      @fs.kind(fallback_path) is @fs.FileKind::Regular
+      self.exists(fallback_path) &&
+      self.kind(fallback_path) is @fs.FileKind::Regular
     catch {
-      _ => false
+      @native.NativeError::Missing => false
+      e => raise e
     }
     if fallback_exists {
       return self.serve_file(request, fallback_path, fallback_target, None)
@@ -1020,10 +892,18 @@ async fn StaticEngine::serve_file(
   chosen : String,
   represented_path : String,
   content_encoding : String?,
-) -> HandleResult {
-  let lease = FileLease::acquire(chosen)
-  let file_size = @fs.file_size(chosen) catch { _ => 0L }
-  let (mtime_sec, _) = @fs.mtime(chosen) catch { _ => (0L, 0) }
+) -> PlanResult {
+  let file = self.open_file(chosen)
+  errdefer file.close()
+  if file.kind != 1 { raise ServerError::FileChanged("chosen representation became a directory") }
+  if content_encoding == Some("gzip") {
+    let magic=if file.size >= 2L { file.read(0L,2) } else { b"" }
+    if magic.length()!=2 || magic[0]!=b'\x1f' || magic[1]!=b'\x8b' {
+      raise ServerError::FileChanged("chosen gzip representation changed before opening")
+    }
+  }
+  let file_size = file.size
+  let mtime_sec = file.mtime
 
   let mime_type = @core.resolve_content_type(
     represented_path,
@@ -1057,10 +937,10 @@ async fn StaticEngine::serve_file(
   }
 
   let mut status = 200
-  let mut body : @core.ResponseBody = FileRegion(chosen, 0L, file_size)
+  let mut body : PlanBody = FileRegion(file, 0L, file_size)
 
   // Range evaluation (RFC 7233)
-  if header(request, "range") is Some(range_header) {
+  if header(request, "if-range") is None && header(request, "range") is Some(range_header) {
     let range_result = @core.parse_range_spec(range_header, file_size)
     match range_result {
       Satisfiable(r) => {
@@ -1072,7 +952,7 @@ async fn StaticEngine::serve_file(
           file_size,
         )
         headers["Content-Length"] = slice_len.to_string()
-        body = FileRegion(chosen, r.start, slice_len)
+        body = FileRegion(file, r.start, slice_len)
       }
       NotSatisfiable => {
         status = 416
@@ -1113,23 +993,23 @@ async fn StaticEngine::serve_file(
         None => ()
       }
       @core.apply_security_headers(fresh_headers, self.config, request.meth)
+      file.close()
       return Handled({
         status: 304,
         headers: fresh_headers,
-        body: @core.ResponseBody::Empty,
+        body: PlanBody::Empty,
       })
     }
   }
 
   // HEAD method suppresses body
   if request.meth is Head {
-    body = @core.ResponseBody::Empty
+    body = PlanBody::Empty
   }
 
   // D-17 In-Flight Mutation Check
-  if lease is Some(l) && l.is_mutated() {
-    return Error(ServerError::FileChanged(chosen))
-  }
+  file.check()
+  if !(body is FileRegion(_, _, _)) { file.close() }
 
   // Apply configured security headers
   @core.apply_security_headers(headers, self.config, request.meth)

@@ -1,342 +1,71 @@
-// Build and test script for Docker images (D-15, R-N12, T-022).
-//
-// Packages pre-compiled full and thin binaries into Google Distroless static
-// nonroot containers, and verifies container lifecycle, static file serving,
-// and port binding.
-//
-// Usage:
-//   moon run scripts/build_docker.mbtx
-//   moon run scripts/build_docker.mbtx -- --skip-test
-//   moon run scripts/build_docker.mbtx -- --build-static
-//
-
-import {
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @fs,
-  "moonbitlang/async/shell" @shell,
-  "moonbitlang/core/env" @env,
+// D-15 / T-030. Four actual containers consume the already audited musl CLIs.
+// No shell inside images and no separate benchmark/demo server.
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs", "moonbitlang/async@0.21.3/shell", "moonbitlang/core/env", "moonbitlang/core/json" }
+async fn command(args : Array[String]) -> String {
+  let result=@shell.Cmd("docker",args).output();result.check();result.stdout().trim().to_owned()
 }
-
-///|
-async fn find_container_engine() -> String {
-  match @env.get_env_var("CONTAINER_ENGINE") {
-    Some(e) => return e
-    None => ()
-  }
-  let d_res = try {
-    @shell.Cmd("which", ["docker"]).output()
-  } catch {
-    _ => return "podman"
-  }
-  if d_res.exit_code() == 0 {
-    return "docker"
-  }
-  let p_res = try {
-    @shell.Cmd("which", ["podman"]).output()
-  } catch {
-    _ => abort("container engine not found")
-  }
-  if p_res.exit_code() == 0 {
-    return "podman"
-  }
-  println("ERROR: neither docker nor podman found in PATH.")
-  abort("container engine not found")
+async fn request(url : String,args? : Array[String]=[]) -> String {
+  let result=@shell.Cmd("curl",["--fail","--silent","--show-error","--retry","30","--retry-connrefused","--retry-delay","1","--max-time","10",..args,url]).output()
+  result.check();result.stdout()
 }
-
-///|
-async fn file_exists(path : String) -> Bool {
-  @fs.exists(path) catch { _ => false }
-}
-
-///|
-async fn enable_static_linking(pkg_path : String) -> String {
-  let content = try {
-    @fs.read_file(pkg_path).text()
-  } catch {
-    _ => return ""
-  }
-  if !content.contains("\"cc-link-flags\": \"-static\"") {
-    let replaced = content.replace_all(
-      old="\"stub-cc-flags\": \"-fPIC\"",
-      new="\"stub-cc-flags\": \"-fPIC\", \"cc-link-flags\": \"-static\"",
-    )
-    try {
-      @fs.write_file(pkg_path, replaced)
-    } catch {
-      _ => ()
-    }
-  }
-  content
-}
-
-///|
-async fn restore_pkg_file(pkg_path : String, original : String) -> Unit {
-  if original != "" {
-    try {
-      @fs.write_file(pkg_path, original)
-    } catch {
-      _ => ()
-    }
-  }
-}
-
-///|
-async fn resolve_binary(name : String) -> String {
-  let candidates = [
-    "release-cli/\{name}-linux-amd64",
-    "release-cli/\{name}",
-    "release-cli/\{name}.exe",
-    "_build/native/release/build/cmd/\{name}/\{name}.exe",
-    "_build/native/release/build/cmd/\{name}/\{name}",
-    "_build/native/debug/build/cmd/\{name}/\{name}.exe",
-    "_build/native/debug/build/cmd/\{name}/\{name}",
-  ]
-  for cand in candidates {
-    if file_exists(cand) {
-      return cand
-    }
-  }
-  ""
-}
-
-///|
-async fn run_cmd_checked(engine : String, args : Array[String], desc : String) -> Unit {
-  let mut cmd_str = engine
-  for a in args {
-    cmd_str = cmd_str + " " + a
-  }
-  println("[EXEC] \{cmd_str}")
-  let res = @shell.Cmd(engine, args).output() catch {
-    err => {
-      println("ERROR: failed to execute \{desc}: \{err}")
-      abort("command failed")
-    }
-  }
-  if res.exit_code() != 0 {
-    println("ERROR: \{desc} exited with code \{res.exit_code()}")
-    let stdout = res.stdout()
-    let stderr = res.stderr()
-    if stdout != "" {
-      println("STDOUT:\n\{stdout}")
-    }
-    if stderr != "" {
-      println("STDERR:\n\{stderr}")
-    }
-    abort("command failed")
-  }
-}
-
-///|
-async fn test_container(
-  engine : String,
-  tag : String,
-  container_name : String,
-  host_port : String
-) -> Bool {
-  println("\n--- Testing container \{tag} on port \{host_port} ---")
-  
-  // Clean up any stale container with same name
-  try {
-    let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
-  } catch {
-    _ => ()
-  }
-
-  // 1. Run container in background with SELinux-compatible volume flag (:ro,z)
-  let pwd = match @env.get_env_var("PWD") {
-    Some(p) => p
-    None => "."
-  }
-  let abs_mount = pwd + "/testdata/public"
-  let run_args = [
-    "run", "-d",
-    "--name", container_name,
-    "-p", "\{host_port}:8080",
-    "-v", "\{abs_mount}:/data:ro,z",
-    tag,
-  ]
-  println("[TEST] Starting container \{container_name}...")
-  let run_res = try {
-    @shell.Cmd(engine, run_args).output()
-  } catch {
-    _ => return false
-  }
-  if run_res.exit_code() != 0 {
-    println("FAILED to start container:")
-    println(run_res.stderr())
-    return false
-  }
-
-  // 2. Wait briefly for server ready
-  try {
-    let _ = @shell.Cmd("sleep", ["1"]).output()
-  } catch {
-    _ => ()
-  }
-
-  // 3. Test HTTP GET with curl
-  let test_url = "http://127.0.0.1:\{host_port}/hello.txt"
-  println("[TEST] Fetching \{test_url}...")
-  let curl_res = try {
-    @shell.Cmd("curl", ["-sS", "-f", test_url]).output()
-  } catch {
-    _ => {
-      println("[FAIL] curl execution failed")
-      try {
-        let _ = @shell.Cmd(engine, ["stop", container_name]).output()
-        let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
-      } catch {
-        _ => ()
-      }
-      return false
-    }
-  }
-  
-  let success = if curl_res.exit_code() == 0 {
-    let out = curl_res.stdout()
-    if out.contains("hello moonbit") {
-      println("[PASS] Successfully received expected file content!")
-      true
-    } else {
-      println("[FAIL] Unexpected response: \{out}")
-      false
-    }
-  } else {
-    println("[FAIL] curl request failed with code \{curl_res.exit_code()}")
-    println(curl_res.stderr())
-    // Print container logs for debugging
-    try {
-      let logs = @shell.Cmd(engine, ["logs", container_name]).output()
-      println("[CONTAINER LOGS]:\n\{logs.stdout()}\{logs.stderr()}")
-    } catch {
-      _ => ()
-    }
-    false
-  }
-
-  // 4. Cleanup container
-  println("[TEST] Stopping and removing container \{container_name}...")
-  try {
-    let _ = @shell.Cmd(engine, ["stop", container_name]).output()
-    let _ = @shell.Cmd(engine, ["rm", "-f", container_name]).output()
-  } catch {
-    _ => ()
-  }
-  
-  success
-}
-
-///|
 async fn main {
-  let args = @env.args()
-  let mut run_tests = true
-  let mut build_static = false
-  for a in args {
-    if a == "--skip-test" {
-      run_tests = false
-    }
-    if a == "--build-static" {
-      build_static = true
-    }
-  }
-
-  println("=== Docker Image Packaging (D-15 Distroless static) ===")
-
-  // 0. Optional: trigger static native compilation if requested
-  if build_static {
-    println("\n>>> Injecting static link options for Linux build...")
-    let full_pkg = "cmd/http-server-mbt/moon.pkg"
-    let thin_pkg = "cmd/http-server-mbt-thin/moon.pkg"
-    let orig_full = enable_static_linking(full_pkg)
-    let orig_thin = enable_static_linking(thin_pkg)
-
-    println("Compiling static release binaries...")
-    let build_res = try {
-      @shell.Cmd("moon", ["build", "cmd/http-server-mbt", "cmd/http-server-mbt-thin", "--target", "native", "--release"]).output()
-    } catch {
-      err => {
-        restore_pkg_file(full_pkg, orig_full)
-        restore_pkg_file(thin_pkg, orig_thin)
-        abort("moon build failed: \{err}")
+  let os=@shell.Cmd("uname",["-s"]).output();os.check()
+  assert_eq(os.stdout().trim(),"Linux")
+  let out="target/candidate/containers"
+  if !@fs.exists(out) { @fs.mkdir(out,recursive=true) }
+  let context=@fs.tmpdir(prefix="hs-container-")
+  let fixtures=context+"/fixtures"
+  @fs.mkdir(fixtures)
+  @fs.write_file(fixtures+"/hello.txt","hello moonbit\n")
+  // Private local trust only: verify DNS through Docker's named service and TLS
+  // against this explicit root. Certificate validity does not depend on a fixture date.
+  @shell.Cmd("openssl",["req","-x509","-newkey","rsa:2048","-nodes","-days","2","-subj","/CN=origin.test","-addext","subjectAltName=DNS:origin.test","-keyout",fixtures+"/key.pem","-out",fixtures+"/cert.pem"]).run()
+  @shell.Cmd("chmod",["644",fixtures+"/key.pem"]).run()
+  let network="hs-candidate-"+@env.get_env_var("GITHUB_RUN_ID").unwrap_or("local")
+  ignore(command(["network","create",network]))
+  defer ignore(command(["network","rm",network]))
+  let records : Array[Json]=[]
+  for flavor in ["thin","full"] {
+    let name=if flavor=="thin" { "http-server-mbt-thin" } else { "http-server-mbt" }
+    let artifact="target/candidate/cli/"+name+"-linux-amd64"
+    let hash=@shell.Cmd("sha256sum",[artifact]).output();hash.check()
+    let expected=hash.stdout().split(" ").next().unwrap().to_owned()
+    @fs.write_file(context+"/"+name,@fs.read_file(artifact))
+    @fs.write_file(context+"/Dockerfile",@fs.read_file(if flavor=="thin" { "Dockerfile.thin" } else { "Dockerfile" }))
+    for base in ["distroless","scratch"] {
+      let tag="http-server-mbt-candidate:"+flavor+"-"+base
+      let args=["build","--build-arg","BINARY_PATH="+name,"-t",tag]
+      if base=="scratch" { args.push("--build-arg");args.push("BASE_IMAGE=scratch") }
+      args.push(context)
+      @shell.Cmd("docker",args).run()
+      let image=@json.parse(command(["image","inspect",tag]))
+      guard image is [{"Id":String(image_id),"Config":{"User":String("65532:65532"),..},..},..] else { fail("container must declare UID/GID 65532") }
+      let id=command(["run","-d","--read-only","--network",network,"-p","127.0.0.1::8080","--mount","type=bind,src="+fixtures+",dst=/data,readonly",tag,"/data","-p","8080"])
+      defer ignore(command(["rm","-f",id]))
+      let port=command(["port",id,"8080/tcp"]).split(":").to_array().last().unwrap().to_owned()
+      let url="http://127.0.0.1:"+port+"/hello.txt"
+      assert_eq(request(url),"hello moonbit\n")
+      assert_true(request(url,args=["--head"]).contains("200 OK"))
+      assert_eq(request(url,args=["-H","Range: bytes=6-12"]),"moonbit")
+      let config=@json.parse(command(["inspect",id]))
+      guard config is [{"HostConfig":{"ReadonlyRootfs":True,..},"Mounts":[{"RW":False,..},..],..},..] else { fail("readonly root/mount contract missing") }
+      ignore(command(["cp",id+":/usr/local/bin/"+name,context+"/from-image"]))
+      let actual=@shell.Cmd("sha256sum",[context+"/from-image"]).output();actual.check()
+      assert_eq(actual.stdout().split(" ").next().unwrap(),expected)
+      ignore(command(["stop","--time","8",id]))
+      let stopped=@json.parse(command(["inspect",id]))
+      guard stopped is [{"State":{"ExitCode":Number(exit,..),"OOMKilled":False,..},..},..] && (exit==0 || exit==143) else { fail("PID 1 failed graceful SIGTERM drain (SIGKILL/137 forbidden)") }
+      if flavor=="full" {
+        let origin=command(["run","-d","--read-only","--network",network,"--network-alias","origin.test","--mount","type=bind,src="+fixtures+",dst=/data,readonly",tag,"/data","-p","8080","--cert","/data/cert.pem","--key","/data/key.pem"])
+        defer ignore(command(["rm","-f",origin]))
+        let proxy=command(["run","-d","--read-only","--network",network,"-p","127.0.0.1::8080","--mount","type=bind,src="+fixtures+",dst=/data,readonly",tag,"/data","-p","8080","--proxy","https://origin.test:8080","--proxy-all","--ca-file","/data/cert.pem"])
+        defer ignore(command(["rm","-f",proxy]))
+        let proxy_port=command(["port",proxy,"8080/tcp"]).split(":").to_array().last().unwrap().to_owned()
+        assert_eq(request("http://127.0.0.1:"+proxy_port+"/hello.txt"),"hello moonbit\n")
+        ignore(command(["stop","--time","8",proxy,origin]))
       }
-    }
-    restore_pkg_file(full_pkg, orig_full)
-    restore_pkg_file(thin_pkg, orig_thin)
-
-    if build_res.exit_code() != 0 {
-      let stderr = build_res.stderr()
-      println("ERROR: static build failed with exit code \{build_res.exit_code()}")
-      if stderr != "" {
-        println(stderr)
-      }
-      if stderr.contains("找不到 -lc") || stderr.contains("cannot find -lc") || stderr.contains("have you installed the static version") {
-        println("\n=======================================================")
-        println("【诊断提示】：系统缺少静态 C 运行时库 (libc.a / libm.a)。")
-        println("由于 gcr.io/distroless/static 是无 glibc 的纯静态镜像，程序必须完全静态链接。")
-        println("请在当前系统安装静态 C 运行时库后重新运行：")
-        println("  • Fedora / RHEL / CentOS: sudo dnf install -y glibc-static")
-        println("  • Ubuntu / Debian:       sudo apt-get install -y build-essential libc6-dev")
-        println("  • Alpine Linux:          apk add gcc musl-dev")
-        println("=======================================================\n")
-      }
-      return
-    }
-    println("Static compilation succeeded!")
-  }
-
-  let engine = find_container_engine()
-  println("Container Engine: \{engine}")
-
-  // 1. Locate binaries
-  let full_bin = resolve_binary("http-server-mbt")
-  let thin_bin = resolve_binary("http-server-mbt-thin")
-
-  if full_bin == "" {
-    println("ERROR: full binary (http-server-mbt) not found!")
-    println("Please run: moon build cmd/http-server-mbt --target native --release")
-    abort("full binary missing")
-  }
-  if thin_bin == "" {
-    println("ERROR: thin binary (http-server-mbt-thin) not found!")
-    println("Please run: moon build cmd/http-server-mbt-thin --target native --release")
-    abort("thin binary missing")
-  }
-
-  println("Full Binary: \{full_bin}")
-  println("Thin Binary: \{thin_bin}")
-
-  // 2. Build full image
-  println("\n>>> Building full image: http-server-mbt:full ...")
-  run_cmd_checked(
-    engine,
-    ["build", "-t", "http-server-mbt:full", "--build-arg", "BINARY_PATH=\{full_bin}", "-f", "Dockerfile", "."],
-    "Build full image",
-  )
-
-  // 3. Build thin image
-  println("\n>>> Building thin image: http-server-mbt:thin ...")
-  run_cmd_checked(
-    engine,
-    ["build", "-t", "http-server-mbt:thin", "--build-arg", "BINARY_PATH=\{thin_bin}", "-f", "Dockerfile.thin", "."],
-    "Build thin image",
-  )
-
-  println("\n>>> Docker Images Built Successfully!")
-
-  // 4. Run tests if requested
-  if run_tests {
-    println("\n=== Testing Built Images ===")
-    let thin_ok = test_container(engine, "http-server-mbt:thin", "test-hs-thin", "18081")
-    let full_ok = test_container(engine, "http-server-mbt:full", "test-hs-full", "18082")
-
-    println("\n=== Test Results Summary ===")
-    let thin_msg = if thin_ok { "PASSED" } else { "FAILED (requires static linked binary for distroless/static)" }
-    let full_msg = if full_ok { "PASSED" } else { "FAILED (requires static linked binary for distroless/static)" }
-    println("Thin Image (http-server-mbt:thin): \{thin_msg}")
-    println("Full Image (http-server-mbt:full): \{full_msg}")
-    if !thin_ok || !full_ok {
-      println("\nNOTE: In Distroless static base, Linux binaries must be statically linked (without glibc dynamic linker).")
-      println("In CI (Ubuntu), compile with cc-link-flags: \"-static\" to produce full static ELF.")
+      records.push({"flavor":flavor,"base":base,"image":image_id,"cli_sha256":expected,"get_head_range":true,"uid_gid":"65532:65532","readonly":true,"pid1_sigterm":true,"dns_explicit_ca_tls":flavor=="full"})
     }
   }
+  @fs.write_file(out+"/matrix.json",records.to_json().stringify(indent=2))
 }

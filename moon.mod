@@ -13,3 +13,5 @@ repository = "https://github.com/unmbt/http-server-mbt"
 license = "MIT"
 
 preferred_target = "native"
+
+options("--moonbit-unstable-prebuild": "build.mbtx")

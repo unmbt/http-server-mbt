@@ -11,9 +11,9 @@
 // temporary directory. The committed tls/mbedtls-4.2.0 tree is the product of
 // this script; do not edit vendored files by hand.
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @fs,
-  "moonbitlang/async/shell" @shell,
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs" @fs,
+  "moonbitlang/async@0.21.3/shell" @shell,
   "moonbitlang/core/env" @env,
 }
 
@@ -74,8 +74,7 @@ const OVERRIDES_BEGIN : String = "http-server-mbt managed overrides (begin)"
 const OVERRIDES_END : String = "http-server-mbt managed overrides (end)"
 
 ///|
-const INCLUDE_FLAGS : String =
-  "-I tls/mbedtls-4.2.0/include -I tls/mbedtls-4.2.0/tf-psa-crypto/include -I tls/mbedtls-4.2.0/library -I tls/mbedtls-4.2.0/tf-psa-crypto/core -I tls/mbedtls-4.2.0/tf-psa-crypto/dispatch -I tls/mbedtls-4.2.0/tf-psa-crypto/platform -I tls/mbedtls-4.2.0/tf-psa-crypto/utilities -I tls/mbedtls-4.2.0/tf-psa-crypto/extras -I tls/mbedtls-4.2.0/tf-psa-crypto/drivers/builtin/include -I tls/mbedtls-4.2.0/tf-psa-crypto/drivers/builtin/src"
+const INCLUDE_FLAGS : String = "${build.HS_TLS_FLAGS}"
 
 ///|
 /// Subtrees copied from the tarball: (source relative to tarball root,
@@ -392,11 +391,10 @@ fn find_line_end_after(content : String, index : Int) -> Int {
 
 ///|
 /// Regenerate tls/moon.pkg: the native-stub list is the sorted set of vendored
-/// *.c files plus tls_bridge.c; stub-cc-flags carries the include paths (the
-/// compiler runs with the module root as its working directory).
+/// *.c files plus tls_bridge.c. build.mbtx computes package-owned absolute
+/// include paths in the consuming workspace, independently of compiler cwd.
 async fn regenerate_moon_pkg() -> Unit {
-  // native-stub paths resolve relative to the package directory (tls/),
-  // while stub-cc-flags resolve against the module root (compiler cwd).
+  // native-stub paths resolve relative to the package directory (tls/).
   let sources : Array[String] = []
   @fs.walk(
     "tls/mbedtls-4.2.0",
@@ -432,12 +430,13 @@ async fn regenerate_moon_pkg() -> Unit {
   }
   let buf = StringBuilder(size_hint=8192)
   buf.write_string("import {\n")
+  buf.write_string("  \"moonbitlang/async\",\n")
   buf.write_string("  \"moonbitlang/async/io\",\n")
   buf.write_string("  \"moonbitlang/core/cmp\",\n")
   buf.write_string("  \"moonbitlang/core/encoding/utf8\",\n")
   buf.write_string("}\n")
   buf.write_string(
-    "import {\n  \"moonbitlang/async\",\n  \"moonbitlang/async/fs\",\n  \"moonbitlang/async/io\",\n  \"moonbitlang/async/socket\",\n  \"moonbitlang/core/encoding/utf8\",\n} for \"test\"\n")
+    "import {\n  \"moonbitlang/async\",\n  \"moonbitlang/async/fs\",\n  \"moonbitlang/async/io\",\n  \"moonbitlang/async/socket\",\n} for \"test\"\n")
   buf.write_string(
     "// TLS package backed by vendored Mbed TLS \{MBEDTLS_VERSION} + TF-PSA-Crypto 1.2.0.\n",
   )
@@ -451,7 +450,7 @@ async fn regenerate_moon_pkg() -> Unit {
   buf.write_string("    \"tls_bridge.c\",\n")
   buf.write_string("  ],\n")
   buf.write_string(
-    "  \"link\": { \"native\": { \"cc-flags\": \"-fPIC\", \"stub-cc-flags\": \"-fPIC \{INCLUDE_FLAGS}\" } },\n",
+    "  \"link\": { \"native\": { \"cc-flags\": \"${build.HS_C_FLAGS}\", \"stub-cc-flags\": \"\{INCLUDE_FLAGS}\" } },\n",
   )
   buf.write_string("  targets: { \"*.mbt\": [ \"native\" ] },\n")
   buf.write_string(")\n")

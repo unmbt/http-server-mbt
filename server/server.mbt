@@ -9,6 +9,7 @@ pub struct Server {
   proxy_rules : Array[@core.ProxyRule]
   mut stopped : Bool
   mut task : @async.Task[Unit]?
+  mut accept_task : @async.Task[Unit]?
   active_requests : Ref[Int]
 }
 
@@ -125,7 +126,8 @@ pub async fn with_server_at_with_connector(
     None => PlainUpstreamConnector::new()
   }
   defer effective_connector.close()
-  let engine = @root.StaticEngine::new(config)
+  let engine = @root.StaticEngine::open(config)
+  defer engine.close()
   // SO_REUSEADDR on Linux/macOS so an immediate re-bind after stop succeeds
   // through TIME_WAIT (Windows ignores this flag; libuv in the original
   // http-server enables it by default). See D-05 platform parity.
@@ -140,14 +142,31 @@ pub async fn with_server_at_with_connector(
     proxy_rules,
     stopped: false,
     task: None,
+    accept_task: None,
     active_requests: { val: 0, },
   }
   defer listener.close()
   @async.with_task_group() <| group => {
     let server_task = group.spawn(allow_failure=true, () => {
-      listener.run_forever((tcp_conn, _addr) => {
-        handle_connection(server, tcp_conn)
-      })
+      @async.with_task_group() <| clients => {
+        let accepting=clients.spawn(allow_failure=true,() => {
+          defer listener.close()
+        while !server.stopped {
+          // Pause while the shared owner is full. Concurrent listeners may
+          // already have an accept pending: recheck atomically before
+          // allocating any protocol/TLS state and close excess sockets.
+          if !@native.connection_available() { @async.sleep(10); continue }
+          let (tcp,_)=listener.accept()
+          if !@native.try_acquire_connection() { tcp.close(); continue }
+          clients.spawn_bg(allow_failure=true,() => {
+            defer @native.release_connection()
+            defer tcp.close()
+            handle_connection(server, tcp)
+          })
+        }
+        })
+        server.accept_task=Some(accepting)
+      }
     })
     server.task = Some(server_task)
     defer {
@@ -167,7 +186,10 @@ pub async fn with_server_at_with_connector(
 ///|
 /// Stop accepting new connections.
 pub fn Server::stop(self : Server) -> Unit {
-  self.stopped = true
+  if !self.stopped {
+    self.stopped = true
+    if self.accept_task is Some(task) { task.cancel() }
+  }
 }
 
 ///|
@@ -185,9 +207,10 @@ pub async fn Server::stop_and_drain(
       waited += step
     }
   })
-  if self.task is Some(t) {
-    t.cancel()
-  }
+  @async.protect_from_cancel(() => {
+    if self.task is Some(t) { t.cancel(); ignore(t.wait() catch { _ => () }) }
+    self.engine.close()
+  })
 }
 
 ///|
@@ -217,6 +240,7 @@ pub struct Transport {
   raw_fd : @types.Fd?
   raw_tcp : @socket.Tcp?
   close_fn : () -> Unit
+  shutdown_write_fn : (async () -> Bool)?
 }
 
 ///|
@@ -228,6 +252,7 @@ pub fn Transport::plain(tcp : @socket.Tcp) -> Transport {
     raw_fd: Some(tcp.fd()),
     raw_tcp: Some(tcp),
     close_fn: fn() { tcp.close() },
+    shutdown_write_fn:Some(fn() { @native.shutdown_write(tcp.fd()) }),
   }
 }
 
@@ -240,8 +265,14 @@ pub fn Transport::custom(
   close_fn~ : () -> Unit,
   raw_fd? : @types.Fd,
   raw_tcp? : @socket.Tcp,
+  shutdown_write_fn? : async () -> Bool,
 ) -> Transport {
-  { reader, writer, raw_fd, raw_tcp, close_fn, }
+  { reader, writer, raw_fd, raw_tcp, close_fn, shutdown_write_fn }
+}
+///|
+/// End this direction while permitting the peer to finish its response.
+pub async fn Transport::shutdown_write(self : Transport) -> Bool {
+  match self.shutdown_write_fn { Some(shutdown) => shutdown(); None => false }
 }
 
 ///|
@@ -294,9 +325,10 @@ pub fn PlainUpstreamConnector::new() -> PlainUpstreamConnector {
 
 ///|
 pub impl UpstreamConnector for PlainUpstreamConnector with fn connect(
-  self,
+  _self,
   target,
 ) {
+  if target.scheme() != "http" { raise @core.ConfigError::InvalidTls("HTTPS upstream requires the Full connector") }
   let tcp = @socket.Tcp::connect_to_host(target.host(), port=target.port())
   Transport::plain(tcp)
 }
@@ -331,32 +363,6 @@ pub fn PlainAcceptor::plain() -> &Acceptor {
 }
 
 ///|
-/// Map a parsed HTTP request method onto the engine method model.
-fn map_request_method(meth : @http.RequestMethod) -> @core.Method {
-  match meth {
-    @http.RequestMethod::Get => @core.Method::Get
-    @http.RequestMethod::Head => @core.Method::Head
-    @http.RequestMethod::Options => @core.Method::Other("OPTIONS")
-    @http.RequestMethod::Post => @core.Method::Other("POST")
-    @http.RequestMethod::Put => @core.Method::Other("PUT")
-    @http.RequestMethod::Delete => @core.Method::Other("DELETE")
-    @http.RequestMethod::Connect => @core.Method::Other("CONNECT")
-    @http.RequestMethod::Trace => @core.Method::Other("TRACE")
-    @http.RequestMethod::Patch => @core.Method::Other("PATCH")
-  }
-}
-
-///|
-/// Lower-case the request headers into the engine's header model.
-fn lower_headers(request_headers : @http.Headers) -> Map[String, String] {
-  let headers : Map[String, String] = Map([])
-  for key, value in request_headers {
-    headers[key.to_string().to_lower()] = value
-  }
-  headers
-}
-
-///|
 /// Decide whether the connection should accept another request.
 fn should_keep_alive(server : Server, headers : Map[String, String]) -> Bool {
   let conn_val = match headers.get("connection") {
@@ -372,33 +378,56 @@ fn should_keep_alive(server : Server, headers : Map[String, String]) -> Bool {
 async fn dispatch_engine_request(
   server : Server,
   transport : Transport,
+  body : @framing.Connection,
   meth : @core.Method,
   headers : Map[String, String],
   target : String,
+  http11 : Bool,
 ) -> Bool {
+  let request : @core.Request={meth,target,headers}
+  match @core.evaluate_security_policies(server.config,request) {
+    Proceed => ()
+    _ => {
+      match server.engine.handle(request) {
+        @root.HandleResult::Handled(response) => ignore(send_response(transport,response,http11))
+        _ => ignore(send_fallback_status(transport,403,"Forbidden"))
+      }
+      return false
+    }
+  }
+  // Proxy routes bypass the local mount prefix, never URL traversal checks.
+  match @core.resolve_path(server.config.root,"/",target) {
+    Err(@core.PathError::MalformedUri(_)) => {
+      ignore(send_fallback_status(transport,400,"Bad Request"));return false
+    }
+    Err(_) => {
+      ignore(send_fallback_status(transport,403,"Forbidden"));return false
+    }
+    Ok(_) => ()
+  }
   // 1. Direct proxy-all (bypasses local static files)
   if server.config.proxy_all is Some(upstream) {
     return proxy_http_request(
-      server, transport, meth, headers, target, upstream,
+      server, transport, body, meth, headers, target, upstream,
     )
   }
 
   // 2. Route-based proxy rules (proxy-config)
   if server.match_proxy_rule(target) is Some((rule_target, rewritten_path)) {
     return proxy_http_request(
-      server, transport, meth, headers, rewritten_path, rule_target,
+      server, transport, body, meth, headers, rewritten_path, rule_target,
     )
   }
 
   // 3. Local static file engine
   let result = server.engine.handle({ meth, target, headers, })
   let ok = match result {
-    @root.HandleResult::Handled(response) => send_response(transport, response)
+    @root.HandleResult::Handled(response) => send_response(transport, response, http11)
     @root.HandleResult::Next => {
       // 4. Fallback proxy for unhandled requests
       if server.config.proxy is Some(upstream) {
         return proxy_http_request(
-          server, transport, meth, headers, target, upstream,
+          server, transport, body, meth, headers, target, upstream,
         )
       }
       let _ = if meth is Other(_) {
@@ -407,6 +436,12 @@ async fn dispatch_engine_request(
         send_fallback_status(transport, 404, "Not Found")
       }
       return false
+    }
+    @root.HandleResult::Error(@root.ServerError::Forbidden(_)) => {
+      ignore(send_fallback_status(transport,403,"Forbidden")); return false
+    }
+    @root.HandleResult::Error(@root.ServerError::Overloaded) => {
+      ignore(send_fallback_status(transport,503,"Service Unavailable")); return false
     }
     @root.HandleResult::Error(_) => {
       let _ = send_fallback_status(transport, 500, "Internal Server Error")
@@ -417,189 +452,10 @@ async fn dispatch_engine_request(
 }
 
 ///|
-/// Plain-path request handling (unchanged behavior over
-/// `@http.ServerConnection`, including the WebSocket upgrade branch).
-async fn handle_single_request(
-  server : Server,
-  transport : Transport,
-  http_conn : @http.ServerConnection,
-) -> Bool {
-  let req_opt = if server.config.idle_timeout_ms > 0 {
-    @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
-      http_conn.read_request()
-    }) catch {
-      _ => None
-    }
-  } else {
-    Some(http_conn.read_request()) catch {
-      _ => None
-    }
-  }
-  let request = match req_opt {
-    Some(r) => r
-    None => return false
-  }
-  server.active_requests.val += 1
-  defer {
-    server.active_requests.val = server.active_requests.val - 1
-  }
-  let mut is_ws_upgrade = false
-  for k, v in request.headers {
-    if k.to_string().to_lower() == "upgrade" && v.to_lower() == "websocket" {
-      is_ws_upgrade = true
-      break
-    }
-  }
-  if server.has_upgrade_capability() && is_ws_upgrade {
-    let proxy_target = match server.config.proxy {
-      Some(p) => p
-      None => ""
-    }
-    let ws_upstream_url = if proxy_target.has_prefix("https://") {
-      "wss://" + proxy_target[8:].to_owned() + request.path
-    } else if proxy_target.has_prefix("http://") {
-      "ws://" + proxy_target[7:].to_owned() + request.path
-    } else {
-      "ws://" + proxy_target + request.path
-    }
-    let upstream_opt = Some(@websocket.connect(ws_upstream_url)) catch {
-      _ => None
-    }
-    match upstream_opt {
-      None => {
-        let _ = http_conn
-          ..send_response(502, "Bad Gateway")
-          ..write("Upstream WebSocket unreachable")
-          .end_response() catch {
-            _ => ()
-          }
-        return false
-      }
-      Some(upstream_ws) => {
-        let client_ws_res = Ok(@websocket.from_http_server(request, http_conn)) catch {
-          err => Err(err)
-        }
-        match client_ws_res {
-          Err(_) => {
-            upstream_ws.close()
-            return false
-          }
-          Ok(client_ws) => {
-            let _ = try
-              @async.with_task_group() <| group => {
-                let t1_ref : Ref[@async.Task[Unit]?] = Ref(None)
-                let t2_ref : Ref[@async.Task[Unit]?] = Ref(None)
-                let t1 = group.spawn(allow_failure=true, () => {
-                  defer (if t2_ref.val is Some(t) { t.cancel() })
-                  for ;; {
-                    let msg = client_ws.recv() catch { _ => break }
-                    match msg.kind {
-                      Text => {
-                        let data = msg.read_all() catch { _ => break }
-                        let txt = data.text() catch { _ => break }
-                        upstream_ws.send_text(txt) catch {
-                          _ => break
-                        }
-                      }
-                      Binary => {
-                        let data = msg.read_all() catch { _ => break }
-                        let bin = data.binary()
-                        upstream_ws.send_binary(bin) catch {
-                          _ => break
-                        }
-                      }
-                    }
-                  }
-                  upstream_ws.send_close() catch {
-                    _ => ()
-                  }
-                })
-                t1_ref.val = Some(t1)
-                let t2 = group.spawn(allow_failure=true, () => {
-                  defer (if t1_ref.val is Some(t) { t.cancel() })
-                  for ;; {
-                    let msg = upstream_ws.recv() catch { _ => break }
-                    match msg.kind {
-                      Text => {
-                        let data = msg.read_all() catch { _ => break }
-                        let txt = data.text() catch { _ => break }
-                        client_ws.send_text(txt) catch {
-                          _ => break
-                        }
-                      }
-                      Binary => {
-                        let data = msg.read_all() catch { _ => break }
-                        let bin = data.binary()
-                        client_ws.send_binary(bin) catch {
-                          _ => break
-                        }
-                      }
-                    }
-                  }
-                  client_ws.send_close() catch {
-                    _ => ()
-                  }
-                })
-                t2_ref.val = Some(t2)
-              }
-            catch {
-              _ => ()
-            }
-            client_ws.close()
-            upstream_ws.close()
-            return false
-          }
-        }
-      }
-    }
-  }
-  dispatch_engine_request(
-    server,
-    transport,
-    map_request_method(request.meth),
-    lower_headers(request.headers),
-    request.path,
-  )
-}
-
-///|
-/// Stream request handling: the parser operates on the decrypted or stream transport.
-/// The WebSocket upgrade branch is not available here (T-014 scope).
-async fn handle_stream_single_request(
-  server : Server,
-  transport : Transport,
-  reader : HttpReader,
-) -> Bool {
-  let req_opt = if server.config.idle_timeout_ms > 0 {
-    @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
-      reader.read_request()
-    }) catch {
-      _ => None
-    }
-  } else {
-    Some(reader.read_request()) catch {
-      _ => None
-    }
-  }
-  let request = match req_opt {
-    Some(r) => r
-    None => return false
-  }
-  server.active_requests.val += 1
-  defer {
-    server.active_requests.val = server.active_requests.val - 1
-  }
-  dispatch_engine_request(
-    server,
-    transport,
-    map_request_method(request.meth),
-    lower_headers(request.headers),
-    request.path,
-  )
-}
-
-///|
 async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
+  let charge=32768+(if server.acceptor.is_tls() { 131072 } else { 0 })
+  if !@native.try_acquire_body(charge) { tcp_conn.close(); return }
+  defer @native.release_body(charge)
   let transport = server.acceptor.accept(tcp_conn) catch {
     _ => {
       tcp_conn.close()
@@ -611,40 +467,30 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
 }
 
 ///|
-/// Uniformly handle an accepted client transport connection.
 async fn handle_client(server : Server, transport : Transport) -> Unit {
-  match transport.raw_tcp {
-    Some(tcp) => {
-      let http_conn = @http.ServerConnection::new(tcp)
-      for ;; {
-        if server.stopped {
-          break
-        }
-        let keep_going = handle_single_request(server, transport, http_conn) catch {
-          _ => false
-        }
-        if !keep_going {
-          break
-        }
+  let reader=@framing.Connection::new(transport.reader)
+  while !server.stopped {
+    let head=if server.config.idle_timeout_ms>0 {
+      @async.with_timeout_opt(server.config.idle_timeout_ms, () => reader.read_request())
+    } else { Some(reader.read_request()) }
+    guard head is Some(head) else { break }
+    let req=head.request
+    server.active_requests.val += 1
+    let keep={
+      defer { server.active_requests.val -= 1 }
+      if server.has_upgrade_capability() && @framing.has_token(req.headers.get("upgrade").unwrap_or(""),"websocket") {
+        if head.http11 { proxy_websocket(server,transport,reader,req) }
+        else { ignore(send_fallback_status(transport,400,"Bad Request")) }
+        false
+      } else {
+        let keep=dispatch_engine_request(server,transport,reader,req.meth,req.headers,req.target,head.http11)
+        if keep && head.keep_alive { reader.drain() }
+        keep
       }
     }
-    None => {
-      let reader = HttpReader::new(transport.reader)
-      for ;; {
-        if server.stopped {
-          break
-        }
-        let keep_going = handle_stream_single_request(server, transport, reader) catch {
-          _ => false
-        }
-        if !keep_going {
-          break
-        }
-      }
-    }
+    if !keep || !head.keep_alive { break }
   }
 }
-
 ///|
 fn status_reason(status : Int) -> String {
   match status {
@@ -668,7 +514,14 @@ fn status_reason(status : Int) -> String {
 async fn send_response(
   transport : Transport,
   response : @root.Response,
+  http11 : Bool,
 ) -> Bool {
+  defer response.close()
+  response.check()
+  let streaming=response.content_length() is None
+  let chunked=streaming && http11
+  if streaming && !http11 { response.headers["Connection"]="close" }
+  if chunked { response.headers["Transfer-Encoding"]="chunked" }
   let header_buf = StringBuilder(size_hint=256)
   header_buf.write_string(
     "HTTP/1.1 \{response.status} \{status_reason(response.status)}\r\n",
@@ -681,93 +534,14 @@ async fn send_response(
   if !ok {
     return false
   }
-  match response.body {
-    Empty => true
-    Bytes(b) => send_bytes_bounded(transport, b)
-    FileRegion(path, offset, length) =>
-      send_file_region(transport, response, path, offset, length)
-  }
-}
-
-///|
-async fn send_bytes_bounded(transport : Transport, bytes : Bytes) -> Bool {
-  let chunk_size = 65536
-  let total = bytes.length()
-  let mut pos = 0
-  while pos < total {
-    let cur_len = if total - pos < chunk_size {
-      total - pos
-    } else {
-      chunk_size
+  try {
+    match transport.raw_tcp {
+      _ if chunked => response.write_to(transport.writer, chunked=true)
+      Some(tcp) => response.send_to(tcp)
+      None => response.write_to(transport.writer)
     }
-    let chunk = bytes[pos:pos + cur_len].to_owned()
-    let ok = transport.send(chunk)
-    if !ok {
-      return false
-    }
-    pos += cur_len
-  }
-  true
-}
-
-///|
-async fn send_file_region(
-  transport : Transport,
-  response : @root.Response,
-  path : String,
-  offset : Int64,
-  length : Int64,
-) -> Bool {
-  if length <= 0L {
-    return true
-  }
-  // Zero-copy TransmitFile runs when a raw socket FD is available.
-  // TLS and virtual transports have raw_fd == None, returning -1 to take bounded buffer.
-  let ret = match transport.raw_fd {
-    Some(fd) => transmit_file(fd, path, offset, length)
-    None => -1
-  }
-  if ret == 0 {
-    return true
-  }
-  if ret == -2 {
-    // Client disconnected
-    return false
-  }
-  if ret == -3 {
-    // D-17: File modified or truncated during transfer (FILE_CHANGED)
-    return false
-  }
-  // Fallback: bounded 64KB chunk streaming
-  send_file_region_bounded_buffer(transport, response, length)
-}
-
-///|
-async fn send_file_region_bounded_buffer(
-  transport : Transport,
-  response : @root.Response,
-  length : Int64,
-) -> Bool {
-  let chunk_size = 65536
-  let mut pos = 0
-  let total = length.to_int()
-  while pos < total {
-    let cur_len = if total - pos < chunk_size {
-      total - pos
-    } else {
-      chunk_size
-    }
-    let bytes = response.read(offset=pos, max_len=cur_len)
-    if bytes.length() == 0 {
-      return false
-    }
-    let ok = transport.send(bytes)
-    if !ok {
-      return false
-    }
-    pos += bytes.length()
-  }
-  true
+    !(streaming && !http11)
+  } catch { _ => false }
 }
 
 ///|
@@ -785,3 +559,10 @@ async fn send_fallback_status(
   buf.write_string(body)
   transport.send(buf.to_string())
 }
+
+
+///|
+pub extend PlainUpstreamConnector with UpstreamConnector::{close, connect}
+
+///|
+pub extend PlainAcceptor with Acceptor::{accept, close, is_tls}

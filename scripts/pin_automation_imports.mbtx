@@ -1,0 +1,16 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  for path in ["build.mbtx",..@fs.readdir("scripts").filter(f => f.has_suffix(".mbtx")).map(f => "scripts/"+f)] {
+    let source=@fs.read_file(path).text()
+    let parts=source.split("\"").to_array()
+    let output=StringBuilder()
+    for i in 0..<parts.length() {
+      let text=parts[i].to_owned()
+      if i%2==1 && text.has_prefix("moonbitlang/async") && !text.contains("@") {
+        output.write_string(text.replace_all(old="moonbitlang/async",new="moonbitlang/async@0.21.3"))
+      } else { output.write_string(text) }
+      if i<parts.length()-1 { output.write_string("\"") }
+    }
+    if source!=output.to_string() { @fs.write_file(path,output.to_string()) }
+  }
+}

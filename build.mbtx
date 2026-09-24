@@ -1,0 +1,16 @@
+// D-08/D-14: Native configuration is computed in the consuming module's
+// environment. No build output or absolute path is written into source.
+import { "moonbitlang/core/env" }
+
+fn main {
+  let windows=@env.get_env_var("OS")==Some("Windows_NT")
+  let cc=@env.get_env_var("MOON_CC").unwrap_or("")
+  let msvc=windows && (cc=="" || cc.has_suffix("cl") || cc.has_suffix("cl.exe"))
+  let flags=if msvc { "/utf-8" } else { "-fPIC" }
+  let root=@env.current_dir().unwrap().replace_all(old="\\",new="/")
+  let dirs=["include","tf-psa-crypto/include","library","tf-psa-crypto/core","tf-psa-crypto/dispatch","tf-psa-crypto/platform","tf-psa-crypto/utilities","tf-psa-crypto/extras","tf-psa-crypto/drivers/builtin/include","tf-psa-crypto/drivers/builtin/src"]
+  let includes=dirs.map(dir => "-I \""+root+"/tls/mbedtls-4.2.0/"+dir+"\"").join(" ")
+  let cli_link=if @env.get_env_var("HTTP_SERVER_STATIC_MUSL")==Some("1") { "-static" } else { "" }
+  let output : Json={"vars":{"HS_C_FLAGS":flags,"HS_TLS_FLAGS":flags+" "+includes,"HS_CLI_LINK":cli_link}}
+  println(output.stringify())
+}

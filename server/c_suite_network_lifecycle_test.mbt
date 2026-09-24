@@ -316,9 +316,10 @@ test "C037 & C040: Proxy configuration and protocol scheme preflight checks" {
   }
   assert_true(err_no_proxy)
 
-  // C040: Illegal proxy protocol schemes (ws://, ftp://, file://, missing scheme) fail validation
+  // C040 / D-08 revision 2026-09-24: ws/wss are accepted upgrade targets;
+  // malformed or non-HTTP/WebSocket schemes remain rejected.
   let schemes = [
-    "ftp://127.0.0.1:21", "ws://127.0.0.1:8080", "file:///etc/passwd", "127.0.0.1:3000",
+    "ftp://127.0.0.1:21", "ws:/127.0.0.1:8080", "file:///etc/passwd", "127.0.0.1:3000",
   ]
   for s in schemes {
     let bad_cfg : @core.Config = { ..base_cfg, proxy: Some(s), }
@@ -329,6 +330,9 @@ test "C037 & C040: Proxy configuration and protocol scheme preflight checks" {
       _ => true
     }
     assert_true(failed)
+  }
+  for target in ["ws://127.0.0.1:8080","wss://localhost:8443"] {
+    @core.validate_config({..base_cfg,proxy:Some(target),websocket:true})
   }
 
   // Valid proxy with http and https schemes

@@ -48,7 +48,7 @@ async fn proxy_targets_include_https(config : @core.Config) -> Bool {
       } else {
         value
       }
-      content.contains("https://")
+      content.contains("https://") || content.contains("wss://")
     }
   }
 }

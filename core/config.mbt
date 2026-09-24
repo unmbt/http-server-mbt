@@ -13,6 +13,7 @@ pub(all) suberror ConfigError {
   InvalidHeader(String)
   InvalidTimeout(String)
   InvalidTls(String)
+  InvalidLimits(String)
 } derive(Eq, Debug)
 
 ///|
@@ -29,6 +30,7 @@ pub fn ConfigError::to_string(self : ConfigError) -> String {
     InvalidHeader(s) => "InvalidHeader: " + s
     InvalidTimeout(s) => "InvalidTimeout: " + s
     InvalidTls(s) => "InvalidTls: " + s
+    InvalidLimits(s) => "InvalidLimits: " + s
   }
 }
 
@@ -42,6 +44,7 @@ pub impl Show for ConfigError with fn output(self, logger) {
 /// Contains all configuration settings for protocol, static resolution,
 /// routing mounts, SPA fallback, security policies, and upstream proxies.
 pub(all) struct Config {
+  limits : RuntimeLimits
   // --- Filesystem & Network ---
   root : String // Filesystem root directory (default "." or "public")
   port : Int // TCP listen port (0..65535, 0 = ephemeral)
@@ -113,6 +116,7 @@ pub(all) struct Config {
 pub fn Config::default(root : String) -> Config {
   {
     root,
+    limits: RuntimeLimits::default(),
     port: 8080,
     address: "0.0.0.0",
     base_url: "/",
@@ -211,14 +215,14 @@ pub fn Config::has_tls(self : Config) -> Bool {
 /// Inline/file proxy rules are conservatively treated as HTTPS when their
 /// configuration contains an `https://` target.
 pub fn Config::proxy_targets_include_https(self : Config) -> Bool {
-  if self.proxy is Some(url) && url.has_prefix("https://") {
+  if self.proxy is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
-  if self.proxy_all is Some(url) && url.has_prefix("https://") {
+  if self.proxy_all is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
   match self.proxy_config {
-    Some(value) => value.contains("https://")
+    Some(value) => value.contains("https://") || value.contains("wss://")
     None => false
   }
 }
@@ -318,6 +322,8 @@ pub fn validate_try_files_path(path : String) -> String raise ConfigError {
 ///|
 /// Validate upstream proxy URL format (http:// or https:// with valid host/port).
 pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
+  let url=if url.has_prefix("wss://") { "https://"+url[6:].to_owned() }
+    else if url.has_prefix("ws://") { "http://"+url[5:].to_owned() } else { url }
   if !url.has_prefix("http://") && !url.has_prefix("https://") {
     raise ConfigError::InvalidProxy(
       "proxy URL must start with http:// or https://",
@@ -365,6 +371,7 @@ pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
 /// Validate all configuration settings before creating any network listener.
 /// Raises ConfigError on any syntactic defect or mutual exclusion conflict.
 pub fn validate_config(config : Config) -> Unit raise ConfigError {
+  config.limits.validate()
   ignore(validate_root(config.root))
   ignore(normalize_base_url(config.base_url))
 
@@ -457,3 +464,16 @@ pub fn parse_auth_credential(str : String) -> (String, String)? {
     None => None
   }
 }
+
+
+///|
+pub extend ConfigError with Eq::{not_equal, equal}
+
+///|
+pub extend ConfigError with Debug::{to_repr}
+
+///|
+pub extend ConfigError with Show::{output}
+
+///|
+pub extend Config with Debug::{to_repr}

@@ -1,5 +1,20 @@
 # http-server-mbt 重构设计
 
+## 2026-09-24 实施修订（D-03、D-05～D-08、D-14～D-18、D-20）
+
+本修订优先于下文历史实现描述。当前已有 Native 源码；历史“待创建/没有源码”不再描述当前状态。
+
+- D-03/D-17：根目录及响应绑定已打开句柄；元数据和正文使用同一 lease。根内链接允许，越界或无法证明安全的解析拒绝。检测文件改变返回 FILE_CHANGED，不映射为空正文/EOF；路径替换不切换在途句柄。If-Range 无可靠强验证器时忽略 Range 并返回完整表示，大小/mtime 标签不作为可靠续传验证器，不新增全文哈希扫描。
+- D-07/D-14：MoonBit 引擎与响应拥有资源，作用域退出或异步 close 自动取消排空。正文顺序、有界读取，一响应最多一个在途读取；关闭与文件错误明确传播。旧同步构造、按路径随机读取及无上限全文读取接口按下一次次版本迁移，默认 API 不暴露裸句柄。
+- D-05/D-06：默认 4 个文件工作线程、256 个排队操作、1024 个连接、64 KiB 正文块、64 MiB 正文缓冲及 64 MiB 目录元数据预算；配置可调整，共享 owner 的实例计入共同预算。C worker 仅操作 C 数据；取消等待最终完成再释放。目录先有界枚举/排序，再增量 UTF-8 渲染；提交前预算不足为 503，提交后错误中止流。未知长度 HTTP/1.1 使用 chunked，HTTP/1.0 关闭定界，HEAD 不产生正文。
+- D-08/D-20：Full 内嵌固定版本、哈希和许可的 Mozilla 信任根；显式 ca_file 替换内嵌根，secure=false 是唯一关闭校验方式。替代此前 D-20 的“缺少 ca_file 必须失败”。入站、HTTPS upstream、wss 共用 MbedTLS；Thin 不带入 TLS。WebSocket 升级后有界字节透传，禁止完整消息缓冲。
+- D-03/D-20：HTTP 和 WebSocket 的所有代理入口先执行 Host/Auth/路径安全策略；显式代理路由不受本地 BaseURL 挂载前缀限制。`ws://`/`wss://` 目标分别使用 HTTP/HTTPS 握手传输。CLI 的参数解析、横幅、颜色、IP 枚举和作用域编排归属 `cmd/common`，两个 main 仅选择启动函数。
+- D-08/D-14：`build.mbtx` 在消费模块环境计算 Native 编译选项和 TLS 绝对 include 路径；Windows MSVC 使用 UTF-8，Unix 使用 PIC。候选源码必须包含此脚本、Native stub、资源和许可证。独立 workspace 消费验证不等于 registry 发布或发布后拉取。
+- D-15/D-16：固定工具链、Distroless digest；musl CLI 与 scratch/Distroless × thin/full 四组合共同验证。候选产物汇总门槛与最终完整发行门槛分离，发行消费相同提交/哈希的已验证产物，自动化驱动只用 .mbtx。
+- D-10/D-18：保存故障输入、种子和事件序列；三平台回放、sanitizer、消费与依赖审计是证据要求。Windows 本机不能代替远程 Actions。
+
+本轮只实施用户选定七项；C/Node 异步嵌入、io_uring、wasm-gc 引擎保留原任务与最终门槛，不因候选验证通过而视为完成。C/Python/Rust/Node 本轮消费仅验证已有完整服务器模式。T-024 仍为撤出范围，不新增性能指标。实际发布不属于本轮自动操作。
+
 2026-09-22 增补：六项架构优化见 D-20 和 [架构审计](architecture-review.md)。此前“零加密 C 依赖”修正为无 TLS 后端 / 代理功能依赖，允许平台 runtime 的通用随机数系统库。
 
 版本：5。日期：2026-09-18。修订 D-08/D-11：经用户确认，TLS 后端由静态链接 OpenSSL 3 改为源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0），理由与固定清单见 D-08；增补 CLI 与 C ABI（动态库与静态库）的 thin（纯静态 HTTP、不含 TLS/代理功能与 MbedTLS C 源）与 full（集成 MbedTLS TLS 与代理能力）双版本打包规范；D-11 增补 MoonBit 对象 .drectve 剥离与 .def 白名单符号隔离机制。版本 4 内容保持不变。本文是待实现契约，需求见 [proposal](proposal.md)，任务与案例见 [tasks](tasks.md)。

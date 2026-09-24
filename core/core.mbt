@@ -31,3 +31,16 @@ pub fn ResponseBody::length(self : ResponseBody) -> Int {
     FileRegion(_, _, length) => length.to_int()
   }
 }
+
+
+///|
+pub extend Method with Eq::{not_equal, equal}
+
+///|
+pub extend Method with Debug::{to_repr}
+
+///|
+pub extend ResponseBody with Eq::{not_equal, equal}
+
+///|
+pub extend ResponseBody with Debug::{to_repr}

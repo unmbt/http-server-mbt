@@ -1,14 +1,13 @@
 import {
+  "unmbt/http-server-mbt/internal/native",
+  "unmbt/http-server-mbt/internal/framing",
   "unmbt/http-server-mbt" @root,
   "unmbt/http-server-mbt/core",
   "moonbitlang/async",
-  "moonbitlang/async/http",
   "moonbitlang/async/socket",
   "moonbitlang/async/io",
   "moonbitlang/async/types",
-  "moonbitlang/async/websocket",
-  "moonbitlang/core/cmp",
-  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/base64",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/async/fs",
@@ -17,9 +16,11 @@ import {
 import {
   "moonbitlang/async/websocket",
   "moonbitlang/async/fs",
+  "moonbitlang/async/http",
+  "moonbitlang/core/string",
 } for "test"
 
 options(
-  link: { "native": { "cc-flags": "-fPIC", "stub-cc-flags": "-fPIC" } },
+  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } },
   targets: { "*.mbt": [ "native" ] },
 )

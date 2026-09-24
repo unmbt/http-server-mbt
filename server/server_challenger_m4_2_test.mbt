@@ -92,7 +92,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
 
     // 1. Direct transmit_file edge cases
     // Negative offset
-    let r1 = @server.transmit_file(
+    let r1 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       -1L,
@@ -100,7 +100,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     )
     assert_true(r1 < 0)
 
-    let r2 = @server.transmit_file(
+    let r2 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       -1000L,
@@ -109,7 +109,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r2 < 0)
 
     // Negative length
-    let r3 = @server.transmit_file(
+    let r3 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       0L,
@@ -117,7 +117,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     )
     assert_true(r3 < 0)
 
-    let r4 = @server.transmit_file(
+    let r4 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       0L,
@@ -126,7 +126,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r4 < 0)
 
     // Both negative
-    let r5 = @server.transmit_file(
+    let r5 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       -5L,
@@ -135,7 +135,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r5 < 0)
 
     // Zero length: no-op success
-    let r6 = @server.transmit_file(
+    let r6 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       0L,
@@ -144,7 +144,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_eq(r6, 0)
 
     // Non-existent file
-    let r7 = @server.transmit_file(
+    let r7 = test_transmit_file(
       conn.fd(),
       "testdata/public/nonexistent_xyz.txt",
       0L,
@@ -153,11 +153,11 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r7 < 0)
 
     // Empty path
-    let r8 = @server.transmit_file(conn.fd(), "", 0L, 10L)
+    let r8 = test_transmit_file(conn.fd(), "", 0L, 10L)
     assert_true(r8 < 0)
 
     // Directory path (cannot TransmitFile a directory)
-    let r9 = @server.transmit_file(
+    let r9 = test_transmit_file(
       conn.fd(),
       "testdata/public/subfolder",
       0L,
@@ -166,7 +166,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r9 < 0)
 
     // Offset beyond file size (hello.txt is 14 bytes)
-    let r10 = @server.transmit_file(
+    let r10 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       20L,
@@ -175,7 +175,7 @@ async test "challenger2: Negative offsets, lengths, non-existent files and inval
     assert_true(r10 < 0)
 
     // Offset + length beyond file size
-    let r11 = @server.transmit_file(
+    let r11 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       10L,

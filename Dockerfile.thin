@@ -6,7 +6,7 @@
 # (zero C crypto/proxy dependencies).
 # ----------------------------------------------------------------------
 
-ARG BASE_IMAGE=gcr.io/distroless/static:nonroot
+ARG BASE_IMAGE=gcr.io/distroless/static-debian12@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 FROM ${BASE_IMAGE}
 
 ARG BINARY_PATH=http-server-mbt-thin
@@ -15,7 +15,7 @@ ARG BINARY_PATH=http-server-mbt-thin
 WORKDIR /data
 
 # Copy pre-compiled binary from host / CI build artifact
-COPY ${BINARY_PATH} /usr/local/bin/http-server-mbt-thin
+COPY --chmod=0555 ${BINARY_PATH} /usr/local/bin/http-server-mbt-thin
 
 # UID 65532 is nonroot user in Distroless
 USER 65532:65532

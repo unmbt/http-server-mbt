@@ -301,7 +301,7 @@ async test "transmit_file parameter validation error handling" {
     defer conn.close()
 
     // Negative offset
-    let ret1 = @server.transmit_file(
+    let ret1 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       -1L,
@@ -310,7 +310,7 @@ async test "transmit_file parameter validation error handling" {
     assert_true(ret1 < 0)
 
     // Negative length
-    let ret2 = @server.transmit_file(
+    let ret2 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       0L,
@@ -319,7 +319,7 @@ async test "transmit_file parameter validation error handling" {
     assert_true(ret2 < 0)
 
     // Range beyond file size
-    let ret3 = @server.transmit_file(
+    let ret3 = test_transmit_file(
       conn.fd(),
       "testdata/public/hello.txt",
       100L,
@@ -328,7 +328,7 @@ async test "transmit_file parameter validation error handling" {
     assert_true(ret3 < 0)
 
     // Non-existent file
-    let ret4 = @server.transmit_file(
+    let ret4 = test_transmit_file(
       conn.fd(),
       "testdata/public/nonexistent_file_xyz.txt",
       0L,

@@ -15,7 +15,7 @@ on:
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
@@ -30,12 +30,11 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up MoonBit
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+        uses: hustcer/setup-moonbit@v1
+        with:
+          version: 0.1.20260920
+          core-version: 0.1.20260920
 
-      - name: Update MoonBit dependencies
-        run: |
-            moon version --all
-            moon update
+      - name: Verify the pinned compiler
+        run: moon version --all
             

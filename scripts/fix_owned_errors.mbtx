@@ -1,0 +1,14 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  let path="engine.mbt"
+  let source=@fs.read_file(path).text().replace_all(old="\r\n",new="\n")
+  let lines=source.split("\n").to_array()
+  let out=StringBuilder()
+  for line in lines {
+    if line.trim()=="_ => false" {
+      let indent=line[:line.length()-line.trim_start().length()].to_owned()
+      out.write_string(indent+"@native.NativeError::Missing => false\n"+indent+"e => raise e\n")
+    } else { out.write_string(line.to_owned()+"\n") }
+  }
+  @fs.write_file(path,out.to_string())
+}

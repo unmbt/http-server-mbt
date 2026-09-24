@@ -5,7 +5,9 @@
   "main": "http_server.linux-x64-gnu.node",
   "files": [
     "http_server.linux-x64-gnu.node",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "licenses"
   ],
   "os": [
     "linux"
@@ -18,7 +20,7 @@
     "url": "git+https://github.com/unmbt/http-server-mbt.git",
     "directory": "npm/linux-x64-gnu"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "engines": {
     "node": ">=16.13.0"
   }

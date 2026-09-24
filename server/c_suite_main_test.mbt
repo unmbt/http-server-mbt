@@ -85,7 +85,9 @@ async fn main_request(
     Some(s) => fi_parse_int(s[:]).unwrap_or(0)
     None => 0
   }
-  let body = if meth != "HEAD" &&
+  let body = if meth != "HEAD" && res_headers.get("transfer-encoding")==Some("chunked") {
+    read_test_chunked_body(conn)
+  } else if meth != "HEAD" &&
     status != 304 &&
     status != 204 &&
     content_len > 0 {

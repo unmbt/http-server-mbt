@@ -13,6 +13,6 @@ import {
 } for "test"
 
 options(
-  link: { "native": { "cc-flags": "-fPIC" } },
+  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}" } },
   targets: { "*.mbt": [ "native" ] },
 )

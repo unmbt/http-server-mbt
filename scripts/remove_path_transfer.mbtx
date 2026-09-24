@@ -1,0 +1,11 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  for name in ["server_challenger_test.mbt","server_challenger_m4_2_test.mbt","server_test.mbt"] {
+    let path="server/"+name
+    @fs.write_file(path,@fs.read_file(path).text().replace_all(old="@server.transmit_file(",new="test_transmit_file("))
+  }
+  @fs.write_file("file_transfer.mbt","///|\n/// Process handle count for Native resource probes.\npub fn get_handle_count() -> UInt { @native.process_handles() }\n")
+  @fs.write_file("server/transmit_file.mbt","///|\n/// Process handle count for Native resource probes.\npub fn get_handle_count() -> UInt { @root.get_handle_count() }\n")
+  for path in ["transfer_stub.c","server/transmit_file_windows.c","server/transmit_file_linux.c","server/transmit_file_darwin.c"] { @fs.remove(path) }
+  @fs.write_file("moon.pkg",@fs.read_file("moon.pkg").text().replace_all(old="  \"native-stub\": [ \"transfer_stub.c\" ],\n",new="").replace_all(old="  \"moonbitlang/async/types\",\n",new=""))
+}

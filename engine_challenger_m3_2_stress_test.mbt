@@ -48,7 +48,8 @@ async test "challenger2: HTTP method handling (POST/PUT/DELETE return Next, SPA 
     ..@core.Config::default("testdata/public"),
     spa: true,
   }
-  let engine = StaticEngine::new(config_spa)
+  let engine = @http-server-mbt.StaticEngine::open(config_spa)
+  defer engine.close()
 
   // 1. POST to existing file -> Next
   let r_post_file = engine.handle({
@@ -102,7 +103,8 @@ async test "challenger2: HEAD body suppression invariants across all response ty
     base_url: "/app",
     basic_auth: Some(("admin", "secret")),
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // 1. HEAD on 401 Unauthorized: body length 0, Content-Length set
   let r_401 = engine.handle({
@@ -113,7 +115,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_401 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "13")
       assert_eq(res.headers["WWW-Authenticate"], "Basic realm=\"\"")
     }
@@ -129,7 +131,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_403_base {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "0")
     }
     _ => fail("expected 403 on HEAD outside base_url")
@@ -144,7 +146,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_403_trav {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 on HEAD traversal")
   }
@@ -158,7 +160,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_302 {
     Handled(res) => {
       assert_eq(res.status, 302)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Location"], "/app/subfolder/")
       assert_eq(res.headers["Content-Length"], "0")
     }
@@ -174,7 +176,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_200 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Length"], "14")
       assert_eq(res.headers["Content-Type"], "text/plain; charset=UTF-8")
     }
@@ -190,7 +192,7 @@ async test "challenger2: HEAD body suppression invariants across all response ty
   match r_spa_head {
     Handled(res) => {
       assert_eq(res.status, 200)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_true(res.headers.contains("Content-Length"))
       assert_eq(res.headers["Content-Type"], "text/html; charset=UTF-8")
     }
@@ -206,7 +208,8 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
     auto_index: true,
     show_dir: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // 1. Request to BaseURL root without slash: /app/v2 -> 302 to /app/v2/
   let r1 = engine.handle({
@@ -231,7 +234,7 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let body = ch2_bytes_to_string(res.to_bytes())
+      let body = ch2_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(body.contains("index"))
     }
     _ => fail("expected 200 index.html at base_url root")
@@ -260,7 +263,7 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
   match r4 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      let body = ch2_bytes_to_string(res.to_bytes())
+      let body = ch2_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_eq(body, "hello moonbit\n")
     }
     _ => fail("expected 200 hello.txt under base_url")
@@ -275,7 +278,7 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
   match r5 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
     }
     _ => fail("expected 403 outside base_url")
   }
@@ -289,7 +292,7 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
   match r6 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(ch2_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 403 for traversal in base_url")
   }
@@ -305,7 +308,8 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     show_dir: true,
     dir_overrides_404: false,
   }
-  let eng_a = StaticEngine::new(cfg_a)
+  let eng_a = @http-server-mbt.StaticEngine::open(cfg_a)
+  defer eng_a.close()
   let res_a = eng_a.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -314,7 +318,7 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
   match res_a {
     Handled(r) => {
       assert_eq(r.status, 404)
-      assert_true(ch2_bytes_to_string(r.to_bytes()).contains("Custom 404"))
+      assert_true(ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains("Custom 404"))
     }
     _ => fail("expected custom 404 precedence when dir_overrides_404 is false")
   }
@@ -328,7 +332,8 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     dir_overrides_404: false,
     spa: true,
   }
-  let eng_b = StaticEngine::new(cfg_b)
+  let eng_b = @http-server-mbt.StaticEngine::open(cfg_b)
+  defer eng_b.close()
   let res_b = eng_b.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -337,7 +342,7 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
   match res_b {
     Handled(r) => {
       assert_eq(r.status, 200)
-      let body = ch2_bytes_to_string(r.to_bytes())
+      let body = ch2_bytes_to_string(r.to_bytes(max_bytes=16777216))
       assert_true(body.contains("Index of /empty_dir/"))
     }
     _ => fail("expected directory listing in SPA mode over custom 404")
@@ -351,7 +356,8 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     show_dir: true,
     dir_overrides_404: true,
   }
-  let eng_c = StaticEngine::new(cfg_c)
+  let eng_c = @http-server-mbt.StaticEngine::open(cfg_c)
+  defer eng_c.close()
   let res_c = eng_c.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -361,7 +367,7 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     Handled(r) => {
       assert_eq(r.status, 200)
       assert_true(
-        ch2_bytes_to_string(r.to_bytes()).contains("Index of /empty_dir/"),
+        ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains("Index of /empty_dir/"),
       )
     }
     _ => fail("expected directory listing when dir_overrides_404 is true")
@@ -376,7 +382,8 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     show_dotfiles: false,
     dir_overrides_404: true,
   }
-  let eng_d = StaticEngine::new(cfg_d)
+  let eng_d = @http-server-mbt.StaticEngine::open(cfg_d)
+  defer eng_d.close()
   let res_d = eng_d.handle({
     meth: @core.Method::Get,
     target: "/empty_dir/",
@@ -385,7 +392,7 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
   match res_d {
     Handled(r) => {
       assert_eq(r.status, 200)
-      let html = ch2_bytes_to_string(r.to_bytes())
+      let html = ch2_bytes_to_string(r.to_bytes(max_bytes=16777216))
       assert_true(!html.contains(".gitkeep"))
       assert_true(html.contains("..")) // Parent link present for subfolder
     }
@@ -402,7 +409,8 @@ async test "challenger2: Terminal 404 vs Custom 404 for missing SPA and try-file
     ..@core.Config::default("testdata/public"),
     try_files: Some("does_not_exist_xyz.html"),
   }
-  let engine_try = StaticEngine::new(config_try)
+  let engine_try = @http-server-mbt.StaticEngine::open(config_try)
+  defer engine_try.close()
 
   let r1 = engine_try.handle({
     meth: @core.Method::Get,
@@ -412,7 +420,7 @@ async test "challenger2: Terminal 404 vs Custom 404 for missing SPA and try-file
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      let body = ch2_bytes_to_string(res.to_bytes())
+      let body = ch2_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_eq(body, "File not found. :(")
       assert_true(!body.contains("Custom 404"))
       assert_eq(res.headers["Content-Type"], "text/plain; charset=UTF-8")
@@ -430,7 +438,7 @@ async test "challenger2: Terminal 404 vs Custom 404 for missing SPA and try-file
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["Content-Type"], "text/plain; charset=UTF-8")
       assert_eq(res.headers["Content-Length"], "18")
     }
@@ -443,7 +451,8 @@ async test "challenger2: Terminal 404 vs Custom 404 for missing SPA and try-file
     spa: false,
     try_files: None,
   }
-  let engine_nofallback = StaticEngine::new(config_nofallback)
+  let engine_nofallback = @http-server-mbt.StaticEngine::open(config_nofallback)
+  defer engine_nofallback.close()
   let r3 = engine_nofallback.handle({
     meth: @core.Method::Get,
     target: "/some/random/route",
@@ -452,7 +461,7 @@ async test "challenger2: Terminal 404 vs Custom 404 for missing SPA and try-file
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 404)
-      let body = ch2_bytes_to_string(res.to_bytes())
+      let body = ch2_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_true(body.contains("Custom 404"))
     }
     _ => fail("expected custom 404 when no fallback is configured")
@@ -465,7 +474,8 @@ async test "challenger2: SPA fallback with Range and Conditional requests" {
     ..@core.Config::default("testdata/public"),
     spa: true,
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // 1. Range request to missing SPA route -> serves slice of root index.html!
   let r_range = engine.handle({
@@ -478,7 +488,7 @@ async test "challenger2: SPA fallback with Range and Conditional requests" {
       assert_eq(res.status, 206)
       assert_true(res.headers.contains("Content-Range"))
       assert_eq(res.headers["Content-Length"], "5")
-      let slice = ch2_bytes_to_string(res.to_bytes())
+      let slice = ch2_bytes_to_string(res.to_bytes(max_bytes=16777216))
       assert_eq(slice.length(), 5)
     }
     _ => fail("expected 206 Partial Content on SPA fallback")
@@ -495,7 +505,7 @@ async test "challenger2: SPA fallback with Range and Conditional requests" {
       assert_eq(res.status, 416)
       assert_true(res.headers.contains("Content-Range"))
       assert_true(
-        ch2_bytes_to_string(res.to_bytes()).contains(
+        ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains(
           "Requested range not satisfiable",
         ),
       )
@@ -524,7 +534,7 @@ async test "challenger2: SPA fallback with Range and Conditional requests" {
   match r_304 {
     Handled(res) => {
       assert_eq(res.status, 304)
-      assert_eq(res.body.length(), 0)
+      assert_eq(res.body_length(), 0)
       assert_eq(res.headers["ETag"], etag)
     }
     _ => fail("expected 304 on SPA fallback with matching ETag")
@@ -539,7 +549,8 @@ async test "challenger2: Regression check across Core features (MIME, Range, ETa
     brotli: true,
     gzip: true,
   }
-  let engine_comp = StaticEngine::new(config_comp)
+  let engine_comp = @http-server-mbt.StaticEngine::open(config_comp)
+  defer engine_comp.close()
 
   // 1. Brotli priority over gzip on /bundle.js
   let r_br = engine_comp.handle({
@@ -604,14 +615,12 @@ async test "challenger2: Regression check across Core features (MIME, Range, ETa
 
 ///|
 async test "challenger2: In-flight mutation D-17 lease tracking" {
-  let file_path = "testdata/public/hello.txt"
-  let lease = FileLease::acquire(file_path)
-  match lease {
-    Some(l) =>
-      // Unmodified file is not mutated
-      assert_false(l.is_mutated())
-    None => fail("expected file lease acquisition")
-  }
+  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(engine) {
+    match engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]) }) {
+      Handled(response) => assert_eq(response.to_bytes(max_bytes=14), b"hello moonbit\n")
+      _ => fail("expected opened response")
+    }
+  })
 }
 
 ///|
@@ -620,7 +629,8 @@ async test "challenger2: Malformed URI, traversal, and auth permutation stress" 
     ..@core.Config::default("testdata/public"),
     basic_auth: Some(("user", "pass")),
   }
-  let engine = StaticEngine::new(config)
+  let engine = @http-server-mbt.StaticEngine::open(config)
+  defer engine.close()
 
   // 1. Missing credentials
   let r_no_auth = engine.handle({
@@ -653,7 +663,7 @@ async test "challenger2: Malformed URI, traversal, and auth permutation stress" 
   match r_trav {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(ch2_bytes_to_string(res.to_bytes()), "Access denied")
+      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
     }
     _ => fail("expected 403 on traversal after valid auth")
   }
@@ -667,7 +677,7 @@ async test "challenger2: Malformed URI, traversal, and auth permutation stress" 
   match r_mal {
     Handled(res) => {
       assert_eq(res.status, 400)
-      assert_eq(ch2_bytes_to_string(res.to_bytes()), "Bad Request")
+      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Bad Request")
     }
     _ => fail("expected 400 on malformed URI after valid auth")
   }

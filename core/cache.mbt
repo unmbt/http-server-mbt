@@ -388,3 +388,16 @@ pub fn format_cache_control(policy : CachePolicy) -> String {
     Exact(val) => val
   }
 }
+
+
+///|
+pub extend EntityTag with Eq::{not_equal, equal}
+
+///|
+pub extend EntityTag with Debug::{to_repr}
+
+///|
+pub extend CachePolicy with Eq::{not_equal, equal}
+
+///|
+pub extend CachePolicy with Debug::{to_repr}

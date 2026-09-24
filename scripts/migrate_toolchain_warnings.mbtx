@@ -1,0 +1,54 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs", "moonbitlang/async@0.21.3/shell", "moonbitlang/core/json", "moonbitlang/core/string" }
+struct Edit { line : Int; start : Int; end : Int; replacement : String }
+async fn main {
+  let output=@shell.Cmd("moon",["check","--target","native","--output-json"]).output()
+  let edits : Map[String,Array[Edit]]=Map([])
+  let extensions : Map[String,Set[String]]=Map([])
+  for line in output.stdout().split("\n") {
+    let json=@json.parse(line) catch { _ => continue }
+    guard json is {"level":"warning","path":String(path),"loc":String(loc),"error_code":Number(code),"message":String(message),..} else { continue }
+    if path.contains(".mooncakes") || path.contains("pkg.generated") { continue }
+    if code==25 && message.contains("Use `") {
+      let replacement=message.split("Use `").to_array()[1].split("`").next().unwrap().to_owned()
+      let bounds=loc.split("-").to_array()
+      let a=bounds[0].split(":").to_array()
+      let b=bounds[1].split(":").to_array()
+      if a[0]!=b[0] { continue }
+      let edit={line:@string.parse_int(a[0])-1,start:@string.parse_int(a[1])-1,end:@string.parse_int(b[1])-1,replacement}
+      if edits.get(path) is None { edits[path]=[] }
+      edits[path].push(edit)
+    } else if code==79 && message.contains("Add a `") {
+      let declaration=message.split("Add a `").to_array()[1].split("`").next().unwrap().to_owned()
+        .replace_all(old="@moonbitlang/core/debug.Debug",new="Debug")
+      if extensions.get(path) is None { extensions[path]=Set([]) }
+      extensions[path].add(declaration)
+    }
+  }
+  let paths : Set[String]=Set([])
+  for path in edits.keys() { paths.add(path) }
+  for path in extensions.keys() { paths.add(path) }
+  for path in paths {
+    let source=@fs.read_file(path).text().replace_all(old="\r\n",new="\n")
+    let lines=source.split("\n").map(line=>line.to_owned()).to_array()
+    if edits.get(path) is Some(changes) {
+      changes.sort_by((a,b) => if a.line!=b.line { b.line.compare(a.line) } else { b.start.compare(a.start) })
+      let seen : Set[String]=Set([])
+      for edit in changes {
+        let key="\{edit.line}:\{edit.start}"
+        if seen.contains(key) { continue }
+        seen.add(key)
+        let line=lines[edit.line]
+        lines[edit.line]=line[:edit.start].to_owned()+edit.replacement+line[edit.end:].to_owned()
+      }
+    }
+    let out=StringBuilder()
+    for line in lines { out.write_string(line+"\n") }
+    if extensions.get(path) is Some(declarations) {
+      for declaration in declarations {
+        if !source.contains(declaration) { out.write_string("\n///|\n"+declaration+"\n") }
+      }
+    }
+    @fs.write_file(path,out.to_string())
+  }
+  println("updated \{paths.length()} files from compiler diagnostics")
+}

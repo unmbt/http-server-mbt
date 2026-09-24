@@ -67,33 +67,20 @@ async fn ch1_test_request(
 
 ///|
 async test "challenger1: Direct TransmitFile return code verification (proves zero-copy not fallback)" {
-  let config = @core.Config::default("testdata/public")
-  @server.with_server_at(config, 0, async fn(server) {
-    defer server.stop()
-    let port = server.port()
-    let addr = @socket.Addr::new(0x7F000001, port)
-    let conn = @socket.Tcp::connect(addr)
+  let listener=@socket.TcpServer(@socket.Addr::new(0x7F000001,0))
+  defer listener.close()
+  @async.with_task_group() <| group => {
+    let peer=group.spawn(() => {
+      let (tcp,_)=listener.accept()
+      defer tcp.close()
+      assert_eq(tcp.read_exactly(21),b"hello moonbit\nmoonbit")
+    })
+    let conn=@socket.Tcp::connect(listener.addr)
     defer conn.close()
-
-    // Test direct transmit_file call on hello.txt (14 bytes)
-    let ret = @server.transmit_file(
-      conn.fd(),
-      "testdata/public/hello.txt",
-      0L,
-      14L,
-    )
-    // ret == 0 confirms Win32 TransmitFile succeeded directly in kernel
-    assert_eq(ret, 0)
-
-    // Test direct transmit_file slice (offset 6, len 7 -> "moonbit")
-    let ret2 = @server.transmit_file(
-      conn.fd(),
-      "testdata/public/hello.txt",
-      6L,
-      7L,
-    )
-    assert_eq(ret2, 0)
-  })
+    assert_eq(test_transmit_file(conn.fd(),"testdata/public/hello.txt",0L,14L),0)
+    assert_eq(test_transmit_file(conn.fd(),"testdata/public/hello.txt",6L,7L),0)
+    peer.wait()
+  }
 }
 
 ///|

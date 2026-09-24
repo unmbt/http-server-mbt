@@ -560,3 +560,13 @@ pub fn find_header_case_insensitive(
   }
   None
 }
+
+
+///|
+pub extend PathError with Eq::{not_equal, equal}
+
+///|
+pub extend PathError with Debug::{to_repr}
+
+///|
+pub extend SecurityDecision with Debug::{to_repr}

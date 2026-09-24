@@ -1,0 +1,10 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  for name in ["test_dynamic_thin","test_static_thin","test_dynamic_full","test_static_full"] {
+    let path="testdata/c_consumer/"+name+".c"
+    let source=@fs.read_file(path).text()
+      .replace_all(old="int main(void) {",new="#include \"test_http.h\"\n\nint main(void) {")
+      .replace_all(old="    return 0;",new="    test_real_http();\n    return 0;")
+    @fs.write_file(path,source)
+  }
+}

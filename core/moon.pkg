@@ -1,4 +1,4 @@
 // Core package
 options(
-  link: { "native": { "cc-flags": "-fPIC" } },
+  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}" } },
 )

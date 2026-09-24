@@ -1,0 +1,36 @@
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
+async fn main {
+  let path = "engine.mbt"
+  let s = @fs.read_file(path).text().replace_all(old="\r\n", new="\n")
+  let begin = s.find("///|\nfn render_directory_html(").unwrap()
+  let end = s.find("///|\n/// Pure HTML directory").unwrap()
+  let old = s[begin:end].to_owned()
+  let header_begin = old.find("  let buf = StringBuilder()").unwrap()
+  let row_begin = old.find("  for entry in entries {\n").unwrap()
+  let footer_begin = old.find("  buf.write_string(\"</table>").unwrap()
+  let header = old[header_begin:row_begin].to_owned()
+  let row = old[row_begin+"  for entry in entries {\n".length():footer_begin].to_owned()
+  let row = row[:row.length()-5].to_owned().replace_all(old="continue", new="return buf.to_string()")
+  let footer = old[footer_begin:].to_owned()
+  let replacement = StringBuilder()
+  replacement.write_string("///|\nfn listing_header(title_path : String, raw_query : String?) -> String {\n" + header + "  buf.to_string()\n}\n\n")
+  replacement.write_string("///|\nfn listing_row(entry : ListingEntry, raw_query : String?) -> String {\n  let buf = StringBuilder()\n  let q_suffix = match raw_query { Some(q) if q.length() > 0 => \"?\" + escape_html(q); _ => \"\" }\n" + row + "\n  buf.to_string()\n}\n\n")
+  replacement.write_string("///|\nfn listing_footer(host : String) -> String {\n  let buf = StringBuilder()\n" + footer)
+  replacement.write_string("///|\nfn render_directory_html(title_path : String, entries : Array[ListingEntry], raw_query : String?, host : String) -> String {\n  let buf = StringBuilder()\n  buf.write_string(listing_header(title_path, raw_query))\n  for entry in entries { buf.write_string(listing_row(entry, raw_query)) }\n  buf.write_string(listing_footer(host))\n  buf.to_string()\n}\n\n")
+  let mut output = s[:begin].to_owned() + replacement.to_string() + s[end:].to_owned()
+  let start = output.find("      let html = render_directory_html(").unwrap()
+  let stop = output[start:].find("      return Handled({ status: 200, headers, body, })").unwrap() + start
+  let new =
+    #|      let headers : Map[String, String] = Map([
+    #|        ("Content-Type", "text/html; charset=UTF-8"),
+    #|      ])
+    #|      @core.apply_security_headers(headers, self.config, request.meth)
+    #|      let body = if request.meth is Head {
+    #|        PlanBody::Empty
+    #|      } else {
+    #|        PlanBody::Listing({ entries: final_entries, title: display_title, query: raw_query, host, stage: 0, index: 0, pending: b"", position: 0 })
+    #|      }
+    #|
+  output = output[:start].to_owned() + new + output[stop:].to_owned()
+  @fs.write_file(path, output)
+}

@@ -5,7 +5,9 @@
   "main": "http_server.win32-x64-msvc.node",
   "files": [
     "http_server.win32-x64-msvc.node",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "licenses"
   ],
   "os": [
     "win32"
@@ -18,7 +20,7 @@
     "url": "git+https://github.com/unmbt/http-server-mbt.git",
     "directory": "npm/win32-x64-msvc"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "engines": {
     "node": ">=16.13.0"
   }

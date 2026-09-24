@@ -9,9 +9,9 @@
 //
 
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/fs" @fs,
-  "moonbitlang/async/shell" @shell,
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs" @fs,
+  "moonbitlang/async@0.21.3/shell" @shell,
   "moonbitlang/core/env" @env,
 }
 
@@ -255,84 +255,23 @@ async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
 
 ///|
 async fn find_node_lib_windows() -> String {
-  // 1. Direct path in c_abi/node/lib/node.lib
-  if file_exists("c_abi/node/lib/node.lib") {
-    return "c_abi/node/lib/node.lib"
-  }
-
-  // 2. LocalAppData node-gyp cache
-  match @env.get_env_var("LOCALAPPDATA") {
-    Some(la) => {
-      let cache_dir = normalize_path(la) + "/node-gyp/Cache"
-      if file_exists(cache_dir) {
-        let vers = @fs.readdir(cache_dir) catch { _ => [] }
-        for ver in vers {
-          let cand = "\{cache_dir}/\{ver}/x64/node.lib"
-          if file_exists(cand) {
-            return cand
-          }
-        }
-      }
+  // Node-API 8 import library, fixed independently of the host test version.
+  // Its exact hash is checked even when using an existing local cache.
+  let cached=@env.get_env_var("LOCALAPPDATA").unwrap_or("")+"/node-gyp/Cache/20.16.0/x64/node.lib"
+  let path=if file_exists(cached) { cached } else {
+    let dir="target/node/toolchain"
+    if !file_exists(dir) { @fs.mkdir(dir,recursive=true) }
+    let file=dir+"/node-v20.16.0.lib"
+    if !file_exists(file) {
+      @shell.Cmd("curl.exe",["--fail","--location","--silent","--show-error","https://nodejs.org/dist/v20.16.0/win-x64/node.lib","-o",file]).run()
     }
-    None => ()
+    file
   }
-
-  // 3. UserProfile node-gyp cache
-  match @env.get_env_var("USERPROFILE") {
-    Some(up) => {
-      let cache_dir = normalize_path(up) + "/.node-gyp"
-      if file_exists(cache_dir) {
-        let vers = @fs.readdir(cache_dir) catch { _ => [] }
-        for ver in vers {
-          let cand = "\{cache_dir}/\{ver}/x64/node.lib"
-          if file_exists(cand) {
-            return cand
-          }
-        }
-      }
-    }
-    None => ()
+  let hash=@shell.Cmd("certutil",["-hashfile",path,"SHA256"]).output();hash.check()
+  if !hash.stdout().to_lower().contains("87056190b7cd06f40058f8e059efd328cdcc7600b825afa102c0aa5039865af5") {
+    fail_pipeline("Node import library hash mismatch")
   }
-
-  // 4. GitHub Actions runner toolcache
-  let runner_cache = "C:/hostedtoolcache/windows/node"
-  if file_exists(runner_cache) {
-    let vers = @fs.readdir(runner_cache) catch { _ => [] }
-    for ver in vers {
-      let cand = "\{runner_cache}/\{ver}/x64/node.lib"
-      if file_exists(cand) {
-        return cand
-      }
-      let cand2 = "\{runner_cache}/\{ver}/x64/win-x64/node.lib"
-      if file_exists(cand2) {
-        return cand2
-      }
-    }
-  }
-
-  // 5. Automatic download via curl.exe based on current node version
-  println("  node.lib not found locally, querying node version to download...")
-  let nver_res = @shell.Cmd("node", ["-v"]).output() catch {
-    _ => fail_pipeline("build_node: cannot run node -v to determine version for node.lib download")
-  }
-  let nver = nver_res.stdout().trim().to_owned()
-  if nver.has_prefix("v") {
-    if !file_exists("c_abi/node/lib") {
-      @fs.mkdir("c_abi/node/lib", recursive=true)
-    }
-    let url = "https://nodejs.org/dist/\{nver}/win-x64/node.lib"
-    let dst = "c_abi/node/lib/node.lib"
-    println("  Downloading \{url} -> \{dst}...")
-    let curl_res = @shell.Cmd("curl.exe", ["-sSL", "-f", url, "-o", dst]).output() catch {
-      _ => fail_pipeline("build_node: curl.exe failed to download node.lib from \{url}")
-    }
-    if curl_res.exit_code() == 0 && file_exists(dst) {
-      println("  -> Successfully downloaded \{dst}")
-      return dst
-    }
-  }
-
-  fail_pipeline("build_node: cannot locate or download node.lib on Windows.")
+  path
 }
 
 ///|

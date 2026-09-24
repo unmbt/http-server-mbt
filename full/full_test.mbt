@@ -74,21 +74,12 @@ async test "full with_server_at preflight rejects unreadable cert_file" {
 }
 
 ///|
-async test "full upstream TLS preflight is fail-closed and explicit insecure is allowed" {
+async test "full upstream TLS uses bundled trust roots and explicit insecure is allowed" {
   let secure_config = @core.Config::default("testdata/public")
-  let mut secure_failed = false
-  try {
-    let _ = build_upstream_connector(secure_config)
-  } catch {
-    @core.ConfigError::InvalidTls(msg) => {
-      secure_failed = true
-      assert_true(msg.contains("ca_file"))
-    }
-    err => abort("unexpected upstream TLS error: \{err}")
-  }
-  assert_true(secure_failed)
+  let secure_connector = @full.build_upstream_connector(secure_config)
+  secure_connector.close()
   let insecure_config = { ..secure_config, secure: false, }
-  let connector = build_upstream_connector(insecure_config)
+  let connector = @full.build_upstream_connector(insecure_config)
   connector.close()
 }
 
@@ -98,15 +89,5 @@ async test "full proxy rule file probe detects HTTPS targets before listening" {
     ..@core.Config::default("testdata/public"),
     proxy_config: Some("{\"/api\":{\"target\":\"https://upstream.invalid\"}}"),
   }
-  let mut caught = false
-  @full.with_server_at(config, 0, fn(_server) {
-    abort("Server should not have started without an upstream CA")
-  }) catch {
-    @core.ConfigError::InvalidTls(msg) => {
-      caught = true
-      assert_true(msg.contains("ca_file"))
-    }
-    err => abort("unexpected proxy preflight error: \{err}")
-  }
-  assert_true(caught)
+  @full.with_server_at(config, 0, fn(server) { server.stop() })
 }

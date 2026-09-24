@@ -1,0 +1,9 @@
+import {
+  "unmbt/http-server-mbt" @static,
+  "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/server/plain" @thin,
+  "unmbt/http-server-mbt/full",
+  "moonbitlang/async",
+  "moonbitlang/async/http",
+}
+pkgtype(kind: "executable")

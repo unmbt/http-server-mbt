@@ -1,0 +1,40 @@
+// D-14 / T-030: consume candidate source from a separate workspace, never
+// patch .mooncakes or link a prebuilt server library into the consumer.
+import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs", "moonbitlang/async@0.21.3/shell", "moonbitlang/core/env" }
+
+async fn main {
+  let temp=@env.get_env_var("TEMP").unwrap_or("/tmp")
+  let mut serial=0
+  while @fs.exists("\{temp}/http-server-consumer-\{serial}") { serial+=1 }
+  let workspace="\{temp}/http-server-consumer-\{serial}"
+  @fs.mkdir(workspace+"/candidate",recursive=true)
+  @fs.mkdir(workspace+"/consumer/public",recursive=true)
+  let files=@shell.Cmd("git",["-c","core.quotePath=false","ls-files","--cached","--others","--exclude-standard"]).output()
+  if files.exit_code()!=0 { fail("cannot inventory candidate sources") }
+  for line in files.stdout().split("\n") {
+    let path=line.trim().to_owned()
+    if path.has_suffix(".node") || path.has_suffix(".lib") || path.has_suffix(".obj") || path.has_suffix(".exe") || path.has_suffix(".dll") || path.has_suffix(".so") || path.has_suffix(".a") || path.contains("/_build/") || path.has_prefix("internal/resource_tests/") { continue }
+    if path=="" || path.contains("_test.mbt") || path.contains("_wbtest.mbt") || path.contains("pkg.generated") { continue }
+    let allowed=if !path.contains("/") {
+      path.has_suffix(".mbt") || path=="build.mbtx" || path.has_suffix(".c") || path.has_suffix(".h") || path=="moon.mod" || path=="moon.pkg" || path=="LICENSE" || path=="README.md"
+    } else {
+      ["core/","internal/","server/","full/","tls/","cmd/","c_abi/"].any(prefix=>path.has_prefix(prefix)) || path=="scripts/gen_version.mbtx"
+    }
+    if !allowed || !@fs.exists(path) { continue }
+    let parts=path.split("/").to_array()
+    let parent=workspace+"/candidate/"+parts[:parts.length()-1].join("/")
+    if !@fs.exists(parent) { @fs.mkdir(parent,recursive=true) }
+    @fs.write_file(workspace+"/candidate/"+path,@fs.read_file(path))
+  }
+  @fs.write_file(workspace+"/consumer/moon.mod","name = \"acceptance/consumer\"\nversion = \"0.0.0\"\nimport { \"unmbt/http-server-mbt@0.3.4\", \"moonbitlang/async@0.21.3\" }\npreferred_target = \"native\"\n")
+  for file in ["moon.pkg","main.mbt"] {
+    @fs.write_file(workspace+"/consumer/"+file,@fs.read_file("testdata/moonbit_consumer/"+file))
+  }
+  @fs.write_file(workspace+"/consumer/public/hello.txt",b"hello consumer\n")
+  @shell.Cmd("moon",["work","init","candidate","consumer"],cwd=workspace).run()
+  println("External source candidate: "+workspace)
+  @shell.Cmd("moon",["run",".","--target","native","--deny-warn"],cwd=workspace+"/consumer").run()
+  if !@fs.exists("target/candidate") { @fs.mkdir("target/candidate",recursive=true) }
+  @shell.Cmd("tar",["-czf","target/candidate/moonbit-source.tar.gz","-C",workspace+"/candidate","."]).run()
+  @fs.write_file("target/candidate/moonbit-consumer.txt",workspace+"\nPASS: opened engine, Thin HTTP, Full HTTP; local workspace candidate, not registry publication\n")
+}

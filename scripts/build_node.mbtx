@@ -242,8 +242,8 @@ async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
     }
     MacOS => {
       {
-        cc_exe: "clang",
-        link_exe: "clang",
+        cc_exe: "/usr/bin/clang",
+        link_exe: "/usr/bin/clang",
         msvc_lib: "",
         winkits_ucrt_lib: "",
         winkits_um_lib: "",

@@ -26,7 +26,9 @@ async fn main {
     }
     @fs.write_file(uapi+"/limits.h","#include_next <limits.h>\n#include <linux/limits.h>\n")
     @fs.write_file(uapi+"/probe.c","#include <limits.h>\n#include <linux/openat2.h>\n#ifndef NAME_MAX\n#error NAME_MAX is required by moonbitlang/async\n#endif\n")
-    env["C_INCLUDE_PATH"]=uapi
+    // CPATH is searched before musl's system headers, so the limits.h shim
+    // can add NAME_MAX; C_INCLUDE_PATH is searched too late for that shim.
+    env["CPATH"]=uapi
     @shell.Cmd("musl-gcc",["-std=c11","-c",uapi+"/probe.c","-o",uapi+"/probe.o"],env~).run()
     env["MOON_CC"]="musl-gcc"
     // Moon otherwise derives musl-ar from musl-gcc; musl-tools provides no such binary.

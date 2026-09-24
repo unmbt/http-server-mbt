@@ -40,13 +40,17 @@ async fn main {
     for file in files {
       if file=="manifest.json" { continue }
       let path=dir+"/"+file
+      // async/fs.walk includes directory names in `files` as well as recursing into them.
+      if @fs.kind(path)!=@fs.Regular { continue }
       // Toolchain bootstrap downloads are not candidate artifacts.
       if file.has_prefix("moonbit-") && file!="moonbit-source.tar.gz" { continue }
       artifacts.push({"path":path["target/candidate/".length():].to_owned(),"bytes":@fs.read_file(path).binary().length(),"sha256":digest(path,windows,os=="Darwin")})
     }
-  })
+  },max_concurrency=1)
   let sha=@shell.Cmd("git",["rev-parse","HEAD"]).output().stdout().trim().to_owned()
-  let dirty=@shell.Cmd("git",["status","--porcelain"]).output().stdout().trim()!=""
+  let status=@shell.Cmd("git",["status","--porcelain"]).output();status.check()
+  let dirty=status.stdout().trim()!=""
+  if dirty { println("Candidate source tree changes:\n"+status.stdout()) }
   let run=@env.get_env_var("GITHUB_RUN_ID").unwrap_or("")
   let repo=@env.get_env_var("GITHUB_REPOSITORY").unwrap_or("unmbt/http-server-mbt")
   let manifest : Json={"schema":1,"commit":sha,"dirty":dirty,"os":os,"cpu":cpu,

@@ -8,7 +8,33 @@ async fn main {
   let env : Map[String,String]=Map([])
   if os=="linux" {
     let cc=@shell.Cmd("musl-gcc",["--version"]).output();cc.check()
+    let ar=@shell.Cmd("ar",["--version"]).output();ar.check()
+    // Ubuntu's musl-dev has libc headers, while kernel UAPI headers live in
+    // the host include tree. Copy only UAPI directories so glibc headers
+    // cannot shadow musl's libc headers during the static build.
+    let uapi=@env.current_dir().unwrap()+"/target/musl-uapi"
+    if !@fs.exists(uapi) { @fs.mkdir(uapi,recursive=true) }
+    for (source,name) in [
+      ("/usr/include/linux","linux"),
+      ("/usr/include/asm-generic","asm-generic"),
+      ("/usr/include/x86_64-linux-gnu/asm","asm"),
+    ] {
+      if !@fs.exists(source) { fail("missing Linux UAPI headers: "+source) }
+      if !@fs.exists(uapi+"/"+name) {
+        @shell.Cmd("cp",["-R",source,uapi+"/"+name]).run()
+      }
+    }
+    // async/src/fs/dir.c uses NAME_MAX after including dirent.h. glibc
+    // exposes it there, while musl requires an explicit definition.
+    @fs.write_file(uapi+"/dirent.h","#include_next <dirent.h>\n#ifndef NAME_MAX\n#define NAME_MAX 255\n#endif\n")
+    @fs.write_file(uapi+"/probe.c","#include <dirent.h>\n#include <linux/openat2.h>\n#ifndef NAME_MAX\n#error NAME_MAX is required by moonbitlang/async\n#endif\n")
+    // CPATH is searched before musl's system headers, so the dirent.h shim
+    // is applied without bringing glibc headers into the build.
+    env["CPATH"]=uapi
+    @shell.Cmd("musl-gcc",["-std=c11","-c",uapi+"/probe.c","-o",uapi+"/probe.o"],env~).run()
     env["MOON_CC"]="musl-gcc"
+    // Moon otherwise derives musl-ar from musl-gcc; musl-tools provides no such binary.
+    env["MOON_AR"]="ar"
     env["HTTP_SERVER_STATIC_MUSL"]="1"
   }
   @shell.Cmd("moon",["build","cmd/http-server-mbt","cmd/http-server-mbt-thin","--target","native","--release","--deny-warn","--target-dir","target/cli-build"],env~).run()

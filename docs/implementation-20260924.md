@@ -31,3 +31,19 @@
 ## 待验收
 
 三平台 Actions、Linux musl/四组合镜像、完整外部消费者、长时故障探索和候选清单仍未验收。工具链告警清理、共享 CLI、打包与门槛仍在实施。T-025/T-034 及其他多平台总任务保持未勾选。C/Node 异步嵌入、io_uring、wasm-gc 引擎保留最终发行约束。
+
+## 99ef485 后续 CI 修复（R-N13、D-08/D-11/D-15/D-16、T-020/T-022/T-025）
+
+99ef485 之后的三平台候选工作流出现工具链及构建驱动错误。以下记录仅针对候选验证，不改变上述未完成任务的总状态。
+
+| 提交 / Actions run | Windows x86_64 | Linux x86_64 | macOS arm64 | 汇总 |
+|---|---|---|---|---|
+| `8b95fe2` / [36001995029](https://github.com/unmbt/http-server-mbt/actions/runs/36001995029) | Native 263/263、wasm-gc core 28/28；sanitizer 缺 MoonBit 头路径 | Native 263/263、wasm-gc core 28/28、ASan/UBSan 回放通过；musl 归档器名错误 | Native 263/263、wasm-gc core 28/28；LLVM clang 缺 Xcode SDK | native 三项失败，gate 未运行 |
+| `0da7ef6` / [36004622793](https://github.com/unmbt/http-server-mbt/actions/runs/36004622793) | sanitizer 回放通过；后续继续推进 | sanitizer 回放通过；musl 缺内核 UAPI 头 | Apple clang 编译通过；系统不支持 ASan leak 检测 | native 三项失败，gate 未运行 |
+| `6a5060c` / [36008629525](https://github.com/unmbt/http-server-mbt/actions/runs/36008629525) | native job 通过 | native job 通过，含 musl 静态 CLI、四种 Linux 容器候选 | native job 通过，含 C/Rust/Python 与 Node 消费 | 三份候选 artifact 已上传；gate 对 manifest 的 `dirty` 判定失败 |
+| `8355b38` / [36010910505](https://github.com/unmbt/http-server-mbt/actions/runs/36010910505) | native job 通过 | native job 通过；诊断确认未跟踪的 `llvm/` 来自 LLVM 安装 Action | native job 通过 | gate 同样拒绝脏 manifest；修复为将 LLVM 安装到 `runner.temp` |
+| `2ae484d` / [36012285236](https://github.com/unmbt/http-server-mbt/actions/runs/36012285236) | [native Windows x86_64](https://github.com/unmbt/http-server-mbt/actions/runs/36012285236/job/107675763196) 通过 | [native Linux x86_64](https://github.com/unmbt/http-server-mbt/actions/runs/36012285236/job/107675763389) 通过 | [native macOS arm64](https://github.com/unmbt/http-server-mbt/actions/runs/36012285236/job/107675763396) 通过 | [candidate-gate](https://github.com/unmbt/http-server-mbt/actions/runs/36012285236/job/107678389526) 通过；同提交、三平台候选清单及逐文件 SHA-256 校验成立 |
+
+最后一次运行的三份上传 artifact SHA-256：Linux X64 `47c3c36d11d7cdc675fa1db45114b42e5c065b4489154050eff380d89f4885b1`，Windows X64 `e5c41119cf006c5fb04891988c594a133d52002c35a3e6a592157697f16bc50c`，macOS ARM64 `09cafd328909046ac4a0d4956d79bb08f5240e86bbec1aabc1a4b2ab4d98286d`。gate 从 Actions 下载并重新核对 artifact digest，随后验证三份 manifest 的提交、平台、干净工作树、文件大小和 SHA-256。候选验证通过不等于 registry 发布、完整发行或 T-025 总任务完成。
+
+本机 Windows，Moon 0.1.20260920：`moon run scripts/check_automation.mbtx`、`moon check --target native --deny-warn`、`git diff --check` 通过。`moon test --target native --deny-warn` 曾 261/263，两条句柄计数断言各差 1；分别重跑相关测试文件 7/7、7/7 通过。完整测试结果以同一提交的 Actions job 为准，本机波动仍须单独追踪。修复保留在草稿 PR #2；T-025 涵盖的最终发行范围尚未全部完成，不因候选 gate 通过而勾选。

@@ -43,7 +43,7 @@ jobs:
           CANDIDATE_RUN: ${{ inputs.candidate_run }}
           RELEASE_COMMIT: ${{ inputs.commit }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: moon run scripts/release_gate.mbtx
+        run: moon run scripts/release/release_gate.mbtx
       - name: Publish already-validated artifacts without rebuilding
         uses: softprops/action-gh-release@v3
         with:

@@ -1,9 +1,0 @@
-import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs" }
-async fn main {
-  let files=[("LICENSE","project-MIT.txt"),("c_abi/node/LICENSE-NODE.txt","Node.txt"),("c_abi/node/PROVENANCE.md","Node-PROVENANCE.md"),("full/LICENSE-MPL-2.0.txt","Mozilla-MPL-2.0.txt"),("full/CA-PROVENANCE.md","CA-PROVENANCE.md"),("tls/mbedtls-4.2.0/LICENSE","MbedTLS.txt"),("tls/mbedtls-4.2.0/tf-psa-crypto/LICENSE","TF-PSA-Crypto.txt"),(".mooncakes/moonbitlang/async/LICENSE","MoonBit-async.txt")]
-  for destination in ["target/candidate/licenses","npm/http-server/licenses","npm/win32-x64-msvc/licenses","npm/linux-x64-gnu/licenses","npm/darwin-arm64/licenses"] {
-    if !@fs.exists(destination) { @fs.mkdir(destination,recursive=true) }
-    for (source,name) in files { @fs.write_file(destination+"/"+name,@fs.read_file(source)) }
-  }
-  for pkg in ["http-server","win32-x64-msvc","linux-x64-gnu","darwin-arm64"] { @fs.write_file("npm/"+pkg+"/LICENSE",@fs.read_file("LICENSE")) }
-}

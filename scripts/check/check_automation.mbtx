@@ -1,0 +1,34 @@
+///|
+// Check all maintained MoonBit automation, including generators and diagnostics.
+// Run from the repository root. Historical rewrite scripts live only in Git.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+}
+
+///|
+async fn check_directory(path : String) -> Int {
+  let mut checked = 0
+  for entry in @fs.readdir(path, sort=true) {
+    // Moon's formatter writes script copies below _build; these are not sources.
+    if entry == "_build" || entry == "target" || entry.has_prefix(".") {
+      continue
+    }
+    let child = path + "/" + entry
+    if @fs.kind(child) is Directory {
+      checked += check_directory(child)
+    } else if child.has_suffix(".mbtx") {
+      @shell.Cmd("moon", ["check", child, "--deny-warn"]).run()
+      checked += 1
+    }
+  }
+  checked
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["check", "build.mbtx", "--deny-warn"]).run()
+  let count = check_directory("scripts")
+  println("Checked build.mbtx and \{count} maintained scripts")
+}

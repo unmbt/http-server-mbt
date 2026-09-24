@@ -107,7 +107,12 @@ pub(all) suberror ConfigError {
   InvalidHeader(String)
   InvalidTimeout(String)
   InvalidTls(String)
+  InvalidLimits(String)
 } derive(Eq, @debug.Debug)
+pub fn ConfigError::equal(Self, Self) -> Bool
+pub fn ConfigError::not_equal(Self, Self) -> Bool
+pub fn ConfigError::output(Self, &Logger) -> Unit
+pub fn ConfigError::to_repr(Self) -> @debug.Repr
 pub fn ConfigError::to_string(Self) -> String
 pub impl Show for ConfigError
 
@@ -117,20 +122,30 @@ pub(all) suberror PathError {
   TraversalForbidden(String)
   NotFound(String)
 } derive(Eq, @debug.Debug)
+pub fn PathError::equal(Self, Self) -> Bool
+pub fn PathError::not_equal(Self, Self) -> Bool
+pub fn PathError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
 } derive(Eq, @debug.Debug)
+pub fn ByteRange::equal(Self, Self) -> Bool
+pub fn ByteRange::not_equal(Self, Self) -> Bool
+pub fn ByteRange::to_repr(Self) -> @debug.Repr
 
 pub(all) enum CachePolicy {
   MaxAge(Int)
   NoCache
   Exact(String)
 } derive(Eq, @debug.Debug)
+pub fn CachePolicy::equal(Self, Self) -> Bool
+pub fn CachePolicy::not_equal(Self, Self) -> Bool
+pub fn CachePolicy::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Config {
+  limits : RuntimeLimits
   root : String
   port : Int
   address : String
@@ -184,28 +199,38 @@ pub fn Config::has_tls(Self) -> Bool
 pub fn Config::has_websocket_proxy(Self) -> Bool
 pub fn Config::middleware_default(String) -> Self
 pub fn Config::proxy_targets_include_https(Self) -> Bool
+pub fn Config::to_repr(Self) -> @debug.Repr
 pub fn Config::validate(Self) -> Unit raise ConfigError
 
 pub(all) struct EntityTag {
   tag : String
   is_weak : Bool
 } derive(Eq, @debug.Debug)
+pub fn EntityTag::equal(Self, Self) -> Bool
 pub fn EntityTag::from_metadata(Int64, Int64, Bool) -> Self
 pub fn EntityTag::new(String, Bool) -> Self
+pub fn EntityTag::not_equal(Self, Self) -> Bool
 pub fn EntityTag::parse(String) -> Self?
 pub fn EntityTag::to_header_value(Self) -> String
+pub fn EntityTag::to_repr(Self) -> @debug.Repr
 
 pub(all) enum FallbackMode {
   None
   Spa
   TryFiles(String)
 } derive(Eq, @debug.Debug)
+pub fn FallbackMode::equal(Self, Self) -> Bool
+pub fn FallbackMode::not_equal(Self, Self) -> Bool
+pub fn FallbackMode::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Method {
   Get
   Head
   Other(String)
 } derive(Eq, @debug.Debug)
+pub fn Method::equal(Self, Self) -> Bool
+pub fn Method::not_equal(Self, Self) -> Bool
+pub fn Method::to_repr(Self) -> @debug.Repr
 
 pub(all) struct MimeRegistry {
   table : Map[String, String]
@@ -221,12 +246,18 @@ pub(all) struct ProxyRule {
   target : String
   path_rewrite : Array[(String, String)]
 } derive(Eq, @debug.Debug)
+pub fn ProxyRule::equal(Self, Self) -> Bool
+pub fn ProxyRule::not_equal(Self, Self) -> Bool
+pub fn ProxyRule::to_repr(Self) -> @debug.Repr
 
 pub(all) enum RangeResult {
   Satisfiable(ByteRange)
   NotSatisfiable
   NotApplicable
 } derive(Eq, @debug.Debug)
+pub fn RangeResult::equal(Self, Self) -> Bool
+pub fn RangeResult::not_equal(Self, Self) -> Bool
+pub fn RangeResult::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Request {
   meth : Method
@@ -239,7 +270,24 @@ pub(all) enum ResponseBody {
   Bytes(Bytes)
   FileRegion(String, Int64, Int64)
 } derive(Eq, @debug.Debug)
+pub fn ResponseBody::equal(Self, Self) -> Bool
 pub fn ResponseBody::length(Self) -> Int
+pub fn ResponseBody::not_equal(Self, Self) -> Bool
+pub fn ResponseBody::to_repr(Self) -> @debug.Repr
+
+pub(all) struct RuntimeLimits {
+  file_workers : Int
+  queued_operations : Int
+  connections : Int
+  body_block_bytes : Int
+  body_buffer_bytes : Int
+  directory_metadata_bytes : Int
+} derive(Eq, @debug.Debug)
+pub fn RuntimeLimits::default() -> Self
+pub fn RuntimeLimits::equal(Self, Self) -> Bool
+pub fn RuntimeLimits::not_equal(Self, Self) -> Bool
+pub fn RuntimeLimits::to_repr(Self) -> @debug.Repr
+pub fn RuntimeLimits::validate(Self) -> Unit raise ConfigError
 
 pub(all) enum SecurityDecision {
   Proceed
@@ -247,6 +295,7 @@ pub(all) enum SecurityDecision {
   Forbidden(Map[String, String], Bytes)
   Preflight(Map[String, String])
 } derive(@debug.Debug)
+pub fn SecurityDecision::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

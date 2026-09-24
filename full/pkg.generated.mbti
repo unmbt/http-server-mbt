@@ -25,12 +25,17 @@ pub async fn with_server_at(@core.Config, Int, async (@server.Server) -> Unit) -
 pub struct TlsServerAcceptor {
   tls_acceptor : @tls.TlsAcceptor
 }
+pub async fn TlsServerAcceptor::accept(Self, @socket.Tcp) -> @server.Transport
+pub fn TlsServerAcceptor::close(Self) -> Unit
+pub fn TlsServerAcceptor::is_tls(Self) -> Bool
 pub fn TlsServerAcceptor::new(@tls.TlsAcceptor) -> Self
 pub impl @server.Acceptor for TlsServerAcceptor
 
 pub struct TlsUpstreamConnector {
   tls_acceptor : @tls.TlsAcceptor
 }
+pub fn TlsUpstreamConnector::close(Self) -> Unit
+pub async fn TlsUpstreamConnector::connect(Self, @server.TargetUrl) -> @server.Transport
 pub fn TlsUpstreamConnector::new(@tls.TlsAcceptor) -> Self
 pub impl @server.UpstreamConnector for TlsUpstreamConnector
 

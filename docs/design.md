@@ -1,5 +1,9 @@
 # http-server-mbt 重构设计
 
+## 2026-09-25 仓库组织修订（D-02、D-08、D-10、D-14、D-16、D-18）
+
+关联 R-SDD/R-COMPAT/R-N11/R-N13、T-025/T-026/T-030/T-034。公开 MoonBit 包路径、运行时行为和发行门槛不变。自动化入口按 build/check/release/maintenance/diagnostics 分类，安装脚本 URL 保持稳定；完成的一次性源码迁移器由 Git 保存，不作为可重复执行的维护入口。文档区分当前规范与历史快照。包内单元/黑盒/白盒测试保持 MoonBit 包边界，独立资源探针和外部消费者统一置于 tests，静态 fixtures 保留在 testdata。重命名以行为为依据，保留测试用例及 R/D/T/C/N 编号；共享辅助代码只合并已核对等价的实现。候选源码打包随路径迁移调整，生成接口由当前工具链重建。执行与验证记录见 [仓库整理](repository-layout-20260925.md)。
+
 ## 2026-09-24 实施修订（D-03、D-05～D-08、D-14～D-18、D-20）
 
 本修订优先于下文历史实现描述。当前已有 Native 源码；历史“待创建/没有源码”不再描述当前状态。
@@ -294,7 +298,7 @@ Native C ABI 由库创建并管理内部 owner 线程，同一 runtime 的托管
 | Windows 独立包 | CRT 策略避免要求用户安装额外 redistributable；仅依赖目标系统自带 DLL；DLL 与宿主不能跨 CRT 交叉 free |
 | Docker thin/full | 分别封装精简/完整 Linux 静态 CLI；默认 Distroless static nonroot 基础层，保留 scratch 变体；功能、标签与验收见 D-15 |
 
-TLS 选用源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0 子模块，Apache-2.0/GPL-2.0 双许可、采用 Apache-2.0），T-002/T-012 固定补丁版本、tarball SHA-256、最小化构建配置和许可证，并验证三平台可链接性；不继承当前 async Unix 动态加载 OpenSSL 的实现，也不要求用户安装任何 TLS 运行库。版本 5 变更理由（替代原 OpenSSL 3 决策，经用户 2026-09-13 确认）：源码随包经 moon native-stub 直接编译，无预编译产物与外部 `-l` 链接依赖（实测依赖包声明的 cc-link-flags 不传播到最终链接，moonbitlang/moon#1595）；PSA Crypto 为唯一加密 API 且 RNG 由 PSA 托管，无需 entropy/ctr_drbg 接线；组件更小、嵌入与三平台静态分发更可控。引入方式为 `scripts/vendor_tls.mbtx` 可复现引入：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 TLS/X.509/PSA 源码树（排除 net_sockets 等），对 `mbedtls_config.h` 追加托管 `#undef` 覆盖（禁用 NET/TIMING/FS_IO/ITS 文件/密钥存储/NV seed 等），证书过期检查所需 `MBEDTLS_HAVE_TIME_DATE` 保留；PSA `crypto_config.h` 的最小化裁剪由测试守护逐步收紧。socket 系统调用不进 C 层：TLS 经 `mbedtls_ssl_set_bio` 自定义回调桥接到 async 事件循环，WANT_READ/WANT_WRITE 映射为异步等待，PSA 初始化在进程内幂等执行一次。TLS 握手、证书/私钥/passphrase、上游 SNI、主机名与证书校验纳入测试；`secure=false` 仅在显式配置时关闭上游验证。
+TLS 选用源码 vendor 的 MbedTLS 4.2.0（含 TF-PSA-Crypto 1.2.0 子模块，Apache-2.0/GPL-2.0 双许可、采用 Apache-2.0），T-002/T-012 固定补丁版本、tarball SHA-256、最小化构建配置和许可证，并验证三平台可链接性；不继承当前 async Unix 动态加载 OpenSSL 的实现，也不要求用户安装任何 TLS 运行库。版本 5 变更理由（替代原 OpenSSL 3 决策，经用户 2026-09-13 确认）：源码随包经 moon native-stub 直接编译，无预编译产物与外部 `-l` 链接依赖（实测依赖包声明的 cc-link-flags 不传播到最终链接，moonbitlang/moon#1595）；PSA Crypto 为唯一加密 API 且 RNG 由 PSA 托管，无需 entropy/ctr_drbg 接线；组件更小、嵌入与三平台静态分发更可控。引入方式为 `scripts/maintenance/vendor_tls.mbtx` 可复现引入：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 TLS/X.509/PSA 源码树（排除 net_sockets 等），对 `mbedtls_config.h` 追加托管 `#undef` 覆盖（禁用 NET/TIMING/FS_IO/ITS 文件/密钥存储/NV seed 等），证书过期检查所需 `MBEDTLS_HAVE_TIME_DATE` 保留；PSA `crypto_config.h` 的最小化裁剪由测试守护逐步收紧。socket 系统调用不进 C 层：TLS 经 `mbedtls_ssl_set_bio` 自定义回调桥接到 async 事件循环，WANT_READ/WANT_WRITE 映射为异步等待，PSA 初始化在进程内幂等执行一次。TLS 握手、证书/私钥/passphrase、上游 SNI、主机名与证书校验纳入测试；`secure=false` 仅在显式配置时关闭上游验证。
 
 完整包内嵌有来源/版本记录的信任根 bundle，支持显式 CA 配置覆盖；证书、私钥和站点文件属于部署数据，不是语言运行时依赖。精简包不携带 TLS 信任根。静态 Linux 的 DNS/localhost 与 IPv6 行为在最小环境实测，不能用“链接成功”证明无运行依赖。
 
@@ -363,11 +367,11 @@ T-002 验证路径为：固定支持 C 生成的工具链/编译模式 → 导�
 - **thin 版本**：基于 `c_abi/thin`，仅包含纯静态 HTTP 服务，不含 TLS/代理功能及 MbedTLS C 依赖；Windows 产物为动态库 `hs_thin.dll`（配套 import library `hs_thin.lib`）与静态归档 `hs_thin_static.lib`；dumpbin 审计验证静态归档中 0 `mbedtls_*` / `psa_*` 符号。平台 runtime 的通用系统库不计入该功能边界。
 - **full 版本**：基于 `c_abi/full`，集成 MbedTLS TLS 传输层与反向代理能力；Windows 产物为动态库 `hs_full.dll`（配套 import library `hs_full.lib`）与静态归档 `hs_full_static.lib`。
 
-构建流水线通过纯 MoonBit 脚本 `scripts/build_cabi.mbtx` 驱动：
+构建流水线通过纯 MoonBit 脚本 `scripts/build/build_cabi.mbtx` 驱动：
 1. 编译 `c_abi/thin` 与 `c_abi/full` 产出目标 `.obj` 对象文件并按排除规则暂存（过滤测试对象与无关包）。
 2. **符号隔离与导出控制**：MoonBit 编译器会在对象文件的 `.drectve` 段注入 `#pragma comment(linker, "/EXPORT:...")` 指令，导致 `link.exe /DLL` 默认泄露内部运行时函数与 CLI `main`；构建脚本通过 `llvm-objcopy --remove-section=.drectve --remove-section=.voltbl --remove-section=.gfids` 预先清洗对象文件，并配合 MSVC 模块定义文件（`hs_thin.def`、`hs_full.def`）白名单强制约束，确保动态库严格仅导出 5 项公共 `hs_*` 符号（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`），严禁暴露任何内部符号或 `main`。
 3. **静态库与导入库隔离**：Windows MSVC 的静态归档命名为 `hs_*_static.lib`，与动态库生成的 import library `hs_*.lib` 明确区分，避免调用方误将导入库当作静态库链接。
-4. **独立消费者验收**：在 `testdata/c_consumer/` 下建立独立的 C 消费者测试程序（`test_dynamic_thin.c`, `test_static_thin.c`, `test_dynamic_full.c`, `test_static_full.c`），经由 MSVC `cl.exe` 分别独立编译链接并运行，验证 ABI 版本读取、服务启动/停止/销毁与 TLS 预检拦截。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
+4. **独立消费者验收**：在 `tests/consumers/c/` 下建立独立的 C 消费者测试程序（`test_dynamic_thin.c`, `test_static_thin.c`, `test_dynamic_full.c`, `test_static_full.c`），经由 MSVC `cl.exe` 分别独立编译链接并运行，验证 ABI 版本读取、服务启动/停止/销毁与 TLS 预检拦截。Rust 消费通过 C ABI 与 Cargo 链接配置，不输出依赖 Rust 编译器私有 ABI 的 `.rlib`；Rust 官方的[原生库链接规则](https://doc.rust-lang.org/reference/items/external-blocks.html#linking-modifiers-bundle)是消费侧参考。
 
 静态分发包包含引擎 archive、必要 runtime 对象及随包依赖 archives、同版头文件、target triple/CRT/PIC/构建特性/许可证与传递链接清单。可以是明确清单中的多个 archive，不承诺将一切塞入一个 .a；支持静态链接进 `.node`/其他共享对象的构建须包含适用的 PIC，不能仅把非 PIC 的 CLI 对象归档。D-08 的 MbedTLS/TF-PSA-Crypto 以源码随包编译，其对象随 full 引擎 archive 一并归档，不引入独立的预编译 TLS archive 条目；许可证与源码哈希进传递依赖清单。
 
@@ -492,7 +496,7 @@ GitHub Actions YAML 与 Dockerfile 是工作流/构建声明格式，允许编�
 
 保存输入语料、种子、调度事件、工具链/平台和最小复现；对失败案例最小化后加入固定回归集。PR 在三平台回放固定语料并运行有界探索，workflow_dispatch 可运行更长探索；运行预算只控制测试资源，不是产品性能指标。ASan/UBSan 或平台适用检查与模糊测试结合，超时/死锁、崩溃、泄漏及断言失败必须报失败，不把无法运行记录为通过。驱动和语料管理使用 `.mbtx`；底层可调用适用的编译器模糊测试工具。
 
-预检资源回归使用 `tests/preflight_handles` 独立 Native 测试进程，包内资源探针互斥串行，避免同进程其他服务测试的句柄干扰。预热后逐次确认 `InvalidTls` 且启动回调未执行，要求操作后进程句柄数不高于操作前（零增长容差）；句柄减少不判作泄漏。保留 CI 的 `244 → 243` 回归样本，并以真实文件句柄的保留/释放验证探针能够拒绝增长、接受回落。该检查验证隔离操作的净增长，不能将进程总数解释为逐对象所有权证明；N-21 的其他生命周期及 sanitizer 检查仍保留。
+预检资源回归使用 `tests/resources/preflight` 独立 Native 测试进程，包内资源探针互斥串行，避免同进程其他服务测试的句柄干扰。预热后逐次确认 `InvalidTls` 且启动回调未执行，要求操作后进程句柄数不高于操作前（零增长容差）；句柄减少不判作泄漏。保留 CI 的 `244 → 243` 回归样本，并以真实文件句柄的保留/释放验证探针能够拒绝增长、接受回落。该检查验证隔离操作的净增长，不能将进程总数解释为逐对象所有权证明；N-21 的其他生命周期及 sanitizer 检查仍保留。
 
 ## D-19 CLI 启动横幅与停止提示
 

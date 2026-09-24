@@ -1,6 +1,6 @@
 <div align="center">
 
-[English](./README.md) | [简体中文](./README.zh.md)
+[English](README.md) | [简体中文](README.zh.md)
 
 # 🚀 http-server-mbt
 
@@ -200,7 +200,7 @@ cd http-server-mbt
 moon update
 moon check --target native
 
-# Run the complete test suite (240 tests on the current Windows baseline)
+# Run the complete Native test suite
 moon test --target native
 
 # Build release executable
@@ -212,5 +212,7 @@ The compiled binary will be located at `_build/native/release/build/cmd/http-ser
 ---
 
 ## 📄 License
+
+Developer navigation: [documentation](docs/README.md), [scripts](scripts/README.md), [tests](tests/README.md).
 
 This project is licensed under the [MIT License](LICENSE). The underlying asynchronous networking library `moonbitlang/async` is licensed under Apache-2.0.

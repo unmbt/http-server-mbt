@@ -2,6 +2,7 @@
 package "unmbt/http-server-mbt/tls"
 
 import {
+  "moonbitlang/async",
   "moonbitlang/async/io",
   "moonbitlang/core/debug",
 }
@@ -18,6 +19,7 @@ pub suberror TlsError {
   TlsError(code~ : Int, message~ : String)
   TlsUnexpectedEof
 } derive(@debug.Debug)
+pub fn TlsError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
 type AcceptorObj
@@ -43,11 +45,25 @@ pub struct TlsConn {
   rb : @io.ReaderBuffer
   in_scratch : FixedArray[Byte]
   out_scratch : FixedArray[Byte]
+  input_gate : @async.Mutex
+  output_gate : @async.Mutex
   mut closed : Bool
 }
+pub async fn TlsConn::_direct_read(Self, FixedArray[Byte], offset~ : Int, max_len~ : Int) -> Int
+pub fn TlsConn::_get_internal_buffer(Self) -> @io.ReaderBuffer
 pub fn TlsConn::close(Self) -> Unit
+pub async fn TlsConn::drop(Self, Int) -> Int
 pub fn TlsConn::is_closed(Self) -> Bool
+pub async fn TlsConn::read(Self, FixedArray[Byte], offset? : Int, max_len? : Int) -> Int
+pub async fn TlsConn::read_all(Self) -> &@io.Data
+pub async fn TlsConn::read_exactly(Self, Int) -> Bytes
+pub async fn TlsConn::read_some(Self, max_len? : Int) -> Bytes?
+pub async fn TlsConn::read_until(Self, StringView) -> String?
 pub async fn TlsConn::shutdown(Self) -> Bool
+pub async fn TlsConn::shutdown_write(Self) -> Bool
+pub async fn TlsConn::write(Self, &@io.Data) -> Unit
+pub async fn TlsConn::write_once(Self, Bytes, offset~ : Int, len~ : Int) -> Int
+pub async fn TlsConn::write_reader(Self, &@io.Reader) -> Unit
 pub impl @io.Reader for TlsConn
 pub impl @io.Writer for TlsConn
 

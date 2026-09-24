@@ -1,0 +1,36 @@
+///|
+// A successful run validates this scope only. It never publishes a registry.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+}
+
+///|
+async fn main {
+  let version = @shell.Cmd("moon", ["version", "--all"]).output()
+  version.check()
+  if !version.stdout().contains("0.1.20260920") {
+    fail(
+      "expected Moon 0.1.20260920; dependency upgrades require a reviewed change",
+    )
+  }
+  if !@fs.read_file("moon.mod").text().contains("moonbitlang/async@0.21.3") {
+    fail("async pin drifted")
+  }
+  assert_eq(@fs.read_file("testdata/public/hello.txt").binary().length(), 14)
+  @shell.Cmd("moon", ["run", "scripts/check/check_automation.mbtx"]).run()
+  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["test", "--target", "native", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["check", "core", "--target", "wasm-gc", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_native_sanitizers.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/build/build_cli.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/build/build_cabi.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_external_consumers.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_moonbit_consumer.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/build/build_node.mbtx"]).run()
+  println(
+    "Platform validation finished. Node 22/24 candidate install and Linux containers remain separate mandatory workflow steps.",
+  )
+}

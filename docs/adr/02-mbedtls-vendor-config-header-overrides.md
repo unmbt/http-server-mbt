@@ -6,7 +6,7 @@
 
 ## 上下文 (Context)
 
-按 [ADR-01](./01-choose-mbedtls-4.2-for-tls-engine.md)，TLS 引擎采用源码 vendor 的 Mbed TLS 4.2.0（含 TF-PSA-Crypto 1.2.0），引入方式为 `scripts/vendor_tls.mbtx` 可复现脚本：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 10 个源码子树的 `*.c`/`*.h` 及 LICENSE 到 `tls/mbedtls-4.2.0/`。
+按 [ADR-01](01-choose-mbedtls-4.2-for-tls-engine.md)，TLS 引擎采用源码 vendor 的 Mbed TLS 4.2.0（含 TF-PSA-Crypto 1.2.0），引入方式为 `scripts/maintenance/vendor_tls.mbtx` 可复现脚本：固定下载 URL 与 SHA-256（`2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`），提取 10 个源码子树的 `*.c`/`*.h` 及 LICENSE 到 `tls/mbedtls-4.2.0/`。
 
 2026-09-14 的核查结论：从官方 release URL 重新下载 tarball（SHA-256 与 pin 一致）并逐文件比对，vendored 树 282 个文件中 **280 个与官方 tarball 字节级完全一致**，唯二例外是两个配置头：
 
@@ -19,7 +19,7 @@
 
 ## 决策 (Decision)
 
-两处头文件的改写全部由 `scripts/vendor_tls.mbtx` 自动施加（幂等，两次运行产物逐字节一致），共两类变换：
+两处头文件的改写全部由 `scripts/maintenance/vendor_tls.mbtx` 自动施加（幂等，两次运行产物逐字节一致），共两类变换：
 
 ### 1. 文件末尾追加托管 `#undef` 覆盖块
 
@@ -88,7 +88,7 @@
 
 ### 正向影响 (Positive Consequences)
 
-* **可复现**：`moon run scripts/vendor_tls.mbtx`（可传入本地 tarball）一键重建，输出逐字节稳定。
+* **可复现**：`moon run scripts/maintenance/vendor_tls.mbtx`（可传入本地 tarball）一键重建，输出逐字节稳定。
 * **审计友好**：vendored 树与上游的差异面被永久限制在这两个头，且差异形态声明式固定；对官方源码做安全 diff 时一眼可尽。
 * **边界保证**：所有 C 编译单元不引用 socket/文件/持久化系统调用，产物不含对应死代码。
 
@@ -107,10 +107,10 @@
 
 * 从 `https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-4.2.0/mbedtls-4.2.0.tar.bz2` 重新下载，SHA-256 为 `2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea`，与脚本 pin 及 D-08 记录一致。
 * 逐文件字节比对：vendored 282 个文件中 280 个与 tarball 完全一致；两个配置头的差异与本文声明的变换（ASCII 清洗 + 追加托管块）逐字节重建吻合。
-* 完备性：tarball 10 个拷贝子树内 280 个 `*.c`/`*.h` 文件在 vendored 树中无缺失、无多余。初始清单（109 项）与 “vendored `*.c` − `library/net_sockets.c` + `tls_bridge.c`” 完全一致；2026-09-23 起由 T-035 的裁剪规则额外排除未使用调试、PKCS#7、CSR/证书生成和 SSL cache/cookie 源，当前生成清单为 100 项，来源与排除项均由 `scripts/vendor_tls.mbtx` 再生。
+* 完备性：tarball 10 个拷贝子树内 280 个 `*.c`/`*.h` 文件在 vendored 树中无缺失、无多余。初始清单（109 项）与 “vendored `*.c` − `library/net_sockets.c` + `tls_bridge.c`” 完全一致；2026-09-23 起由 T-035 的裁剪规则额外排除未使用调试、PKCS#7、CSR/证书生成和 SSL cache/cookie 源，当前生成清单为 100 项，来源与排除项均由 `scripts/maintenance/vendor_tls.mbtx` 再生。
 
 ## 相关
 
-* [ADR-01: 选择 Mbed TLS 4.2 作为底层 TLS 引擎](./01-choose-mbedtls-4.2-for-tls-engine.md)
+* [ADR-01: 选择 Mbed TLS 4.2 作为底层 TLS 引擎](01-choose-mbedtls-4.2-for-tls-engine.md)
 * [design D-08 构建、TLS 与分发](../design.md)
-* [scripts/vendor_tls.mbtx](../../scripts/vendor_tls.mbtx)
+* [scripts/maintenance/vendor_tls.mbtx](../../scripts/maintenance/vendor_tls.mbtx)

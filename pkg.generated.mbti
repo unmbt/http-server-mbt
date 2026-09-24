@@ -2,8 +2,8 @@
 package "unmbt/http-server-mbt"
 
 import {
-  "moonbitlang/async/types",
-  "moonbitlang/core/debug",
+  "moonbitlang/async/io",
+  "moonbitlang/async/socket",
   "unmbt/http-server-mbt/core",
 }
 
@@ -14,8 +14,6 @@ pub fn get_handle_count() -> UInt
 
 pub fn render_directory_listing_html(String, Array[(String, Bool)], raw_query? : String?, host? : String) -> String
 
-pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
-
 pub async fn[T] with_engine(@core.Config, async (StaticEngine) -> T) -> T
 
 // Errors
@@ -24,20 +22,15 @@ pub suberror ServerError {
   Forbidden(String)
   Io(String)
   FileChanged(String)
-} derive(@debug.Debug)
+  Closed
+  Busy
+  Overloaded
+}
 pub fn ServerError::forbidden(String) -> Self
 pub fn ServerError::invalid_request(String) -> Self
 pub fn ServerError::io(String) -> Self
 
 // Types and methods
-pub struct FileLease {
-  path : String
-  initial_size : Int64
-  initial_mtime : (Int64, Int)
-} derive(@debug.Debug)
-pub async fn FileLease::acquire(String) -> Self?
-pub async fn FileLease::is_mutated(Self) -> Bool
-
 pub(all) enum HandleResult {
   Handled(Response)
   Next
@@ -47,18 +40,24 @@ pub(all) enum HandleResult {
 pub struct Response {
   status : Int
   headers : Map[String, String]
-  body : @core.ResponseBody
-} derive(@debug.Debug)
-pub fn Response::close(Self) -> Unit
-pub async fn Response::read(Self, offset? : Int, max_len? : Int) -> Bytes
-pub async fn Response::to_bytes(Self) -> Bytes
+  // private fields
+}
+pub fn Response::body_length(Self) -> Int64
+pub async fn Response::check(Self) -> Unit
+pub async fn Response::close(Self) -> Unit
+pub fn Response::content_length(Self) -> Int64?
+pub async fn Response::read(Self, max_len? : Int) -> Bytes
+pub async fn Response::send_to(Self, @socket.Tcp) -> Unit
+pub async fn Response::to_bytes(Self, max_bytes~ : Int) -> Bytes
+pub async fn Response::write_to(Self, &@io.Writer, chunked? : Bool) -> Unit
 
 pub struct StaticEngine {
   config : @core.Config
-  mime_registry : @core.MimeRegistry
+  // private fields
 }
+pub async fn StaticEngine::close(Self) -> Unit
 pub async fn StaticEngine::handle(Self, @core.Request) -> HandleResult
-pub fn StaticEngine::new(@core.Config) -> Self
+pub async fn StaticEngine::open(@core.Config) -> Self
 
 // Type aliases
 

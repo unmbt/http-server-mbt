@@ -1,6 +1,6 @@
 <div align="center">
 
-[English](./README.md) | [简体中文](./README.zh.md)
+[English](README.md) | [简体中文](README.zh.md)
 
 # 🚀 http-server-mbt
 
@@ -200,7 +200,7 @@ cd http-server-mbt
 moon update
 moon check --target native
 
-# 运行全套测试（当前 Windows 基线为 240 项）
+# 运行全套 Native 测试
 moon test --target native
 
 # 编译原生 Release 二进制文件
@@ -212,5 +212,7 @@ moon build --target native --release
 ---
 
 ## 📄 许可证
+
+开发入口：[文档导航](docs/README.md)、[脚本说明](scripts/README.md)、[测试布局](tests/README.md)。
 
 本项目基于 [MIT 许可证](LICENSE) 开源，依赖的底层异步库 `moonbitlang/async` 基于 Apache-2.0 许可证。

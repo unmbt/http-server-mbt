@@ -1,7 +1,0 @@
-import {
-  "moonbitlang/async",
-  "unmbt/http-server-mbt" @static,
-  "unmbt/http-server-mbt/core",
-  "unmbt/http-server-mbt/internal/native",
-} for "test"
-options(targets: { "*.mbt": ["native"] })

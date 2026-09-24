@@ -1,0 +1,509 @@
+///|
+// Build script for Node-API native addon (@unmbt/http-server-mbt).
+//
+// Drives Node-API C compilation (c_abi/node/addon.c), static linking against
+// MoonBit Full engine static archive (hs_full_static.lib / libhs_full.a),
+// and outputs self-contained .node binaries into npm/<platform>/ and target/node/.
+//
+// Usage:
+//   moon run scripts/build/build_node.mbtx
+//
+
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+enum TargetOs {
+  Windows
+  Linux
+  MacOS
+} derive(Debug, Eq)
+
+///|
+pub impl Show for TargetOs with fn output(self, logger) {
+  match self {
+    Windows => logger.write_string("Windows")
+    Linux => logger.write_string("Linux")
+    MacOS => logger.write_string("MacOS")
+  }
+}
+
+///|
+struct Toolchain {
+  cc_exe : String
+  link_exe : String
+  msvc_lib : String
+  winkits_ucrt_lib : String
+  winkits_um_lib : String
+  include_paths : Array[String]
+}
+
+///|
+fn[T] fail_pipeline(msg : String) -> T {
+  println("ERROR: \{msg}")
+  abort(msg)
+}
+
+///|
+async fn detect_target_os() -> TargetOs {
+  if @env.get_env_var("OS") == Some("Windows_NT") {
+    return Windows
+  }
+  match @env.get_env_var("RUNNER_OS") {
+    Some("Windows") => return Windows
+    Some("macOS") => return MacOS
+    Some("Linux") => return Linux
+    _ => ()
+  }
+  let res = @shell.Cmd("uname", ["-s"]).output() catch { _ => return Linux }
+  let out = res.stdout()
+  if out.contains("Darwin") {
+    MacOS
+  } else {
+    Linux
+  }
+}
+
+///|
+async fn file_exists(path : String) -> Bool {
+  @fs.exists(path) catch {
+    _ => false
+  }
+}
+
+///|
+fn normalize_path(path : String) -> String {
+  let mut s = path.replace_all(old="\\", new="/")
+  while s.has_suffix("/") {
+    s = s[:s.length() - 1].to_owned()
+  }
+  s
+}
+
+///|
+async fn find_msvc_root_dir() -> String {
+  match @env.get_env_var("VCToolsInstallDir") {
+    Some(p) => {
+      let trimmed = normalize_path(p)
+      if file_exists(trimmed + "/bin/Hostx64/x64/cl.exe") ||
+        file_exists(trimmed + "/bin/HostX64/x64/cl.exe") {
+        return trimmed
+      }
+    }
+    None => ()
+  }
+
+  match @env.get_env_var("VCINSTALLDIR") {
+    Some(p) => {
+      let tools_dir = normalize_path(p) + "/Tools/MSVC"
+      if file_exists(tools_dir) {
+        let entries = @fs.readdir(tools_dir) catch { _ => [] }
+        for entry in entries {
+          let candidate = tools_dir + "/" + entry
+          if file_exists(candidate + "/bin/Hostx64/x64/cl.exe") ||
+            file_exists(candidate + "/bin/HostX64/x64/cl.exe") {
+            return candidate
+          }
+        }
+      }
+    }
+    None => ()
+  }
+
+  let roots = [
+    "E:/Program Files/msvc/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
+  ]
+  for root in roots {
+    if file_exists(root) {
+      let entries = @fs.readdir(root) catch { _ => [] }
+      for entry in entries {
+        let candidate = root + "/" + entry
+        if file_exists(candidate + "/bin/Hostx64/x64/cl.exe") ||
+          file_exists(candidate + "/bin/HostX64/x64/cl.exe") {
+          return candidate
+        }
+      }
+    }
+  }
+
+  let fallbacks = [
+    "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.42.34433",
+    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.43.34808",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.42.34433",
+    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.42.34433",
+  ]
+  for fb in fallbacks {
+    if file_exists(fb) {
+      return fb
+    }
+  }
+  fail_pipeline("build_node: cannot locate MSVC directory on Windows")
+}
+
+///|
+async fn find_windows_sdk_dirs() -> (String, String, String, String, String) {
+  match
+    (@env.get_env_var("WindowsSdkDir"), @env.get_env_var("WindowsSDKVersion")) {
+    (Some(sdk_dir), Some(sdk_ver)) => {
+      let sdir = normalize_path(sdk_dir)
+      let sver = normalize_path(sdk_ver)
+      let ucrt_lib = "\{sdir}/Lib/\{sver}/ucrt/x64"
+      let um_lib = "\{sdir}/Lib/\{sver}/um/x64"
+      let ucrt_inc = "\{sdir}/Include/\{sver}/ucrt"
+      let um_inc = "\{sdir}/Include/\{sver}/um"
+      let shared_inc = "\{sdir}/Include/\{sver}/shared"
+      if file_exists(ucrt_lib) {
+        return (ucrt_lib, um_lib, ucrt_inc, um_inc, shared_inc)
+      }
+      let ucrt_lib_lower = "\{sdir}/lib/\{sver}/ucrt/x64"
+      if file_exists(ucrt_lib_lower) {
+        let um_lib_lower = "\{sdir}/lib/\{sver}/um/x64"
+        let ucrt_inc_lower = "\{sdir}/include/\{sver}/ucrt"
+        let um_inc_lower = "\{sdir}/include/\{sver}/um"
+        let shared_inc_lower = "\{sdir}/include/\{sver}/shared"
+        return (
+          ucrt_lib_lower, um_lib_lower, ucrt_inc_lower, um_inc_lower, shared_inc_lower,
+        )
+      }
+    }
+    _ => ()
+  }
+
+  let sdk_roots = [
+    "C:/Program Files (x86)/Windows Kits/10", "C:/Program Files/Windows Kits/10",
+  ]
+  for root in sdk_roots {
+    let lib_dir = "\{root}/Lib"
+    let check_lib_dir = if file_exists(lib_dir) {
+      lib_dir
+    } else {
+      "\{root}/lib"
+    }
+    if file_exists(check_lib_dir) {
+      let vers = @fs.readdir(check_lib_dir) catch { _ => [] }
+      for ver in vers {
+        let ucrt_lib = "\{check_lib_dir}/\{ver}/ucrt/x64"
+        if file_exists(ucrt_lib) {
+          let um_lib = "\{check_lib_dir}/\{ver}/um/x64"
+          let ucrt_inc = "\{root}/Include/\{ver}/ucrt"
+          let actual_ucrt_inc = if file_exists(ucrt_inc) {
+            ucrt_inc
+          } else {
+            "\{root}/include/\{ver}/ucrt"
+          }
+          let um_inc = "\{root}/Include/\{ver}/um"
+          let actual_um_inc = if file_exists(um_inc) {
+            um_inc
+          } else {
+            "\{root}/include/\{ver}/um"
+          }
+          let shared_inc = "\{root}/Include/\{ver}/shared"
+          let actual_shared_inc = if file_exists(shared_inc) {
+            shared_inc
+          } else {
+            "\{root}/include/\{ver}/shared"
+          }
+          return (
+            ucrt_lib, um_lib, actual_ucrt_inc, actual_um_inc, actual_shared_inc,
+          )
+        }
+      }
+    }
+  }
+
+  fail_pipeline("build_node: cannot locate Windows Kits SDK directory")
+}
+
+///|
+async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
+  match target_os {
+    Windows => {
+      let msvc_root = find_msvc_root_dir()
+      let msvc_bin = if file_exists(msvc_root + "/bin/Hostx64/x64/cl.exe") {
+        msvc_root + "/bin/Hostx64/x64"
+      } else if file_exists(msvc_root + "/bin/HostX64/x64/cl.exe") {
+        msvc_root + "/bin/HostX64/x64"
+      } else {
+        msvc_root + "/bin/Hostx64/x64"
+      }
+      let msvc_lib = msvc_root + "/lib/x64"
+      let msvc_inc = msvc_root + "/include"
+
+      let (
+        winkits_ucrt_lib,
+        winkits_um_lib,
+        winkits_ucrt_inc,
+        winkits_um_inc,
+        winkits_shared_inc,
+      ) = find_windows_sdk_dirs()
+
+      {
+        cc_exe: msvc_bin + "/cl.exe",
+        link_exe: msvc_bin + "/link.exe",
+        msvc_lib,
+        winkits_ucrt_lib,
+        winkits_um_lib,
+        include_paths: [
+          msvc_inc, winkits_ucrt_inc, winkits_um_inc, winkits_shared_inc,
+        ],
+      }
+    }
+    Linux =>
+      {
+        cc_exe: "clang",
+        link_exe: "clang",
+        msvc_lib: "",
+        winkits_ucrt_lib: "",
+        winkits_um_lib: "",
+        include_paths: [],
+      }
+    MacOS =>
+      {
+        cc_exe: "/usr/bin/clang",
+        link_exe: "/usr/bin/clang",
+        msvc_lib: "",
+        winkits_ucrt_lib: "",
+        winkits_um_lib: "",
+        include_paths: [],
+      }
+  }
+}
+
+///|
+async fn find_node_lib_windows() -> String {
+  // Node-API 8 import library, fixed independently of the host test version.
+  // Its exact hash is checked even when using an existing local cache.
+  let cached = @env.get_env_var("LOCALAPPDATA").unwrap_or("") +
+    "/node-gyp/Cache/20.16.0/x64/node.lib"
+  let path = if file_exists(cached) {
+    cached
+  } else {
+    let dir = "target/node/toolchain"
+    if !file_exists(dir) {
+      @fs.mkdir(dir, recursive=true)
+    }
+    let file = dir + "/node-v20.16.0.lib"
+    if !file_exists(file) {
+      @shell.Cmd("curl.exe", [
+        "--fail", "--location", "--silent", "--show-error", "https://nodejs.org/dist/v20.16.0/win-x64/node.lib",
+        "-o", file,
+      ]).run()
+    }
+    file
+  }
+  let hash = @shell.Cmd("certutil", ["-hashfile", path, "SHA256"]).output()
+  hash.check()
+  if !hash
+    .stdout()
+    .to_lower()
+    .contains(
+      "87056190b7cd06f40058f8e059efd328cdcc7600b825afa102c0aa5039865af5",
+    ) {
+    fail_pipeline("Node import library hash mismatch")
+  }
+  path
+}
+
+///|
+async fn main {
+  println("==================================================================")
+  println("http-server-mbt Node-API Build Pipeline (@unmbt/http-server-mbt)")
+  println("==================================================================")
+
+  let target_os = detect_target_os()
+  println("Target OS: \{target_os}")
+
+  println("1. Discovering toolchain...")
+  let tc = discover_toolchain(target_os)
+  println("  Compiler: \{tc.cc_exe}")
+  println("  Linker: \{tc.link_exe}")
+
+  println("2. Verifying MoonBit Full C ABI static archive...")
+  let static_archive = match target_os {
+    Windows => "target/cabi/hs_full_static.lib"
+    Linux | MacOS => "target/cabi/libhs_full.a"
+  }
+  if !file_exists(static_archive) {
+    println(
+      "Static archive \{static_archive} not found! Building via scripts/build/build_cabi.mbtx...",
+    )
+    let b_res = @shell.Cmd("moon", ["run", "scripts/build/build_cabi.mbtx"]).output()
+    if b_res.exit_code() != 0 {
+      println(
+        "ERROR: scripts/build/build_cabi.mbtx failed with code \{b_res.exit_code()}",
+      )
+      println("STDOUT:\n" + b_res.stdout())
+      println("STDERR:\n" + b_res.stderr())
+      fail_pipeline("failed to build C ABI static archive")
+    }
+  }
+  if !file_exists(static_archive) {
+    fail_pipeline(
+      "Static archive \{static_archive} still does not exist after build!",
+    )
+  }
+  println("  Found: \{static_archive}")
+
+  println("3. Preparing output directories...")
+  if !file_exists("target/node") {
+    @fs.mkdir("target/node", recursive=true)
+  }
+
+  let (platform_dir, node_filename) = match target_os {
+    Windows => ("npm/win32-x64-msvc", "http_server.win32-x64-msvc.node")
+    Linux => ("npm/linux-x64-gnu", "http_server.linux-x64-gnu.node")
+    MacOS => ("npm/darwin-arm64", "http_server.darwin-arm64.node")
+  }
+  if !file_exists(platform_dir) {
+    @fs.mkdir(platform_dir, recursive=true)
+  }
+  let out_path = "\{platform_dir}/\{node_filename}"
+  let target_copy = "target/node/\{node_filename}"
+
+  println("4. Compiling and linking Node-API addon...")
+  match target_os {
+    Windows => {
+      let node_lib = find_node_lib_windows()
+      println("  Using node.lib: \{node_lib}")
+
+      let obj_dst = "target/node/addon.obj"
+      let cc_args : Array[String] = [
+        "/nologo", "/c", "/O2", "/DHS_STATIC", "/D_AMD64_", "/I", "c_abi/node/include",
+        "/I", "c_abi/include",
+      ]
+      for inc in tc.include_paths {
+        cc_args.push("/I")
+        cc_args.push(inc)
+      }
+      cc_args.push("/Fo:\{obj_dst}")
+      cc_args.push("c_abi/node/addon.c")
+
+      let cc_res = @shell.Cmd(tc.cc_exe, cc_args).output()
+      if cc_res.exit_code() != 0 {
+        println("ERROR: cl.exe failed to compile addon.c:")
+        println("STDOUT:\n" + cc_res.stdout())
+        println("STDERR:\n" + cc_res.stderr())
+        fail_pipeline("cl.exe failed for addon.c")
+      }
+
+      println("  Linking \{out_path}...")
+      let link_args : Array[String] = [
+        "/nologo",
+        "/DLL",
+        "/LIBPATH:target/cabi",
+        "/LIBPATH:\{tc.msvc_lib}",
+        "/LIBPATH:\{tc.winkits_ucrt_lib}",
+        "/LIBPATH:\{tc.winkits_um_lib}",
+        "/OUT:\{out_path}",
+        obj_dst,
+        "hs_full_static.lib",
+        node_lib,
+        "kernel32.lib",
+        "libcmt.lib",
+        "crypt32.lib",
+        "secur32.lib",
+        "iphlpapi.lib",
+        "ws2_32.lib",
+        "mswsock.lib",
+        "userenv.lib",
+        "advapi32.lib",
+        "synchronization.lib",
+        "dbghelp.lib",
+        "bcrypt.lib",
+        "shell32.lib",
+        "/NODEFAULTLIB:msvcrt.lib",
+      ]
+      let link_res = @shell.Cmd(tc.link_exe, link_args).output()
+      if link_res.exit_code() != 0 {
+        println("ERROR: link.exe failed:")
+        println("STDOUT:\n" + link_res.stdout())
+        println("STDERR:\n" + link_res.stderr())
+        fail_pipeline("link.exe failed for \{out_path}")
+      }
+    }
+    Linux => {
+      let obj_dst = "target/node/addon.o"
+      let cc_args = [
+        "-c", "-fPIC", "-O2", "-DHS_STATIC", "-I", "c_abi/node/include", "-I", "c_abi/include",
+        "c_abi/node/addon.c", "-o", obj_dst,
+      ]
+      let cc_res = @shell.Cmd(tc.cc_exe, cc_args).output()
+      if cc_res.exit_code() != 0 {
+        println("ERROR: clang failed to compile addon.c:")
+        println("STDOUT:\n" + cc_res.stdout())
+        println("STDERR:\n" + cc_res.stderr())
+        fail_pipeline("clang failed for addon.c")
+      }
+
+      println("  Linking \{out_path}...")
+      let link_args = [
+        "-shared", "-fPIC", "-o", out_path, obj_dst, "target/cabi/libhs_full.a",
+        "-lpthread", "-lm", "-ldl",
+      ]
+      let link_res = @shell.Cmd(tc.link_exe, link_args).output()
+      if link_res.exit_code() != 0 {
+        println("ERROR: clang failed to link \{out_path}:")
+        println("STDOUT:\n" + link_res.stdout())
+        println("STDERR:\n" + link_res.stderr())
+        fail_pipeline("clang failed for \{out_path}")
+      }
+    }
+    MacOS => {
+      let obj_dst = "target/node/addon.o"
+      let cc_args = [
+        "-c", "-fPIC", "-O2", "-DHS_STATIC", "-arch", "arm64", "-I", "c_abi/node/include",
+        "-I", "c_abi/include", "c_abi/node/addon.c", "-o", obj_dst,
+      ]
+      let cc_res = @shell.Cmd(tc.cc_exe, cc_args).output()
+      if cc_res.exit_code() != 0 {
+        println("ERROR: clang failed to compile addon.c:")
+        println("STDOUT:\n" + cc_res.stdout())
+        println("STDERR:\n" + cc_res.stderr())
+        fail_pipeline("clang failed for addon.c")
+      }
+
+      println("  Linking \{out_path}...")
+      let link_args = [
+        "-dynamiclib", "-undefined", "dynamic_lookup", "-arch", "arm64", "-o", out_path,
+        obj_dst, "target/cabi/libhs_full.a", "-lpthread", "-lm",
+      ]
+      let link_res = @shell.Cmd(tc.link_exe, link_args).output()
+      if link_res.exit_code() != 0 {
+        println("ERROR: clang failed to link \{out_path}:")
+        println("STDOUT:\n" + link_res.stdout())
+        println("STDERR:\n" + link_res.stderr())
+        fail_pipeline("clang failed for \{out_path}")
+      }
+    }
+  }
+
+  // Copy to target/node/ for fallback access
+  @fs.write_file(target_copy, @fs.read_file(out_path).binary())
+
+  let size = @fs.read_file(out_path).binary().length()
+  println("  -> Built successfully: \{out_path} (\{size} bytes)")
+  println("  -> Staged copy: \{target_copy}")
+
+  println("5. Performing Node.js smoke test...")
+  let test_script = "const addon = require('./\{target_copy}'); const v = addon.getAbiVersion(); if (v !== 0x10000) throw new Error('Bad ABI: ' + v); console.log('Node-API ABI Version OK: 0x' + v.toString(16));"
+  let smoke_res = @shell.Cmd("node", ["-e", test_script]).output()
+  if smoke_res.exit_code() != 0 {
+    println("ERROR: Node smoke test failed with code \{smoke_res.exit_code()}:")
+    println("STDOUT:\n" + smoke_res.stdout())
+    println("STDERR:\n" + smoke_res.stderr())
+    fail_pipeline("Node-API smoke test failed")
+  }
+  println("  -> " + smoke_res.stdout().trim().to_owned())
+
+  println("==================================================================")
+  println("Node-API addon build SUCCEEDED for \{target_os}!")
+  println("==================================================================")
+}

@@ -1,7 +1,0 @@
-// Type-check every shipped automation entry point against the pinned runtime.
-import { "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/shell" }
-async fn main {
-  for path in ["build.mbtx","scripts/build_cli.mbtx","scripts/build_cabi.mbtx","scripts/build_node.mbtx","scripts/build_docker.mbtx","scripts/check_external_consumers.mbtx","scripts/check_moonbit_consumer.mbtx","scripts/check_node_candidate.mbtx","scripts/check_native_sanitizers.mbtx","scripts/candidate_manifest.mbtx","scripts/verify_candidates.mbtx","scripts/release_gate.mbtx","scripts/validate_candidate.mbtx","scripts/check_automation.mbtx"] {
-    @shell.Cmd("moon",["check",path,"--deny-warn"]).run()
-  }
-}

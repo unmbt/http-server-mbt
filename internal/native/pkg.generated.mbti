@@ -1,0 +1,84 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/internal/native"
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/cond_var",
+  "moonbitlang/async/pipe",
+  "moonbitlang/async/types",
+}
+
+// Values
+pub fn connection_available() -> Bool
+
+pub fn process_handles() -> UInt
+
+pub fn release_body(Int) -> Unit
+
+pub fn release_connection() -> Unit
+
+pub fn shutdown_write(@types.Fd) -> Bool
+
+pub fn try_acquire_body(Int) -> Bool
+
+pub fn try_acquire_connection() -> Bool
+
+// Errors
+pub suberror NativeError {
+  FileChanged
+  Forbidden
+  Missing
+  Io
+  Overloaded
+  Closed
+  Busy
+  Unsupported
+}
+
+// Types and methods
+pub struct File {
+  runtime : Runtime
+  handle : Handle
+  kind : Int
+  size : Int64
+  mtime : Int64
+  mut closed : Bool
+  mut closing : Bool
+  mut active : Int
+  idle : @cond_var.Cond
+  mut next_id : Int
+  // private fields
+}
+pub async fn File::check(Self) -> Unit
+pub async fn File::close(Self) -> Unit
+pub async fn File::names(Self, Int64) -> (Array[String], Int)
+pub async fn File::open(Self, String) -> Self
+pub async fn File::read(Self, Int64, Int) -> Bytes
+pub async fn File::send(Self, @types.Fd, Int64, Int) -> Int64?
+
+type Handle
+
+type Pool
+
+pub struct Runtime {
+  pool : Pool
+  reader : @pipe.PipeRead
+  writer : @pipe.PipeWrite
+  gate : @async.Mutex
+  idle : @cond_var.Cond
+  mut active : Int
+  mut closing : Bool
+  mut closed : Bool
+  mut next_id : Int
+  // private fields
+}
+pub async fn Runtime::close(Self) -> Unit
+pub fn Runtime::new(workers~ : Int, capacity~ : Int, body_bytes? : Int, directory_bytes? : Int, connections? : Int) -> Self raise
+pub async fn Runtime::open_root(Self, String) -> File
+pub fn Runtime::release(Self, directory~ : Bool, Int) -> Unit
+pub fn Runtime::reserve(Self, directory~ : Bool, Int) -> Unit raise
+pub fn Runtime::stop(Self) -> Unit
+
+// Type aliases
+
+// Traits

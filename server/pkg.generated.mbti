@@ -21,10 +21,6 @@ pub fn parse_proxy_rules(String) -> Array[@core.ProxyRule]
 
 pub fn parse_target_url(String) -> TargetUrl?
 
-pub async fn proxy_http_request(Server, Transport, @core.Method, Map[String, String], String, String) -> Bool
-
-pub async fn transmit_file(@types.Fd, String, Int64, Int64) -> Int
-
 pub async fn with_server(@core.Config, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
 
 pub async fn with_server_at(@core.Config, Int, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
@@ -36,12 +32,17 @@ pub async fn with_server_at_with_connector(@core.Config, Int, acceptor? : &Accep
 // Types and methods
 pub struct PlainAcceptor {
 }
+pub async fn PlainAcceptor::accept(Self, @socket.Tcp) -> Transport
+pub fn PlainAcceptor::close(Self) -> Unit
+pub fn PlainAcceptor::is_tls(Self) -> Bool
 pub fn PlainAcceptor::new() -> Self
 pub fn PlainAcceptor::plain() -> &Acceptor
 pub impl Acceptor for PlainAcceptor
 
 pub struct PlainUpstreamConnector {
 }
+pub fn PlainUpstreamConnector::close(Self) -> Unit
+pub async fn PlainUpstreamConnector::connect(Self, TargetUrl) -> Transport
 pub fn PlainUpstreamConnector::new() -> Self
 pub impl UpstreamConnector for PlainUpstreamConnector
 
@@ -54,6 +55,7 @@ pub struct Server {
   proxy_rules : Array[@core.ProxyRule]
   mut stopped : Bool
   mut task : @async.Task[Unit]?
+  mut accept_task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int]
 }
 pub fn Server::acceptor(Self) -> &Acceptor
@@ -73,9 +75,12 @@ pub struct TargetUrl {
   port : Int
   base_path : String
 } derive(Eq, @debug.Debug)
+pub fn TargetUrl::equal(Self, Self) -> Bool
 pub fn TargetUrl::host(Self) -> String
+pub fn TargetUrl::not_equal(Self, Self) -> Bool
 pub fn TargetUrl::port(Self) -> Int
 pub fn TargetUrl::scheme(Self) -> String
+pub fn TargetUrl::to_repr(Self) -> @debug.Repr
 
 pub struct Transport {
   reader : &@io.Reader
@@ -83,11 +88,13 @@ pub struct Transport {
   raw_fd : @types.Fd?
   raw_tcp : @socket.Tcp?
   close_fn : () -> Unit
+  shutdown_write_fn : (async () -> Bool)?
 }
 pub fn Transport::close(Self) -> Unit
-pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : @types.Fd, raw_tcp? : @socket.Tcp) -> Self
+pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : @types.Fd, raw_tcp? : @socket.Tcp, shutdown_write_fn? : async () -> Bool) -> Self
 pub fn Transport::plain(@socket.Tcp) -> Self
 pub async fn Transport::send(Self, &@io.Data) -> Bool
+pub async fn Transport::shutdown_write(Self) -> Bool
 
 // Type aliases
 

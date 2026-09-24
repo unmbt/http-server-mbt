@@ -54,19 +54,19 @@ jobs:
         with:
           node-version: '22.21.1'
       - name: Native, resource, CLI, C ABI and external MoonBit/C/Rust/Python checks
-        run: moon run scripts/validate_candidate.mbtx
+        run: moon run scripts/check/validate_candidate.mbtx
       - name: Node 22 offline candidate installation and lifecycle
-        run: moon run scripts/check_node_candidate.mbtx
+        run: moon run scripts/check/check_node_candidate.mbtx
       - uses: actions/setup-node@v7
         with:
           node-version: '24.10.0'
       - name: Node 24 offline candidate installation and lifecycle
-        run: moon run scripts/check_node_candidate.mbtx
+        run: moon run scripts/check/check_node_candidate.mbtx
       - name: Linux four-container matrix
         if: runner.os == 'Linux'
-        run: moon run scripts/build_docker.mbtx
+        run: moon run scripts/build/build_docker.mbtx
       - name: Record same-commit candidate inventory
-        run: moon run scripts/candidate_manifest.mbtx
+        run: moon run scripts/release/candidate_manifest.mbtx
       - uses: actions/upload-artifact@v7
         with:
           name: candidate-${{ runner.os }}-${{ runner.arch }}
@@ -93,4 +93,4 @@ jobs:
           pattern: candidate-*
           path: target/verified-candidates
       - name: Check OS/CPU, commit and artifact SHA-256
-        run: moon run scripts/verify_candidates.mbtx
+        run: moon run scripts/release/verify_candidates.mbtx

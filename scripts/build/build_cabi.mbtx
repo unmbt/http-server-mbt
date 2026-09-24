@@ -1,0 +1,1292 @@
+///|
+// Build script for C ABI dynamic and static libraries (D-07, D-11, T-020, T-027).
+//
+// Drives MoonBit compilation, object staging, symbol isolation stripping,
+// dynamic library linking (hs_thin.dll / libhs_thin.so / libhs_thin.dylib),
+// static library archiving (hs_thin_static.lib / libhs_thin.a), and
+// standalone C consumer smoke tests across Windows, Linux, and macOS.
+//
+// Usage:
+//   moon run scripts/build/build_cabi.mbtx
+//
+
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+enum TargetOs {
+  Windows
+  Linux
+  MacOS
+} derive(Debug, Eq)
+
+///|
+pub impl Show for TargetOs with fn output(self, logger) {
+  match self {
+    Windows => logger.write_string("Windows")
+    Linux => logger.write_string("Linux")
+    MacOS => logger.write_string("MacOS")
+  }
+}
+
+///|
+struct Toolchain {
+  target_os : TargetOs
+  cc_exe : String
+  link_exe : String
+  lib_exe : String
+  sym_exe : String
+  objcopy_exe : String
+  msvc_lib : String
+  winkits_ucrt_lib : String
+  winkits_um_lib : String
+  include_paths : Array[String]
+  moon_lib_dir : String
+}
+
+///|
+fn[T] fail_pipeline(msg : String) -> T {
+  println("ERROR: \{msg}")
+  abort(msg)
+}
+
+///|
+async fn detect_target_os() -> TargetOs {
+  if @env.get_env_var("OS") == Some("Windows_NT") {
+    return Windows
+  }
+  match @env.get_env_var("RUNNER_OS") {
+    Some("Windows") => return Windows
+    Some("macOS") => return MacOS
+    Some("Linux") => return Linux
+    _ => ()
+  }
+  let res = @shell.Cmd("uname", ["-s"]).output() catch { _ => return Linux }
+  let out = res.stdout()
+  if out.contains("Darwin") {
+    MacOS
+  } else {
+    Linux
+  }
+}
+
+///|
+async fn file_exists(path : String) -> Bool {
+  @fs.exists(path) catch {
+    _ => false
+  }
+}
+
+///|
+async fn find_existing(candidates : Array[String]) -> String? {
+  for path in candidates {
+    if file_exists(path) {
+      return Some(path)
+    }
+  }
+  None
+}
+
+///|
+fn normalize_path(path : String) -> String {
+  let mut s = path.replace_all(old="\\", new="/")
+  while s.has_suffix("/") {
+    s = s[:s.length() - 1].to_owned()
+  }
+  s
+}
+
+///|
+async fn find_msvc_root_dir() -> String {
+  // 1. Check VCToolsInstallDir environment variable (set by msvc-dev-cmd)
+  match @env.get_env_var("VCToolsInstallDir") {
+    Some(p) => {
+      let trimmed = normalize_path(p)
+      if file_exists(trimmed + "/bin/Hostx64/x64/cl.exe") ||
+        file_exists(trimmed + "/bin/HostX64/x64/cl.exe") {
+        return trimmed
+      }
+    }
+    None => ()
+  }
+
+  // 2. Check VCINSTALLDIR
+  match @env.get_env_var("VCINSTALLDIR") {
+    Some(p) => {
+      let tools_dir = normalize_path(p) + "/Tools/MSVC"
+      if file_exists(tools_dir) {
+        let entries = @fs.readdir(tools_dir) catch { _ => [] }
+        for entry in entries {
+          let candidate = tools_dir + "/" + entry
+          if file_exists(candidate + "/bin/Hostx64/x64/cl.exe") ||
+            file_exists(candidate + "/bin/HostX64/x64/cl.exe") {
+            return candidate
+          }
+        }
+      }
+    }
+    None => ()
+  }
+
+  // 3. Scan candidate MSVC root directories
+  let roots = [
+    "E:/Program Files/msvc/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
+  ]
+  for root in roots {
+    if file_exists(root) {
+      let entries = @fs.readdir(root) catch { _ => [] }
+      for entry in entries {
+        let candidate = root + "/" + entry
+        if file_exists(candidate + "/bin/Hostx64/x64/cl.exe") ||
+          file_exists(candidate + "/bin/HostX64/x64/cl.exe") {
+          return candidate
+        }
+      }
+    }
+  }
+
+  // 4. Fallback to hardcoded versions
+  let fallbacks = [
+    "E:/Program Files/msvc/VC/Tools/MSVC/14.42.34433", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.42.34433",
+    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.43.34808",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.42.34433",
+    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.42.34433",
+  ]
+  for fb in fallbacks {
+    if file_exists(fb) {
+      return fb
+    }
+  }
+  fail_pipeline("build_cabi: cannot locate MSVC directory on Windows")
+}
+
+///|
+async fn find_windows_sdk_dirs() -> (String, String, String, String, String) {
+  // 1. Check WindowsSdkDir and WindowsSDKVersion env vars
+  match
+    (@env.get_env_var("WindowsSdkDir"), @env.get_env_var("WindowsSDKVersion")) {
+    (Some(sdk_dir), Some(sdk_ver)) => {
+      let sdir = normalize_path(sdk_dir)
+      let sver = normalize_path(sdk_ver)
+      let ucrt_lib = "\{sdir}/Lib/\{sver}/ucrt/x64"
+      let um_lib = "\{sdir}/Lib/\{sver}/um/x64"
+      let ucrt_inc = "\{sdir}/Include/\{sver}/ucrt"
+      let um_inc = "\{sdir}/Include/\{sver}/um"
+      let shared_inc = "\{sdir}/Include/\{sver}/shared"
+      if file_exists(ucrt_lib) {
+        return (ucrt_lib, um_lib, ucrt_inc, um_inc, shared_inc)
+      }
+      let ucrt_lib_lower = "\{sdir}/lib/\{sver}/ucrt/x64"
+      if file_exists(ucrt_lib_lower) {
+        let um_lib_lower = "\{sdir}/lib/\{sver}/um/x64"
+        let ucrt_inc_lower = "\{sdir}/include/\{sver}/ucrt"
+        let um_inc_lower = "\{sdir}/include/\{sver}/um"
+        let shared_inc_lower = "\{sdir}/include/\{sver}/shared"
+        return (
+          ucrt_lib_lower, um_lib_lower, ucrt_inc_lower, um_inc_lower, shared_inc_lower,
+        )
+      }
+    }
+    _ => ()
+  }
+
+  // 2. Scan Windows Kits SDK directories
+  let sdk_roots = [
+    "C:/Program Files (x86)/Windows Kits/10", "C:/Program Files/Windows Kits/10",
+  ]
+  for root in sdk_roots {
+    let lib_dir = "\{root}/Lib"
+    let check_lib_dir = if file_exists(lib_dir) {
+      lib_dir
+    } else {
+      "\{root}/lib"
+    }
+    if file_exists(check_lib_dir) {
+      let vers = @fs.readdir(check_lib_dir) catch { _ => [] }
+      for ver in vers {
+        let ucrt_lib = "\{check_lib_dir}/\{ver}/ucrt/x64"
+        if file_exists(ucrt_lib) {
+          let um_lib = "\{check_lib_dir}/\{ver}/um/x64"
+          let ucrt_inc = "\{root}/Include/\{ver}/ucrt"
+          let actual_ucrt_inc = if file_exists(ucrt_inc) {
+            ucrt_inc
+          } else {
+            "\{root}/include/\{ver}/ucrt"
+          }
+          let um_inc = "\{root}/Include/\{ver}/um"
+          let actual_um_inc = if file_exists(um_inc) {
+            um_inc
+          } else {
+            "\{root}/include/\{ver}/um"
+          }
+          let shared_inc = "\{root}/Include/\{ver}/shared"
+          let actual_shared_inc = if file_exists(shared_inc) {
+            shared_inc
+          } else {
+            "\{root}/include/\{ver}/shared"
+          }
+          return (
+            ucrt_lib, um_lib, actual_ucrt_inc, actual_um_inc, actual_shared_inc,
+          )
+        }
+      }
+    }
+  }
+
+  // 3. Fallback list of known versions
+  let versions = [
+    "10.0.26100.0", "10.0.22621.0", "10.0.22000.0", "10.0.19041.0", "10.0.18362.0",
+    "10.0.17763.0",
+  ]
+  for root in sdk_roots {
+    for ver in versions {
+      let ucrt_lib = "\{root}/lib/\{ver}/ucrt/x64"
+      if file_exists(ucrt_lib) {
+        let um_lib = "\{root}/lib/\{ver}/um/x64"
+        let ucrt_inc = "\{root}/include/\{ver}/ucrt"
+        let um_inc = "\{root}/include/\{ver}/um"
+        let shared_inc = "\{root}/include/\{ver}/shared"
+        return (ucrt_lib, um_lib, ucrt_inc, um_inc, shared_inc)
+      }
+    }
+  }
+  fail_pipeline("build_cabi: cannot locate Windows Kits SDK directory")
+}
+
+///|
+async fn find_moonbit_lib_dir(target_os : TargetOs) -> String {
+  // 1. Env vars MOON_HOME, MOON_TOOLCHAIN_ROOT
+  match @env.get_env_var("MOON_HOME") {
+    Some(h) => {
+      let p = normalize_path(h) + "/lib"
+      if file_exists(p + "/libmoonbitrun.o") {
+        return p
+      }
+    }
+    None => ()
+  }
+  match @env.get_env_var("MOON_TOOLCHAIN_ROOT") {
+    Some(h) => {
+      let p = normalize_path(h) + "/lib"
+      if file_exists(p + "/libmoonbitrun.o") {
+        return p
+      }
+    }
+    None => ()
+  }
+
+  // 2. User home directories: ~/.moon/lib
+  match @env.get_env_var("HOME") {
+    Some(h) => {
+      let p = normalize_path(h) + "/.moon/lib"
+      if file_exists(p + "/libmoonbitrun.o") {
+        return p
+      }
+    }
+    None => ()
+  }
+  match @env.get_env_var("USERPROFILE") {
+    Some(up) => {
+      let p = normalize_path(up) + "/.moon/lib"
+      if file_exists(p + "/libmoonbitrun.o") {
+        return p
+      }
+    }
+    None => ()
+  }
+
+  // 3. which moon / where moon
+  let which_cmd = match target_os {
+    Windows => "where"
+    Linux | MacOS => "which"
+  }
+  let res_opt = Some(@shell.Cmd(which_cmd, ["moon"]).output()) catch {
+    _ => None
+  }
+  match res_opt {
+    Some(res) =>
+      if res.exit_code() == 0 {
+        let stdout = res.stdout()
+        for line in stdout.split("\n") {
+          let trimmed = normalize_path(line.trim().to_owned())
+          if trimmed == "" {
+            continue
+          }
+          let mut base = trimmed
+          if base.has_suffix(".exe") {
+            base = base[:base.length() - 4].to_owned()
+          }
+          if base.has_suffix("/bin/moon") {
+            let p = base[:base.length() - 9].to_owned() + "/lib"
+            if file_exists(p + "/libmoonbitrun.o") {
+              return p
+            }
+          }
+        }
+      }
+    None => ()
+  }
+
+  // 4. Common hardcoded runner paths
+  let candidates = [
+    "/home/runner/.moon/lib", "/Users/runner/.moon/lib", "C:/Users/runneradmin/.moon/lib",
+    "E:/dev-env/moonbit/lib",
+  ]
+  for cand in candidates {
+    if file_exists(cand + "/libmoonbitrun.o") {
+      return cand
+    }
+  }
+
+  ""
+}
+
+///|
+async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
+  let moon_lib_dir = find_moonbit_lib_dir(target_os)
+  match target_os {
+    Windows => {
+      let msvc_root = find_msvc_root_dir()
+      let msvc_bin = if file_exists(msvc_root + "/bin/Hostx64/x64/cl.exe") {
+        msvc_root + "/bin/Hostx64/x64"
+      } else if file_exists(msvc_root + "/bin/HostX64/x64/cl.exe") {
+        msvc_root + "/bin/HostX64/x64"
+      } else {
+        msvc_root + "/bin/Hostx64/x64"
+      }
+      let msvc_lib = msvc_root + "/lib/x64"
+      let msvc_inc = msvc_root + "/include"
+
+      let (
+        winkits_ucrt_lib,
+        winkits_um_lib,
+        winkits_ucrt_inc,
+        winkits_um_inc,
+        winkits_shared_inc,
+      ) = find_windows_sdk_dirs()
+
+      let objcopy_candidates = [
+        "E:/Program Files/llvm-mingw-20220906-msvcrt-x86_64/bin/llvm-objcopy.exe",
+        "C:/Program Files/LLVM/bin/llvm-objcopy.exe", "C:/ProgramData/chocolatey/bin/llvm-objcopy.exe",
+        "llvm-objcopy.exe", "llvm-objcopy",
+      ]
+      let objcopy_exe = match find_existing(objcopy_candidates) {
+        Some(p) => p
+        None => {
+          let probe = @shell.Cmd("llvm-objcopy", ["--version"]).output()
+          probe.check()
+          "llvm-objcopy"
+        }
+      }
+
+      {
+        target_os: Windows,
+        cc_exe: msvc_bin + "/cl.exe",
+        link_exe: msvc_bin + "/link.exe",
+        lib_exe: msvc_bin + "/lib.exe",
+        sym_exe: msvc_bin + "/dumpbin.exe",
+        objcopy_exe,
+        msvc_lib,
+        winkits_ucrt_lib,
+        winkits_um_lib,
+        include_paths: [
+          msvc_inc, winkits_ucrt_inc, winkits_um_inc, winkits_shared_inc,
+        ],
+        moon_lib_dir,
+      }
+    }
+    Linux =>
+      {
+        target_os: Linux,
+        cc_exe: "clang",
+        link_exe: "clang",
+        lib_exe: "ar",
+        sym_exe: "nm",
+        objcopy_exe: "objcopy",
+        msvc_lib: "",
+        winkits_ucrt_lib: "",
+        winkits_um_lib: "",
+        include_paths: [],
+        moon_lib_dir,
+      }
+    MacOS =>
+      {
+        target_os: MacOS,
+        cc_exe: "/usr/bin/clang",
+        link_exe: "/usr/bin/clang",
+        lib_exe: "ar",
+        sym_exe: "nm",
+        objcopy_exe: "",
+        msvc_lib: "",
+        winkits_ucrt_lib: "",
+        winkits_um_lib: "",
+        include_paths: [],
+        moon_lib_dir,
+      }
+  }
+}
+
+///|
+async fn find_moonbit_inc_dir(tc : Toolchain) -> String {
+  if tc.moon_lib_dir != "" {
+    let cand1 = tc.moon_lib_dir + "/../include"
+    if file_exists(cand1 + "/moonbit.h") {
+      return cand1
+    }
+    let cand2 = tc.moon_lib_dir + "/include"
+    if file_exists(cand2 + "/moonbit.h") {
+      return cand2
+    }
+  }
+  let home = match @env.get_env_var("HOME") {
+    Some(h) => h
+    None => ""
+  }
+  if home != "" && file_exists(home + "/.moon/include/moonbit.h") {
+    return home + "/.moon/include"
+  }
+  ""
+}
+
+///|
+async fn compile_c_file(
+  tc : Toolchain,
+  c_src : String,
+  obj_dst : String,
+) -> Unit {
+  let moon_inc = find_moonbit_inc_dir(tc)
+  if tc.target_os == Windows {
+    let args : Array[String] = ["/nologo", "/c", "/Fo:\{obj_dst}"]
+    if moon_inc != "" {
+      args.push("/I" + moon_inc)
+    }
+    for inc in tc.include_paths {
+      args.push("/I")
+      args.push(inc)
+    }
+    args.push("/DMOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_SYSTEM")
+    args.push(c_src)
+    let res = @shell.Cmd(tc.cc_exe, args).output()
+    if res.exit_code() != 0 {
+      println("Failed to compile \{c_src}:\n\{res.stderr()}")
+    }
+    res.check()
+  } else {
+    let args : Array[String] = [
+      "-c", "-fPIC", "-fwrapv", "-fno-strict-aliasing", "-DMOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_MIMALLOC",
+    ]
+    if moon_inc != "" {
+      args.push("-I" + moon_inc)
+    }
+    args.push(c_src)
+    args.push("-o")
+    args.push(obj_dst)
+    let res = @shell.Cmd(tc.cc_exe, args).output()
+    if res.exit_code() != 0 {
+      println("Failed to compile \{c_src}:\n\{res.stderr()}")
+    }
+    res.check()
+  }
+}
+
+///|
+async fn find_c_source_for_obj(src : String, tc : Toolchain) -> String {
+  let slash_idx = match src.rev_find("/") {
+    Some(i) => i + 1
+    None => 0
+  }
+  let filename = src[slash_idx:].to_owned()
+  let base_name = if filename.has_suffix(".o") {
+    filename[:filename.length() - 2].to_owned()
+  } else if filename.has_suffix(".obj") {
+    filename[:filename.length() - 4].to_owned()
+  } else {
+    filename
+  }
+
+  // 1. Check runtime: runtime-*.o -> tc.moon_lib_dir + "/runtime/*.c"
+  if base_name.has_prefix("runtime-") {
+    let rt_name = base_name[8:].to_owned()
+    let cand = tc.moon_lib_dir + "/runtime/\{rt_name}.c"
+    if file_exists(cand) {
+      return cand
+    }
+  }
+
+  // 2. Check if in .mooncakes/moonbitlang/async/
+  let prefix = ".mooncakes/moonbitlang/async/"
+  match src.find(prefix) {
+    Some(idx) => {
+      let sub = src[idx + prefix.length():]
+      let sub_c = sub
+        .replace_all(old=".obj", new=".c")
+        .replace_all(old=".o", new=".c")
+      let home = match @env.get_env_var("HOME") {
+        Some(h) => h
+        None => ""
+      }
+      if home != "" {
+        let async_root = home + "/.moon/cache/deps/v1/sources/moonbitlang/async"
+        if file_exists(async_root) {
+          for ver in ["0.21.3"] {
+            let cand = async_root + "/\{ver}/src/\{sub_c}"
+            if file_exists(cand) {
+              return cand
+            }
+          }
+        }
+      }
+    }
+    None => ()
+  }
+
+  // 3. Check if a .c file with the same name exists alongside the .o
+  let dir_path = if slash_idx > 0 {
+    src[:slash_idx - 1].to_owned()
+  } else {
+    "."
+  }
+  let direct_cand = dir_path + "/\{base_name}.c"
+  if file_exists(direct_cand) {
+    return direct_cand
+  }
+
+  // 4. Search in project root
+  let mut prj_found = ""
+  @fs.walk(".", fn(d, files) {
+    if d.contains("_build") || d.contains(".git") {
+      return
+    }
+    for f in files {
+      if f == base_name + ".c" {
+        prj_found = normalize_path(d + "/" + f)
+      }
+    }
+  })
+  prj_found
+}
+
+///|
+async fn collect_and_stage_objects(
+  staging_dir : String,
+  excluded_keywords : Array[String],
+  target_os : TargetOs,
+  objcopy_exe : String,
+  tc : Toolchain,
+) -> Array[String] {
+  if file_exists(staging_dir) {
+    @fs.rmdir(staging_dir, recursive=true)
+  }
+  @fs.mkdir(staging_dir, recursive=true)
+
+  let matched_objs : Array[String] = []
+  @fs.walk("target/cabi-build/native/release/build", fn(dir, files) {
+    for name in files {
+      if name.has_suffix(".obj") || name.has_suffix(".o") {
+        let full = normalize_path(dir + "/" + name)
+        let mut excluded = false
+        for kw in excluded_keywords {
+          if full.contains(kw) {
+            excluded = true
+            break
+          }
+        }
+        if !excluded {
+          matched_objs.push(full)
+        }
+      }
+    }
+  })
+
+  println("Staging \{matched_objs.length()} objects into \{staging_dir}...")
+  let staged_paths : Array[String] = []
+  let mut idx = 0
+  let ext = match target_os {
+    Windows => ".obj"
+    Linux | MacOS => ".o"
+  }
+  for src in matched_objs {
+    let dst = "\{staging_dir}/obj_\{idx}\{ext}"
+    @fs.write_file(dst, @fs.read_file(src).binary())
+    if target_os == Windows && objcopy_exe != "" {
+      // Strip .drectve, .voltbl, .gfids using llvm-objcopy for symbol isolation
+      let res = @shell.Cmd(objcopy_exe, [
+        "--remove-section=.drectve", "--remove-section=.voltbl", "--remove-section=.gfids",
+        dst,
+      ]).output()
+      res.check()
+    } else if target_os == Linux &&
+      (src.contains("runtime-") || src.contains(".mooncakes")) {
+      let c_src = find_c_source_for_obj(src, tc)
+      if c_src != "" {
+        println("Recompiling with -fPIC: \{src} -> \{c_src}...")
+        compile_c_file(tc, c_src, dst)
+      }
+    }
+    staged_paths.push(dst)
+    idx += 1
+  }
+  staged_paths
+}
+
+///|
+async fn build_variant(
+  variant : String,
+  tc : Toolchain,
+  excluded_keywords : Array[String],
+) -> Unit {
+  let staging_dir = "target/cabi/_staging_\{variant}"
+  let staged = collect_and_stage_objects(
+    staging_dir,
+    excluded_keywords,
+    tc.target_os,
+    tc.objcopy_exe,
+    tc,
+  )
+
+  match tc.target_os {
+    Windows => {
+      let def_file = "c_abi/\{variant}/hs_\{variant}.def"
+      let system_libs = [
+        "kernel32.lib", "libcmt.lib", "crypt32.lib", "secur32.lib", "iphlpapi.lib",
+        "ws2_32.lib", "mswsock.lib", "userenv.lib", "advapi32.lib", "synchronization.lib",
+        "dbghelp.lib", "bcrypt.lib", "shell32.lib",
+      ]
+
+      // 1. Link DLL: hs_{variant}.dll + hs_{variant}.lib
+      println("Linking hs_\{variant}.dll...")
+      let link_rsp = "\{staging_dir}/link.rsp"
+      let link_buf = StringBuilder()
+      link_buf.write_string("/DLL\n")
+      link_buf.write_string("/nologo\n")
+      link_buf.write_string("/GUARD:NO\n")
+      link_buf.write_string("/DEF:\{def_file}\n")
+      link_buf.write_string("/OUT:target/cabi/hs_\{variant}.dll\n")
+      link_buf.write_string("/IMPLIB:target/cabi/hs_\{variant}.lib\n")
+      link_buf.write_string("/NODEFAULTLIB:msvcrt.lib\n")
+      link_buf.write_string("/LIBPATH:\"\{tc.msvc_lib}\"\n")
+      link_buf.write_string("/LIBPATH:\"\{tc.winkits_ucrt_lib}\"\n")
+      link_buf.write_string("/LIBPATH:\"\{tc.winkits_um_lib}\"\n")
+      for lib in system_libs {
+        link_buf.write_string("\{lib}\n")
+      }
+      for obj in staged {
+        link_buf.write_string("\"\{obj}\"\n")
+      }
+      @fs.write_file(link_rsp, link_buf.to_string())
+
+      let link_out = @shell.Cmd(tc.link_exe, ["@\{link_rsp}"]).output()
+      if link_out.exit_code() != 0 {
+        println("ERROR: link.exe failed with exit code \{link_out.exit_code()}")
+        println("STDOUT:\n" + link_out.stdout())
+        println("STDERR:\n" + link_out.stderr())
+        fail_pipeline("link.exe failed for hs_\{variant}.dll")
+      }
+
+      // 2. Archive static library: hs_{variant}_static.lib
+      println("Creating static archive hs_\{variant}_static.lib...")
+      let lib_rsp = "\{staging_dir}/lib.rsp"
+      let lib_buf = StringBuilder()
+      lib_buf.write_string("/nologo\n")
+      lib_buf.write_string("/OUT:target/cabi/hs_\{variant}_static.lib\n")
+      for obj in staged {
+        lib_buf.write_string("\"\{obj}\"\n")
+      }
+      @fs.write_file(lib_rsp, lib_buf.to_string())
+
+      let lib_out = @shell.Cmd(tc.lib_exe, ["@\{lib_rsp}"]).output()
+      if lib_out.exit_code() != 0 {
+        println("ERROR: lib.exe failed with exit code \{lib_out.exit_code()}")
+        println("STDOUT:\n" + lib_out.stdout())
+        println("STDERR:\n" + lib_out.stderr())
+        fail_pipeline("lib.exe failed for hs_\{variant}_static.lib")
+      }
+    }
+    Linux => {
+      let version_script = "c_abi/\{variant}/hs_\{variant}.version"
+      let so_path = "target/cabi/libhs_\{variant}.so"
+      println("Linking libhs_\{variant}.so...")
+      let link_args : Array[String] = [
+        "-shared",
+        "-fPIC",
+        "-Wl,-soname,libhs_\{variant}.so",
+        "-Wl,-z,notext",
+        "-Wl,--version-script=\{version_script}",
+        "-o",
+        so_path,
+      ]
+      for obj in staged {
+        link_args.push(obj)
+      }
+      if tc.moon_lib_dir != "" {
+        let run_obj = tc.moon_lib_dir + "/libmoonbitrun.o"
+        if file_exists(run_obj) {
+          link_args.push(run_obj)
+        }
+        let simd_obj = tc.moon_lib_dir + "/simdutf.o"
+        if file_exists(simd_obj) {
+          link_args.push(simd_obj)
+        }
+        let msimd_obj = tc.moon_lib_dir + "/moonbit_simdutf.o"
+        if file_exists(msimd_obj) {
+          link_args.push(msimd_obj)
+        }
+      }
+      link_args.push("-lpthread")
+      link_args.push("-lm")
+      link_args.push("-ldl")
+
+      let link_out = @shell.Cmd(tc.link_exe, link_args).output()
+      if link_out.exit_code() != 0 {
+        println(
+          "ERROR: clang failed for libhs_\{variant}.so with exit code \{link_out.exit_code()}",
+        )
+        println("STDOUT:\n" + link_out.stdout())
+        println("STDERR:\n" + link_out.stderr())
+        fail_pipeline("clang failed for libhs_\{variant}.so")
+      }
+
+      let a_path = "target/cabi/libhs_\{variant}.a"
+      println("Creating static archive libhs_\{variant}.a...")
+      let ar_args : Array[String] = ["rcs", a_path]
+      for obj in staged {
+        ar_args.push(obj)
+      }
+      if tc.moon_lib_dir != "" {
+        let run_obj = tc.moon_lib_dir + "/libmoonbitrun.o"
+        if file_exists(run_obj) {
+          ar_args.push(run_obj)
+        }
+        let simd_obj = tc.moon_lib_dir + "/simdutf.o"
+        if file_exists(simd_obj) {
+          ar_args.push(simd_obj)
+        }
+        let msimd_obj = tc.moon_lib_dir + "/moonbit_simdutf.o"
+        if file_exists(msimd_obj) {
+          ar_args.push(msimd_obj)
+        }
+      }
+      let ar_out = @shell.Cmd(tc.lib_exe, ar_args).output()
+      if ar_out.exit_code() != 0 {
+        println(
+          "ERROR: ar failed for libhs_\{variant}.a with exit code \{ar_out.exit_code()}",
+        )
+        println("STDOUT:\n" + ar_out.stdout())
+        println("STDERR:\n" + ar_out.stderr())
+        fail_pipeline("ar failed for libhs_\{variant}.a")
+      }
+    }
+    MacOS => {
+      let syms_file = "c_abi/\{variant}/hs_\{variant}_macos.syms"
+      let dylib_path = "target/cabi/libhs_\{variant}.dylib"
+      println("Linking libhs_\{variant}.dylib...")
+      let link_args : Array[String] = [
+        "-dynamiclib",
+        "-Wl,-exported_symbols_list,\{syms_file}",
+        "-Wl,-install_name,@rpath/libhs_\{variant}.dylib",
+        "-o",
+        dylib_path,
+      ]
+      for obj in staged {
+        link_args.push(obj)
+      }
+      if tc.moon_lib_dir != "" {
+        let run_obj = tc.moon_lib_dir + "/libmoonbitrun.o"
+        if file_exists(run_obj) {
+          link_args.push(run_obj)
+        }
+        let simd_obj = tc.moon_lib_dir + "/simdutf.o"
+        if file_exists(simd_obj) {
+          link_args.push(simd_obj)
+        }
+        let msimd_obj = tc.moon_lib_dir + "/moonbit_simdutf.o"
+        if file_exists(msimd_obj) {
+          link_args.push(msimd_obj)
+        }
+      }
+      link_args.push("-lpthread")
+      link_args.push("-lm")
+
+      let link_out = @shell.Cmd(tc.link_exe, link_args).output()
+      if link_out.exit_code() != 0 {
+        println(
+          "ERROR: clang failed for libhs_\{variant}.dylib with exit code \{link_out.exit_code()}",
+        )
+        println("STDOUT:\n" + link_out.stdout())
+        println("STDERR:\n" + link_out.stderr())
+        fail_pipeline("clang failed for libhs_\{variant}.dylib")
+      }
+
+      let a_path = "target/cabi/libhs_\{variant}.a"
+      println("Creating static archive libhs_\{variant}.a...")
+      let ar_args : Array[String] = ["rcs", a_path]
+      for obj in staged {
+        ar_args.push(obj)
+      }
+      if tc.moon_lib_dir != "" {
+        let run_obj = tc.moon_lib_dir + "/libmoonbitrun.o"
+        if file_exists(run_obj) {
+          ar_args.push(run_obj)
+        }
+        let simd_obj = tc.moon_lib_dir + "/simdutf.o"
+        if file_exists(simd_obj) {
+          ar_args.push(simd_obj)
+        }
+        let msimd_obj = tc.moon_lib_dir + "/moonbit_simdutf.o"
+        if file_exists(msimd_obj) {
+          ar_args.push(msimd_obj)
+        }
+      }
+      let ar_out = @shell.Cmd(tc.lib_exe, ar_args).output()
+      if ar_out.exit_code() != 0 {
+        println(
+          "ERROR: ar failed for libhs_\{variant}.a with exit code \{ar_out.exit_code()}",
+        )
+        println("STDOUT:\n" + ar_out.stdout())
+        println("STDERR:\n" + ar_out.stderr())
+        fail_pipeline("ar failed for libhs_\{variant}.a")
+      }
+    }
+  }
+}
+
+///|
+async fn verify_exports(tc : Toolchain, dylib_path : String) -> Unit {
+  println("Verifying exports for \{dylib_path}...")
+  if tc.target_os == Windows {
+    let out = @shell.Cmd(tc.sym_exe, ["/EXPORTS", dylib_path]).output()
+    if out.exit_code() != 0 {
+      fail_pipeline("dumpbin failed on \{dylib_path}: \{out.stderr()}")
+    }
+    let stdout = out.stdout()
+    guard stdout.contains("5 number of functions") else {
+      fail_pipeline(
+        "\{dylib_path} does not export exactly 5 functions!\n\{stdout}",
+      )
+    }
+    guard stdout.contains("hs_abi_version") &&
+      stdout.contains("hs_server_start") &&
+      stdout.contains("hs_server_stop") &&
+      stdout.contains("hs_server_destroy") &&
+      stdout.contains("hs_error_copy") else {
+      fail_pipeline("\{dylib_path} missing required hs_* exports!\n\{stdout}")
+    }
+    guard !stdout.contains("main") && !stdout.contains("moonbit_") else {
+      fail_pipeline("\{dylib_path} leaks internal symbols or main!\n\{stdout}")
+    }
+  } else {
+    let nm_args = if tc.target_os == Linux {
+      ["-D", "--defined-only", dylib_path]
+    } else {
+      ["-gU", dylib_path]
+    }
+    let out = @shell.Cmd(tc.sym_exe, nm_args).output()
+    if out.exit_code() != 0 {
+      fail_pipeline("nm failed on \{dylib_path}: \{out.stderr()}")
+    }
+    let stdout = out.stdout()
+    guard stdout.contains("hs_abi_version") &&
+      stdout.contains("hs_server_start") &&
+      stdout.contains("hs_server_stop") &&
+      stdout.contains("hs_server_destroy") &&
+      stdout.contains("hs_error_copy") else {
+      fail_pipeline("\{dylib_path} missing required hs_* exports!\n\{stdout}")
+    }
+    guard !stdout.contains(" main") && !stdout.contains(" _main") else {
+      fail_pipeline("\{dylib_path} leaks main symbol!\n\{stdout}")
+    }
+    let exported : Set[String] = Set([])
+    for line in stdout.split("\n") {
+      let fields = line.split(" ").filter(s => s != "").to_array()
+      if fields.length() < 3 {
+        continue
+      }
+      let symbol = fields.last().unwrap().split("@").next().unwrap().to_owned()
+      let symbol = if tc.target_os == MacOS && symbol.has_prefix("_") {
+        symbol[1:].to_owned()
+      } else {
+        symbol
+      }
+      // ELF version-script namespace markers are not exported code/data.
+      if fields[fields.length() - 2] == "A" {
+        continue
+      }
+      exported.add(symbol)
+    }
+    assert_eq(exported.length(), 5)
+    for
+      symbol in [
+        "hs_abi_version", "hs_server_start", "hs_server_stop", "hs_server_destroy",
+        "hs_error_copy",
+      ] {
+      assert_true(exported.contains(symbol))
+    }
+  }
+  println("  -> Verified: strictly hs_* exports, zero symbol leaks.")
+}
+
+///|
+async fn verify_mbedtls_absence(tc : Toolchain, lib_path : String) -> Unit {
+  println("Verifying absence of MbedTLS symbols in \{lib_path}...")
+  let args = if tc.target_os == Windows {
+    ["/SYMBOLS", lib_path]
+  } else {
+    [lib_path]
+  }
+  let out = @shell.Cmd(tc.sym_exe, args).output()
+  if out.exit_code() != 0 {
+    fail_pipeline("symbol tool failed on \{lib_path}: \{out.stderr()}")
+  }
+  let stdout = out.stdout()
+  guard !stdout.contains("mbedtls_") && !stdout.contains("psa_") else {
+    fail_pipeline("\{lib_path} contains forbidden mbedtls or psa symbols!")
+  }
+  println("  -> Verified: zero mbedtls/psa symbols in thin static archive.")
+}
+
+///|
+async fn test_c_consumer(
+  tc : Toolchain,
+  test_name : String,
+  source_file : String,
+  lib_name : String,
+  is_static : Bool,
+) -> Unit {
+  println("Compiling consumer test \{test_name}...")
+  let exe_name = if tc.target_os == Windows {
+    "\{test_name}.exe"
+  } else {
+    test_name
+  }
+  let exe_path = "target/cabi/\{exe_name}"
+
+  if tc.target_os == Windows {
+    let args : Array[String] = ["/nologo", "/I", "c_abi/include"]
+    for inc in tc.include_paths {
+      args.push("/I")
+      args.push(inc)
+    }
+    args.push("/Fe:\{exe_path}")
+    args.push("/Fo:target/cabi/\{test_name}.obj")
+    args.push(source_file)
+    args.push("/link")
+    args.push("/LIBPATH:target/cabi")
+    args.push("/LIBPATH:\{tc.msvc_lib}")
+    args.push("/LIBPATH:\{tc.winkits_ucrt_lib}")
+    args.push("/LIBPATH:\{tc.winkits_um_lib}")
+    args.push(lib_name)
+    args.push("kernel32.lib")
+    if is_static {
+      args.push("libcmt.lib")
+      args.push("crypt32.lib")
+      args.push("secur32.lib")
+      args.push("iphlpapi.lib")
+      args.push("ws2_32.lib")
+      args.push("mswsock.lib")
+      args.push("userenv.lib")
+      args.push("advapi32.lib")
+      args.push("synchronization.lib")
+      args.push("dbghelp.lib")
+      args.push("bcrypt.lib")
+      args.push("shell32.lib")
+      args.push("/NODEFAULTLIB:msvcrt.lib")
+    }
+    let cl_out = @shell.Cmd(tc.cc_exe, args).output()
+    if cl_out.exit_code() != 0 {
+      println("cl.exe stdout:\n\{cl_out.stdout()}")
+      println("cl.exe stderr:\n\{cl_out.stderr()}")
+      fail_pipeline("cl.exe failed for \{test_name}")
+    }
+  } else {
+    let args : Array[String] = [
+      "-I", "c_abi/include", "-o", exe_path, source_file,
+    ]
+    if is_static {
+      args.push("target/cabi/\{lib_name}")
+      args.push("-lpthread")
+      args.push("-lm")
+      if tc.target_os == Linux {
+        args.push("-ldl")
+      }
+    } else {
+      args.push("-Ltarget/cabi")
+      let mut soname = lib_name
+      if soname.has_prefix("lib") {
+        soname = soname[3:].to_owned()
+      }
+      if soname.has_suffix(".so") {
+        soname = soname[:soname.length() - 3].to_owned()
+      } else if soname.has_suffix(".dylib") {
+        soname = soname[:soname.length() - 6].to_owned()
+      }
+      args.push("-l\{soname}")
+      if tc.target_os == Linux {
+        args.push("-Wl,-rpath,$ORIGIN")
+        args.push("-lpthread")
+        args.push("-lm")
+        args.push("-ldl")
+      } else {
+        args.push("-Wl,-rpath,@executable_path")
+        args.push("-Wl,-rpath,@loader_path")
+        args.push("-lpthread")
+        args.push("-lm")
+      }
+    }
+    let cc_out = @shell.Cmd(tc.cc_exe, args).output()
+    if cc_out.exit_code() != 0 {
+      println("\{tc.cc_exe} stdout:\n\{cc_out.stdout()}")
+      println("\{tc.cc_exe} stderr:\n\{cc_out.stderr()}")
+      fail_pipeline("\{tc.cc_exe} failed for \{test_name}")
+    }
+  }
+
+  println("Running consumer test \{test_name}...")
+  let run_cmd = if tc.target_os == Windows { exe_path } else { "./\{exe_name}" }
+  let run_out = @shell.Cmd(run_cmd, [], cwd="target/cabi").output()
+  if run_out.exit_code() != 0 {
+    println("Consumer test \{test_name} stdout:\n" + run_out.stdout())
+    println("Consumer test \{test_name} stderr:\n" + run_out.stderr())
+    fail_pipeline(
+      "Consumer test \{test_name} failed with code \{run_out.exit_code()}",
+    )
+  }
+  println("  -> PASS: \{test_name}")
+}
+
+///|
+async fn main {
+  println("==================================================================")
+  println("http-server-mbt C ABI Build Pipeline (D-07, D-11, T-020, T-027)")
+  println("==================================================================")
+
+  let target_os = detect_target_os()
+  println("Target OS: \{target_os}")
+
+  println("1. Discovering toolchain...")
+  let tc = discover_toolchain(target_os)
+  println("  Compiler: \{tc.cc_exe}")
+  println("  Linker: \{tc.link_exe}")
+  println("  Archiver: \{tc.lib_exe}")
+  if target_os == Windows {
+    println("  MSVC Lib: \{tc.msvc_lib}")
+    println("  UCRT Lib: \{tc.winkits_ucrt_lib}")
+    println("  UM Lib: \{tc.winkits_um_lib}")
+  }
+  if tc.moon_lib_dir != "" {
+    println("  Moon Lib: \{tc.moon_lib_dir}")
+  }
+
+  // Start with an empty, repository-contained object inventory. Removed
+  // source files must never survive as stale library members.
+  for dir in ["target/cabi-build", "target/cabi"] {
+    if file_exists(dir) {
+      let root = normalize_path(@fs.realpath("."))
+      let resolved = normalize_path(@fs.realpath(dir))
+      assert_eq(resolved, root + "/" + dir)
+      @fs.rmdir(resolved, recursive=true)
+    }
+  }
+  println("2. Building MoonBit packages...")
+  let test_min = @shell.Cmd("moon", [
+    "test", "c_abi/thin", "--target", "native", "--release", "--target-dir", "target/cabi-build",
+  ]).output()
+  if test_min.exit_code() != 0 {
+    println(
+      "ERROR: moon test c_abi/thin failed with exit code \{test_min.exit_code()}",
+    )
+    println("STDOUT:\n" + test_min.stdout())
+    println("STDERR:\n" + test_min.stderr())
+    fail_pipeline("moon test c_abi/thin failed")
+  }
+  let test_full = @shell.Cmd("moon", [
+    "test", "c_abi/full", "--target", "native", "--release", "--target-dir", "target/cabi-build",
+  ]).output()
+  if test_full.exit_code() != 0 {
+    println(
+      "ERROR: moon test c_abi/full failed with exit code \{test_full.exit_code()}",
+    )
+    println("STDOUT:\n" + test_full.stdout())
+    println("STDERR:\n" + test_full.stderr())
+    fail_pipeline("moon test c_abi/full failed")
+  }
+
+  let ext = match target_os {
+    Windows => ".obj"
+    Linux | MacOS => ".o"
+  }
+  emit_foreign_c(tc, "thin")
+  let thin_obj = "target/cabi-build/native/release/build/c_abi/thin/thin\{ext}"
+  let thin_bridge = "target/cabi-build/native/release/build/c_abi/thin/bridge\{ext}"
+  if file_exists("target/cabi-build/native/release/build/c_abi/thin/thin.c") {
+    println("Compiling thin.c to thin\{ext}...")
+    compile_c_file(
+      tc, "target/cabi-build/native/release/build/c_abi/thin/thin.c", thin_obj,
+    )
+  }
+  if !file_exists(thin_obj) || !file_exists(thin_bridge) {
+    fail_pipeline(
+      "moon build c_abi/thin failed to generate \{thin_obj} or \{thin_bridge}",
+    )
+  }
+
+  emit_foreign_c(tc, "full")
+  let full_obj = "target/cabi-build/native/release/build/c_abi/full/full\{ext}"
+  let full_bridge = "target/cabi-build/native/release/build/c_abi/full/bridge\{ext}"
+  if file_exists("target/cabi-build/native/release/build/c_abi/full/full.c") {
+    println("Compiling full.c to full\{ext}...")
+    compile_c_file(
+      tc, "target/cabi-build/native/release/build/c_abi/full/full.c", full_obj,
+    )
+  }
+  if !file_exists(full_obj) || !file_exists(full_bridge) {
+    fail_pipeline(
+      "moon build c_abi/full failed to generate \{full_obj} or \{full_bridge}",
+    )
+  }
+
+  println("3. Preparing target/cabi/ directories...")
+  if !file_exists("target/cabi") {
+    @fs.mkdir("target/cabi", recursive=true)
+  }
+  if !file_exists("target/cabi/include") {
+    @fs.mkdir("target/cabi/include", recursive=true)
+  }
+  @fs.write_file(
+    "target/cabi/include/http_server.h",
+    @fs.read_file("c_abi/include/http_server.h").binary(),
+  )
+
+  println("4. Building thin variant (no TLS backend, static HTTP server)...")
+  build_variant("thin", tc, [
+    "/cmd/", "/build/tls/", "/full/", "/c_abi/full/", "_test.", "_wbtest.", "blackbox_test",
+    "internal_test",
+  ])
+
+  println("5. Building full variant (integrated TLS & proxy)...")
+  build_variant("full", tc, [
+    "/cmd/", "/c_abi/thin/", "_test.", "_wbtest.", "blackbox_test", "internal_test",
+  ])
+
+  let (dyn_thin, stat_thin, dyn_full, stat_full) = match target_os {
+    Windows =>
+      ("hs_thin.dll", "hs_thin_static.lib", "hs_full.dll", "hs_full_static.lib")
+    Linux => ("libhs_thin.so", "libhs_thin.a", "libhs_full.so", "libhs_full.a")
+    MacOS =>
+      ("libhs_thin.dylib", "libhs_thin.a", "libhs_full.dylib", "libhs_full.a")
+  }
+
+  println("6. Verifying symbols and export isolation...")
+  verify_exports(tc, "target/cabi/\{dyn_thin}")
+  verify_exports(tc, "target/cabi/\{dyn_full}")
+  verify_mbedtls_absence(tc, "target/cabi/\{stat_thin}")
+
+  println("7. Compiling and running standalone C consumer tests...")
+  let link_dyn_thin = match target_os {
+    Windows => "hs_thin.lib"
+    Linux => "libhs_thin.so"
+    MacOS => "libhs_thin.dylib"
+  }
+  let link_dyn_full = match target_os {
+    Windows => "hs_full.lib"
+    Linux => "libhs_full.so"
+    MacOS => "libhs_full.dylib"
+  }
+
+  test_c_consumer(
+    tc, "test_dynamic_thin", "tests/consumers/c/test_dynamic_thin.c", link_dyn_thin,
+    false,
+  )
+  test_c_consumer(
+    tc, "test_static_thin", "tests/consumers/c/test_static_thin.c", stat_thin, true,
+  )
+  test_c_consumer(
+    tc, "test_dynamic_full", "tests/consumers/c/test_dynamic_full.c", link_dyn_full,
+    false,
+  )
+  test_c_consumer(
+    tc, "test_static_full", "tests/consumers/c/test_static_full.c", stat_full, true,
+  )
+
+  println("==================================================================")
+  println("C ABI Build and Verification SUCCEEDED!")
+  println("Artifacts in target/cabi/:")
+  let artifacts = match target_os {
+    Windows =>
+      [
+        "target/cabi/include/http_server.h", "target/cabi/hs_thin.dll", "target/cabi/hs_thin.lib",
+        "target/cabi/hs_thin_static.lib", "target/cabi/hs_full.dll", "target/cabi/hs_full.lib",
+        "target/cabi/hs_full_static.lib",
+      ]
+    Linux =>
+      [
+        "target/cabi/include/http_server.h", "target/cabi/libhs_thin.so", "target/cabi/libhs_thin.a",
+        "target/cabi/libhs_full.so", "target/cabi/libhs_full.a",
+      ]
+    MacOS =>
+      [
+        "target/cabi/include/http_server.h", "target/cabi/libhs_thin.dylib", "target/cabi/libhs_thin.a",
+        "target/cabi/libhs_full.dylib", "target/cabi/libhs_full.a",
+      ]
+  }
+  for art in artifacts {
+    let size = @fs.read_file(art).binary().length()
+    println("  - \{art} (\{size} bytes)")
+  }
+  println("==================================================================")
+}
+
+///|
+// T-002: this pinned toolchain emits Native foreign-library C but still attempts
+// an executable link. Accept only its documented missing-entrypoint diagnostic;
+// C compilation, controlled library linking and real consumers must all succeed.
+async fn emit_foreign_c(tc : Toolchain, variant : String) -> Unit {
+  let generated = "target/cabi-build/native/release/build/c_abi/" +
+    variant +
+    "/" +
+    variant +
+    ".c"
+  if file_exists(generated) {
+    @fs.remove(generated)
+  }
+  let result = @shell.Cmd("moon", [
+    "build",
+    "c_abi/" + variant,
+    "--target",
+    "native",
+    "--release",
+    "--deny-warn",
+    "--target-dir",
+    "target/cabi-build",
+  ]).output()
+  if result.exit_code() != 0 {
+    let diagnostic = result.stdout() + result.stderr()
+    let expected = match tc.target_os {
+      Windows => diagnostic.contains("LNK1561")
+      Linux =>
+        diagnostic.contains("undefined reference to `main'") ||
+        diagnostic.contains("undefined symbol: main")
+      MacOS =>
+        diagnostic.contains("_main") &&
+        diagnostic.contains("Undefined symbols for architecture")
+    }
+    if !expected || !file_exists(generated) {
+      println(diagnostic)
+      result.check()
+    }
+    println(
+      "T-002: verified known foreign-library executable-link limitation for " +
+      variant,
+    )
+  }
+  if !file_exists(generated) {
+    fail_pipeline("foreign-library C was not generated")
+  }
+}

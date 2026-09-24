@@ -1,0 +1,49 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/internal/framing"
+
+import {
+  "moonbitlang/async/io",
+  "moonbitlang/core/debug",
+  "unmbt/http-server-mbt/core",
+}
+
+// Values
+pub fn has_token(String, String) -> Bool
+
+// Errors
+pub suberror ProtocolError {
+  Invalid
+  Limit
+} derive(@debug.Debug)
+pub fn ProtocolError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Connection {
+  // private fields
+}
+pub async fn Connection::_direct_read(Self, FixedArray[Byte], offset~ : Int, max_len~ : Int) -> Int
+pub fn Connection::_get_internal_buffer(Self) -> @io.ReaderBuffer
+pub async fn Connection::drain(Self) -> Unit
+pub async fn Connection::drop(Self, Int) -> Int
+pub fn Connection::has_body(Self) -> Bool
+pub async fn Connection::headers(Self) -> Map[String, String]
+pub async fn Connection::line(Self, limit~ : Int) -> String
+pub fn Connection::new(&@io.Reader) -> Self
+pub async fn Connection::read(Self, FixedArray[Byte], offset? : Int, max_len? : Int) -> Int
+pub async fn Connection::read_all(Self) -> &@io.Data
+pub async fn Connection::read_body(Self, FixedArray[Byte]) -> Int
+pub async fn Connection::read_exactly(Self, Int) -> Bytes
+pub async fn Connection::read_request(Self) -> Head
+pub async fn Connection::read_some(Self, max_len? : Int) -> Bytes?
+pub async fn Connection::read_until(Self, StringView) -> String?
+pub impl @io.Reader for Connection
+
+pub struct Head {
+  request : @core.Request
+  http11 : Bool
+  keep_alive : Bool
+}
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,186 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn digest(path : String, windows : Bool, mac : Bool) -> String {
+  let result = if windows {
+    @shell.Cmd("certutil", ["-hashfile", path, "SHA256"]).output()
+  } else {
+    @shell.Cmd(
+      if mac {
+        "shasum"
+      } else {
+        "sha256sum"
+      },
+      if mac {
+        ["-a", "256", path]
+      } else {
+        [path]
+      },
+    ).output()
+  }
+  result.check()
+  for line in result.stdout().split("\n") {
+    let token = line
+      .trim()
+      .to_owned()
+      .split(" ")
+      .next()
+      .unwrap_or("")
+      .to_owned()
+      .to_lower()
+    if token.length() == 64 &&
+      token.iter().all(c => "0123456789abcdef".contains(c.to_string())) {
+      return token
+    }
+  }
+  fail("missing SHA-256 for " + path)
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["run", "scripts/maintenance/stage_licenses.mbtx"]).run()
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let os = if windows {
+    "Windows"
+  } else {
+    @shell.Cmd("uname", ["-s"]).output().stdout().trim().to_owned()
+  }
+  let cpu = if windows {
+    @env.get_env_var("PROCESSOR_ARCHITECTURE").unwrap_or("unknown")
+  } else {
+    @shell.Cmd("uname", ["-m"]).output().stdout().trim().to_owned()
+  }
+  let sdk = "target/candidate/cabi"
+  if !@fs.exists(sdk + "/include") {
+    @fs.mkdir(sdk + "/include", recursive=true)
+  }
+  @fs.write_file(
+    sdk + "/include/http_server.h",
+    @fs.read_file("c_abi/include/http_server.h"),
+  )
+  for file in @fs.readdir("target/cabi") {
+    if (file.has_prefix("hs_") || file.has_prefix("libhs_")) &&
+      (
+        file.has_suffix(".dll") ||
+        file.has_suffix(".lib") ||
+        file.has_suffix(".a") ||
+        file.has_suffix(".so") ||
+        file.has_suffix(".dylib")
+      ) {
+      @fs.write_file(sdk + "/" + file, @fs.read_file("target/cabi/" + file))
+    }
+  }
+  for version in ["v22.21.1", "v24.10.0"] {
+    assert_true(
+      @fs.read_file("target/candidate/node/" + version + ".txt")
+      .text()
+      .has_prefix("PASS " + version),
+    )
+  }
+  for variant in ["thin", "full"] {
+    let lib = if windows {
+      "hs_" + variant + ".dll"
+    } else {
+      "libhs_" + variant + (if os == "Darwin" { ".dylib" } else { ".so" })
+    }
+    let audit = if windows {
+      @shell.Cmd("llvm-readobj", ["--coff-imports", sdk + "/" + lib]).output()
+    } else if os == "Darwin" {
+      @shell.Cmd("otool", ["-L", sdk + "/" + lib]).output()
+    } else {
+      @shell.Cmd("readelf", ["-d", sdk + "/" + lib]).output()
+    }
+    audit.check()
+    @fs.write_file(sdk + "/" + lib + ".dependencies.txt", audit.stdout())
+  }
+  let licenses = "target/candidate/licenses"
+  if !@fs.exists(licenses) {
+    @fs.mkdir(licenses, recursive=true)
+  }
+  for
+    (source, name) in [
+      ("LICENSE", "project-MIT.txt"),
+      ("full/LICENSE-MPL-2.0.txt", "Mozilla-MPL-2.0.txt"),
+      ("full/CA-PROVENANCE.md", "CA-PROVENANCE.md"),
+      ("docs/container-provenance.md", "container-provenance.md"),
+    ] {
+    @fs.write_file(licenses + "/" + name, @fs.read_file(source))
+  }
+  let artifacts : Array[Json] = []
+  @fs.walk(
+    "target/candidate",
+    async fn(dir, files) {
+      for file in files {
+        if file == "manifest.json" {
+          continue
+        }
+        let path = dir + "/" + file
+        // async/fs.walk includes directory names in `files` as well as recursing into them.
+        if @fs.kind(path) != @fs.Regular {
+          continue
+        }
+        // Toolchain bootstrap downloads are not candidate artifacts.
+        if file.has_prefix("moonbit-") && file != "moonbit-source.tar.gz" {
+          continue
+        }
+        artifacts.push({
+          "path": path["target/candidate/".length():].to_owned(),
+          "bytes": @fs.read_file(path).binary().length(),
+          "sha256": digest(path, windows, os == "Darwin"),
+        })
+      }
+    },
+    max_concurrency=1,
+  )
+  let sha = @shell.Cmd("git", ["rev-parse", "HEAD"])
+    .output()
+    .stdout()
+    .trim()
+    .to_owned()
+  let status = @shell.Cmd("git", ["status", "--porcelain"]).output()
+  status.check()
+  let dirty = status.stdout().trim() != ""
+  if dirty {
+    println("Candidate source tree changes:\n" + status.stdout())
+  }
+  let run = @env.get_env_var("GITHUB_RUN_ID").unwrap_or("")
+  let repo = @env.get_env_var("GITHUB_REPOSITORY").unwrap_or(
+    "unmbt/http-server-mbt",
+  )
+  let manifest : Json = {
+    "schema": 1,
+    "commit": sha,
+    "dirty": dirty,
+    "os": os,
+    "cpu": cpu,
+    "toolchain": @shell.Cmd("moon", ["version", "--all"]).output().stdout(),
+    "clang": @shell.Cmd("clang", ["--version"]).output().stdout(),
+    "target": "native",
+    "crt": if windows {
+      "MSVC/UCRT; SDK libraries recorded in build log"
+    } else if os == "Linux" {
+      "musl CLI; host libc C ABI"
+    } else {
+      "Darwin system runtime"
+    },
+    "pic": !windows,
+    "async": "0.21.3",
+    "scope": "CLI and complete-server C/Node hosts; owned Native MoonBit engine",
+    "excluded": ["C/Node asynchronous embedding", "io_uring", "wasm-gc engine"],
+    "full_release_ready": false,
+    "actions_run": if run == "" {
+      "not run locally"
+    } else {
+      "https://github.com/\{repo}/actions/runs/\{run}"
+    },
+    "job": @env.get_env_var("GITHUB_JOB").unwrap_or("local"),
+    "artifacts": artifacts,
+  }
+  @fs.write_file("target/candidate/manifest.json", manifest.stringify(indent=2))
+}

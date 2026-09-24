@@ -23,6 +23,7 @@ pub struct Server {
   config : @core.Config
   mut stopped : Bool
   mut task : @async.Task[Unit]?
+  mut accept_task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int]
 }
 pub fn Server::active_request_count(Self) -> Int

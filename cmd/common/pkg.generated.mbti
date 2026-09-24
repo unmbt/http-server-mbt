@@ -3,22 +3,39 @@ package "unmbt/http-server-mbt/cmd/common"
 
 import {
   "moonbitlang/core/argparse",
+  "moonbitlang/core/debug",
+  "unmbt/http-server-mbt/core",
 }
 
 // Values
+pub fn build_command(thin? : Bool) -> @argparse.Command
+
 pub fn first_value(@argparse.Matches, String) -> String?
 
 pub fn parse_auth(String) -> Result[(String, String), String]
 
 pub fn parse_cache(String) -> Result[(Int, String?), String]
 
+pub fn parse_cli(ArrayView[String], thin? : Bool) -> Result[CliAction, String]
+
 pub fn parse_integer(String) -> Int?
 
 pub fn parse_port(String) -> Int?
 
+pub async fn run(thin~ : Bool, async (@core.Config, Int, async () -> Unit) -> Unit) -> Unit
+
 // Errors
 
 // Types and methods
+pub enum CliAction {
+  Help(String)
+  Version(String)
+  Run(@core.Config, Int)
+} derive(@debug.Debug)
+pub fn CliAction::output(Self, &Logger) -> Unit
+pub fn CliAction::to_repr(Self) -> @debug.Repr
+pub fn CliAction::to_string(Self) -> String
+pub impl Show for CliAction
 
 // Type aliases
 

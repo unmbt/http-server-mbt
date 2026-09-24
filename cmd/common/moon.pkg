@@ -7,7 +7,25 @@ import {
   "moonbitlang/core/argparse",
   "moonbitlang/core/encoding/utf8",
 }
-rule(name: "gen_version", command: "moon run scripts/gen_version.mbtx $input $output")
-dev_build(rule: "gen_version", input: "../../moon.mod", output: "generated_version.mbt")
-options("native-stub": ["local_ips.c", "tty.c"], targets: { "*.mbt": ["native"] },
-link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } })
+
+rule(
+  name: "gen_version",
+  command: "moon run scripts/maintenance/gen_version.mbtx $input $output",
+)
+
+dev_build(
+  rule: "gen_version",
+  input: "../../moon.mod",
+  output: "generated_version.mbt",
+)
+
+options(
+  "native-stub": [ "local_ips.c", "tty.c" ],
+  targets: { "*.mbt": [ "native" ] },
+  link: {
+    "native": {
+      "cc-flags": "${build.HS_C_FLAGS}",
+      "stub-cc-flags": "${build.HS_C_FLAGS}",
+    },
+  },
+)

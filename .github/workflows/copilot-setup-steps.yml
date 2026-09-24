@@ -31,9 +31,6 @@ jobs:
 
       - name: Set up MoonBit
         uses: hustcer/setup-moonbit@v1
-        with:
-          version: 0.1.20260920
-          core-version: 0.1.20260920
 
       - name: Verify the pinned compiler
         run: moon version --all

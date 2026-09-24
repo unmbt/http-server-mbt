@@ -24,10 +24,12 @@ async fn main {
         @shell.Cmd("cp",["-R",source,uapi+"/"+name]).run()
       }
     }
-    @fs.write_file(uapi+"/limits.h","#include_next <limits.h>\n#include <linux/limits.h>\n")
-    @fs.write_file(uapi+"/probe.c","#include <limits.h>\n#include <linux/openat2.h>\n#ifndef NAME_MAX\n#error NAME_MAX is required by moonbitlang/async\n#endif\n")
-    // CPATH is searched before musl's system headers, so the limits.h shim
-    // can add NAME_MAX; C_INCLUDE_PATH is searched too late for that shim.
+    // async/src/fs/dir.c uses NAME_MAX after including dirent.h. glibc
+    // exposes it there, while musl requires an explicit definition.
+    @fs.write_file(uapi+"/dirent.h","#include_next <dirent.h>\n#ifndef NAME_MAX\n#define NAME_MAX 255\n#endif\n")
+    @fs.write_file(uapi+"/probe.c","#include <dirent.h>\n#include <linux/openat2.h>\n#ifndef NAME_MAX\n#error NAME_MAX is required by moonbitlang/async\n#endif\n")
+    // CPATH is searched before musl's system headers, so the dirent.h shim
+    // is applied without bringing glibc headers into the build.
     env["CPATH"]=uapi
     @shell.Cmd("musl-gcc",["-std=c11","-c",uapi+"/probe.c","-o",uapi+"/probe.o"],env~).run()
     env["MOON_CC"]="musl-gcc"

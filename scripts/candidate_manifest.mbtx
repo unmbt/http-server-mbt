@@ -48,7 +48,9 @@ async fn main {
     }
   },max_concurrency=1)
   let sha=@shell.Cmd("git",["rev-parse","HEAD"]).output().stdout().trim().to_owned()
-  let dirty=@shell.Cmd("git",["status","--porcelain"]).output().stdout().trim()!=""
+  let status=@shell.Cmd("git",["status","--porcelain"]).output();status.check()
+  let dirty=status.stdout().trim()!=""
+  if dirty { println("Candidate source tree changes:\n"+status.stdout()) }
   let run=@env.get_env_var("GITHUB_RUN_ID").unwrap_or("")
   let repo=@env.get_env_var("GITHUB_REPOSITORY").unwrap_or("unmbt/http-server-mbt")
   let manifest : Json={"schema":1,"commit":sha,"dirty":dirty,"os":os,"cpu":cpu,

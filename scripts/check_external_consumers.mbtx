@@ -6,7 +6,14 @@ async fn main {
   let python=@env.get_env_var("PYTHON").unwrap_or(if windows { "python" } else { "python3" })
   for variant in ["thin","full"] {
     let binary="target/cabi/rust-"+variant+(if windows { ".exe" } else { "" })
-    let args=["--edition=2021","testdata/rust_consumer/main.rs","-o",binary,"-L","native=target/cabi","-l","static="+(if windows { "hs_\{variant}_static" } else { "hs_\{variant}" })]
+    let args=["--edition=2021","testdata/rust_consumer/main.rs","-o",binary,"-L","native=target/cabi"]
+    if mac {
+      // Darwin's linker can prefer the same-named dylib in -L even when the
+      // Rust native-library request says static. Pass the archive directly.
+      args.append(["-C","link-arg="+root+"/target/cabi/libhs_"+variant+".a"])
+    } else {
+      args.append(["-l","static="+(if windows { "hs_\{variant}_static" } else { "hs_\{variant}" })])
+    }
     if windows {
       args.append(["-C","target-feature=+crt-static"])
       for lib in ["crypt32","secur32","iphlpapi","ws2_32","mswsock","userenv","advapi32","synchronization","dbghelp","bcrypt","shell32"] { args.append(["-l",lib]) }
@@ -15,6 +22,10 @@ async fn main {
       if !mac { args.append(["-l","dl"]) }
     }
     @shell.Cmd("rustc",args).run()
+    if mac {
+      let imports=@shell.Cmd("otool",["-L",binary]).output();imports.check()
+      if imports.stdout().contains("libhs_"+variant+".dylib") { fail("Rust static consumer links a C ABI dylib") }
+    }
     @shell.Cmd(root+"/"+binary,[],cwd=root+"/target/cabi").run(timeout_ms=30000)
     let library=if windows { "hs_\{variant}.dll" } else { "libhs_\{variant}."+(if mac { "dylib" } else { "so" }) }
     @shell.Cmd(python,[root+"/testdata/python_consumer/main.py",root+"/target/cabi/"+library],cwd=root+"/target/cabi").run(timeout_ms=30000)

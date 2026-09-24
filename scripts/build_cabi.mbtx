@@ -406,8 +406,8 @@ async fn discover_toolchain(target_os : TargetOs) -> Toolchain {
     MacOS => {
       {
         target_os: MacOS,
-        cc_exe: "clang",
-        link_exe: "clang",
+        cc_exe: "/usr/bin/clang",
+        link_exe: "/usr/bin/clang",
         lib_exe: "ar",
         sym_exe: "nm",
         objcopy_exe: "",

@@ -41,10 +41,10 @@ jobs:
           toolset: '14.44'
       - uses: KyleMayes/install-llvm-action@v2
         with:
-          version: '22.1.3'
+          version: '21.1.8'
       - if: runner.os == 'Linux'
         run: sudo apt-get install -y musl-tools
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

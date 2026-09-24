@@ -166,23 +166,6 @@ async test "server acceptor: preflight rejects TLS configuration when PlainAccep
 }
 
 ///|
-async test "server acceptor: preflight TLS rejection releases resources and incurs 0 handle leaks" {
-  let config : @core.Config = {
-    ..@core.Config::default("testdata/public"),
-    cert_file: Some("testdata/tls/server_cert.pem"),
-    key_file: Some("testdata/tls/server_key.pem"),
-  }
-  let h_before = @server.get_handle_count()
-  for _ in 0..<5 {
-    @server.with_server_at(config, 0, fn(_s) { () }) catch {
-      _ => ()
-    }
-  }
-  let h_after = @server.get_handle_count()
-  assert_eq(h_after, h_before)
-}
-
-///|
 priv struct CustomStreamAcceptor {}
 
 ///|

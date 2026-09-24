@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/server",
+} for "test"
+
+options(
+  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}" } },
+  targets: { "*.mbt": [ "native" ] },
+)

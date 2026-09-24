@@ -47,3 +47,20 @@
 最后一次运行的三份上传 artifact SHA-256：Linux X64 `47c3c36d11d7cdc675fa1db45114b42e5c065b4489154050eff380d89f4885b1`，Windows X64 `e5c41119cf006c5fb04891988c594a133d52002c35a3e6a592157697f16bc50c`，macOS ARM64 `09cafd328909046ac4a0d4956d79bb08f5240e86bbec1aabc1a4b2ab4d98286d`。gate 从 Actions 下载并重新核对 artifact digest，随后验证三份 manifest 的提交、平台、干净工作树、文件大小和 SHA-256。候选验证通过不等于 registry 发布、完整发行或 T-025 总任务完成。
 
 本机 Windows，Moon 0.1.20260920：`moon run scripts/check_automation.mbtx`、`moon check --target native --deny-warn`、`git diff --check` 通过。`moon test --target native --deny-warn` 曾 261/263，两条句柄计数断言各差 1；分别重跑相关测试文件 7/7、7/7 通过。完整测试结果以同一提交的 Actions job 为准，本机波动仍须单独追踪。修复保留在草稿 PR #2；T-025 涵盖的最终发行范围尚未全部完成，不因候选 gate 通过而勾选。
+
+## 预检句柄测试隔离修复
+
+关联 R-SAFE/R-N13/R-N16、D-10/D-18、T-025/T-034、N-21。基线为 `928716c`；Windows CI 报告 `server_challenger_m1_2_test.mbt` 的 `assert_eq(h_after, h_before)` 失败，实际为 `244 → 243`。这是进程句柄减少触发严格相等断言，不是本次观测到句柄增长。原探针与同包的异步网络测试共用进程快照，无法将其他测试的资源变化归属于本次预检。
+
+两条预检资源用例从 `server/server_acceptor_test.mbt`、`server/server_challenger_m1_2_test.mbt` 迁入 `tests/preflight_handles`，由默认 `moon test --target native` 自动运行于独立测试进程，包内以互斥锁串行采样。保留原测试名称及 5 次/100 次压力覆盖；四类无效 TLS 配置均覆盖默认与显式 PlainAcceptor，每次必须抛出 `InvalidTls`，不得进入启动回调或吞掉其他错误。预热后按零增长容差判断，允许进程资源回收使计数下降；不增加允许泄漏的阈值或重试 CI。生产代码、公开接口与工作流配置未变。
+
+新增两条回归：固定 CI 样本 `244 → 243`，以及真实文件句柄保留时必须检出增长、关闭后必须接受回落的探针。原 263 项用例迁移 2 项、增加 2 项，全量分母为 265，无用例跳过。
+
+本机证据（Windows 11 Pro 10.0.26200 x86_64，Moon 0.1.20260920、moonc v0.10.14+7d59c7ec9、async 0.21.3，基线上的本次工作树）：
+
+- 修复前：固定 CI 样本沿用原相等断言，`moon test --target native tests/preflight_handles` 0/1 通过，准确复现 `243 != 244`。
+- 修复后：`moon check --target native --deny-warn` 通过；`moon test --target native --deny-warn` 265/265 通过。
+- `moon test --target native tests/preflight_handles --deny-warn` 4/4 通过；再由本地忽略的 `target/check_preflight_regression.mbtx` 连续调用 20 次，每次使用新测试进程，合计 80/80 通过。
+- 执行 `moon info --target native`、`moon fmt`，审查生成接口和格式差异。仅保留新测试包的空公开接口；基线已有的无关接口漂移与格式变化恢复，本次测试源码没有格式差异。`git diff --check` 通过。
+
+本次仅改测试及说明，没有改 Native/FFI 所有权或传输实现，因此未重跑 sanitizer、外部宿主或打包矩阵。遵照用户要求只作本地提交，不 push；Linux/macOS 及新提交的远程 Actions 尚未运行，T-025/T-034 总任务保持进行中。

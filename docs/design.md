@@ -492,6 +492,8 @@ GitHub Actions YAML 与 Dockerfile 是工作流/构建声明格式，允许编�
 
 保存输入语料、种子、调度事件、工具链/平台和最小复现；对失败案例最小化后加入固定回归集。PR 在三平台回放固定语料并运行有界探索，workflow_dispatch 可运行更长探索；运行预算只控制测试资源，不是产品性能指标。ASan/UBSan 或平台适用检查与模糊测试结合，超时/死锁、崩溃、泄漏及断言失败必须报失败，不把无法运行记录为通过。驱动和语料管理使用 `.mbtx`；底层可调用适用的编译器模糊测试工具。
 
+预检资源回归使用 `tests/preflight_handles` 独立 Native 测试进程，包内资源探针互斥串行，避免同进程其他服务测试的句柄干扰。预热后逐次确认 `InvalidTls` 且启动回调未执行，要求操作后进程句柄数不高于操作前（零增长容差）；句柄减少不判作泄漏。保留 CI 的 `244 → 243` 回归样本，并以真实文件句柄的保留/释放验证探针能够拒绝增长、接受回落。该检查验证隔离操作的净增长，不能将进程总数解释为逐对象所有权证明；N-21 的其他生命周期及 sanitizer 检查仍保留。
+
 ## D-19 CLI 启动横幅与停止提示
 
 CLI 在监听成功后按基线 `0d3b7bb` 的 `bin/http-server` listen 回调还原启动横幅：Starting up 行（黄色标签 + 青色根目录，显示层把默认根 `.` 写作原版的 `./`，D-01 规范化不变；启用 TLS 时首行追加黄色 ` through` + 青色 ` https`）、版本行、settings 块（COOP、CORS、Private Network Access、Cache、Connection Timeout、Directory Listings、AutoIndex、Serve GZIP Files、Serve Brotli Files、Default File Extension、Base directory，黄色标签；启用值青色、禁用/关闭值红色）、可选 Additional Headers 块（制表符缩进，黄色键 + 青色值）、Available on 地址列表（启用 TLS 时展示 `https://`，未启用展示 `http://`；无色协议与 IP + 绿色端口 + BaseURL 后缀；非回环 IPv4 按枚举顺序在前，127.0.0.1 最后对齐原版 Windows 枚举顺序）、无色的 `Hit CTRL-C to stop the server` 及尾部空行（请求日志间距）。settings 数值全部读取生效配置：Cache `-1` 显示 disabled，`idle_timeout_ms` 按整秒换算、0 显示 disabled，Default File Extension 按 D-01 默认显示 html（原版 CLI 默认 none，此差异随 D-01 记录）；原版 `argv.d`/`argv.i` 的原始真值判断在显式传参时显示反转（原版缺陷），本项目按 `show_dir`/`auto_index` 生效值显示 visible/not visible。IPv6 地址不展示：服务器绑定 IPv4 通配地址，展示 IPv6 会给出不可达链接。COOP/CORS/PNA 启用时显示 true 或自定义头值。网卡展示、横幅与停止提示属于 CLI 适配（D-01），静态引擎不打印。

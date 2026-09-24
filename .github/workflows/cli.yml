@@ -34,6 +34,7 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+      - run: moon update
       - if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -85,6 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+      - run: moon update
       - uses: actions/download-artifact@v8
         with:
           pattern: candidate-*

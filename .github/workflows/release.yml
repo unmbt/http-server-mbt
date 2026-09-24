@@ -30,6 +30,7 @@ jobs:
           ref: ${{ inputs.commit }}
           fetch-depth: 0
       - uses: hustcer/setup-moonbit@v1
+      - run: moon update
       - uses: actions/download-artifact@v8
         with:
           pattern: candidate-*

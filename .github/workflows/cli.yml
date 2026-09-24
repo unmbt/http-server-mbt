@@ -43,6 +43,7 @@ jobs:
       - uses: KyleMayes/install-llvm-action@v2
         with:
           version: '21.1.8'
+          directory: ${{ runner.temp }}/llvm
       - if: runner.os == 'Linux'
         run: sudo apt-get install -y musl-tools
       - uses: dtolnay/rust-toolchain@stable

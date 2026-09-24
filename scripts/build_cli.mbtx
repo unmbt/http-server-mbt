@@ -8,7 +8,10 @@ async fn main {
   let env : Map[String,String]=Map([])
   if os=="linux" {
     let cc=@shell.Cmd("musl-gcc",["--version"]).output();cc.check()
+    let ar=@shell.Cmd("ar",["--version"]).output();ar.check()
     env["MOON_CC"]="musl-gcc"
+    // Moon otherwise derives musl-ar from musl-gcc; musl-tools provides no such binary.
+    env["MOON_AR"]="ar"
     env["HTTP_SERVER_STATIC_MUSL"]="1"
   }
   @shell.Cmd("moon",["build","cmd/http-server-mbt","cmd/http-server-mbt-thin","--target","native","--release","--deny-warn","--target-dir","target/cli-build"],env~).run()

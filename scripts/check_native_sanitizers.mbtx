@@ -16,11 +16,12 @@ async fn main {
   if !@fs.exists("target/sanitizer") { @fs.mkdir("target/sanitizer",recursive=true) }
   let binary="target/sanitizer/native-owner"+(if windows {".exe"} else {""})
   let sanitizers=if windows {"address"} else {"address,undefined"}
+  let mac=!windows && @shell.Cmd("uname",["-s"]).output().stdout().trim()=="Darwin"
   let args=["-std=c11","-O1","-g","-fno-omit-frame-pointer","-fsanitize="+sanitizers,"-I",headers,"testdata/native_sanitizer/main.c","-o",binary]
   if !windows { args.push("-pthread") }
   // Apple's clang knows the active Xcode SDK; the separately installed LLVM
   // clang has no default macOS sysroot on the Actions runner.
-  let compiler=if !windows && @shell.Cmd("uname",["-s"]).output().stdout().trim()=="Darwin" { "/usr/bin/clang" } else { "clang" }
+  let compiler=if mac { "/usr/bin/clang" } else { "clang" }
   @shell.Cmd(compiler,args).run()
   if windows {
     let resource=@shell.Cmd("clang",["--print-resource-dir"]).output().stdout().trim().to_owned()
@@ -30,7 +31,8 @@ async fn main {
   for seed in @fs.read_file("testdata/native_sanitizer/seeds.txt").text().split("\n") {
     let seed=seed.trim().to_owned()
     if seed=="" { continue }
-    let result=@shell.Cmd(binary,["testdata/public",seed,rounds],env=Map([("ASAN_OPTIONS","detect_leaks="+(if windows {"0"} else {"1"}))])).output(timeout_ms=300000)
+    // LeakSanitizer is supported on this Linux runner, but not on macOS or Windows.
+    let result=@shell.Cmd(binary,["testdata/public",seed,rounds],env=Map([("ASAN_OPTIONS","detect_leaks="+(if windows || mac {"0"} else {"1"}))])).output(timeout_ms=300000)
     @fs.write_file("target/sanitizer/"+seed+".log",result.stdout()+result.stderr())
     result.check()
     println(result.stdout().split("\n").filter(s => s.contains("drained")).to_array().join("\n"))

@@ -9,6 +9,25 @@ async fn main {
   if os=="linux" {
     let cc=@shell.Cmd("musl-gcc",["--version"]).output();cc.check()
     let ar=@shell.Cmd("ar",["--version"]).output();ar.check()
+    // Ubuntu's musl-dev has libc headers, while kernel UAPI headers live in
+    // the host include tree. Copy only UAPI directories so glibc headers
+    // cannot shadow musl's libc headers during the static build.
+    let uapi=@env.current_dir().unwrap()+"/target/musl-uapi"
+    if !@fs.exists(uapi) { @fs.mkdir(uapi,recursive=true) }
+    for (source,name) in [
+      ("/usr/include/linux","linux"),
+      ("/usr/include/asm-generic","asm-generic"),
+      ("/usr/include/x86_64-linux-gnu/asm","asm"),
+    ] {
+      if !@fs.exists(source) { fail("missing Linux UAPI headers: "+source) }
+      if !@fs.exists(uapi+"/"+name) {
+        @shell.Cmd("cp",["-R",source,uapi+"/"+name]).run()
+      }
+    }
+    @fs.write_file(uapi+"/limits.h","#include_next <limits.h>\n#include <linux/limits.h>\n")
+    @fs.write_file(uapi+"/probe.c","#include <limits.h>\n#include <linux/openat2.h>\n#ifndef NAME_MAX\n#error NAME_MAX is required by moonbitlang/async\n#endif\n")
+    env["C_INCLUDE_PATH"]=uapi
+    @shell.Cmd("musl-gcc",["-std=c11","-c",uapi+"/probe.c","-o",uapi+"/probe.o"],env~).run()
     env["MOON_CC"]="musl-gcc"
     // Moon otherwise derives musl-ar from musl-gcc; musl-tools provides no such binary.
     env["MOON_AR"]="ar"

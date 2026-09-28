@@ -1,6 +1,6 @@
 name = "unmbt/http-server-mbt"
 
-version = "0.3.4"
+version = "0.4.0"
 
 import {
   "moonbitlang/async@0.21.3",

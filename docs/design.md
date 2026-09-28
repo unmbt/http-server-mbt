@@ -2,6 +2,8 @@
 
 ## 2026-09-28 自动发包修订（D-08、D-14、D-16）
 
+发布后可见性修复（T-025/T-028、N-18）：npm publish 返回成功后，registry 仍可能暂时返回 E404。对已成功提交的包只轮询查询，不重复 publish；最多查询 31 次，间隔 10 秒，每次查询禁用 npm 内部重试并限定 fetch 10 秒/进程 20 秒。哈希不符、认证/其他查询错误立即失败；耗尽时明确提示等待后重跑失败 job。发布身份和 provenance 分开：个人 token 可生成 Actions 来源证明，但不会因此改为 OIDC Trusted Publisher；切换须先配置四个包的可信 workflow，再停止传入 NPM_TOKEN。
+
 按用户确认恢复 tag 自动发布，关联 R-N09/R-N11/R-N13、T-025/T-028/T-030、N-18。本修订优先于历史“全部任务完成才可发行”的描述：日常版本发布以同一 tag 提交的三平台候选工作流全部通过为门槛，继续要求 Native/资源/sanitizer、Node 22/24、外部消费、Linux 四容器、版本与 SHA-256 校验。T-001～T-035 的总任务勾选和 `full_release_ready` 不再阻塞日常发包；原需求、未实现能力和最终 T-026 审计保持追踪，不宣称整个重构已完成。
 
 `release.yml` 接收 `v*` push，调用现有候选工作流，通过 `needs` 等待完整成功，再校验 tag、HEAD、版本、候选 run 及产物。发行直接消费已验证的 MoonBit 源码归档和 npm tarball，不重新构建；npm 三个平台包先于主包。Mooncakes/npm/GitHub Release 分 job 执行，失败可重跑失败 job；npm 已存在版本仅在远程 tarball 哈希一致时跳过。手动入口只允许选择 tag，无需填写 commit/run ID。发布权限及凭据仅进入发布 job；npm 支持 OIDC Trusted Publishing 或 NPM_TOKEN，Mooncakes 使用 MOONCAKES_CREDENTIALS。预发行 npm 使用 next，GitHub Release 标为 prerelease。

@@ -49,6 +49,10 @@ moon test scripts/maintenance/gen_version.mbtx --deny-warn
 
 发布 job 不设置 GitHub environment，因此不要求逐次人工审批；此前仅存在于 `release` environment 的凭据须配置为 repository secrets。凭据不进入候选测试 job。
 
+`--provenance` 表示 GitHub Actions 来源证明，与 npm 发布者身份不同。传入个人 NPM_TOKEN 时，发布者仍可能是 token 所属账号；要使用 OIDC Trusted Publishing，先为四个包配置上述可信发布者，再停止提供该 secret。不要仅凭 provenance 标记判断已切换 OIDC。
+
+npm 返回发布成功后可能尚未对查询可见。脚本对该包最多查询 31 次，查询间隔 10 秒（加上网络请求耗时），仅 E404 等待；确认哈希后再继续下一个包，不重复 publish。认证/哈希错误立即失败。旧 tag 的失败运行仍使用该 tag 中的脚本，提交修复不会改变旧运行代码；重跑旧 job 可跳过已经可见且同哈希的包，但后续新发布包仍可能遇到旧查询问题。
+
 以后正常执行 `moon-bump --release patch` 并推送 commit/tag 即可。预发行版本 npm 使用 `next`，GitHub 标为 prerelease。版本/tag 不匹配、任何必需检查失败、候选文件缺失或哈希不符都会阻止发布。发行使用已通过消费测试的原始 tarball/源码归档，不重新构建。
 
 失败后优先在该次 Actions run 点 **Re-run failed jobs**，复用同一批产物。npm 会核对 registry 的 tarball SHA-1，已存在且相同才跳过；不同则失败，不覆盖。Mooncakes 成功 job 不需重跑。不要对已部分发布的版本重跑全部构建，否则新二进制可能与已发布 tarball 不同。需要重新发起未发布版本时，在 `Run workflow` 的 ref 选择器选择已有 tag（CLI 等价命令：`gh workflow run release.yml --ref v0.4.2`）；不能选择 master 来发布，也不接受旧流程的 run/commit 参数。旧 tag 没有新工作流，应正常追加修复提交并发布新版本。

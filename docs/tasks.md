@@ -8,6 +8,8 @@
 
 ## 1. 任务状态与证据
 
+- [x] T-025/T-028 npm 发布后可见性回归 — 状态：已完成（本机脚本分项，N-18，2026-09-28）。v0.4.2 日志显示 Windows 包 publish 成功后立即查询失败；registry 读回 SHA-1 与日志一致，发布者为 wyatex 且有 provenance。新增 404→404→同哈希案例先复现一次性检查失败，再实现有界只读轮询；脚本 4/4 回归通过，覆盖超时上限、认证失败及哈希冲突立即拒绝。未重复发布、未更改 npm Trusted Publisher 配置、未补发剩余包；远程执行保持待验证。
+
 - [x] T-025/T-032 README 状态展示分项 — 状态：已完成（2026-09-28，文档分项，R-N13/D-16/N-18）。中英文 README 使用 GitHub 原生 master/push 工作流徽章替换固定测试数量与本机状态，表格列出当前三平台 runner/job 并链接 Actions；macOS CI 架构校正为 arm64。动态徽章仅表示整个候选 workflow，版本证据仍查对应 release run/manifest。验证：徽章端点成功返回 `Candidate acceptance - passing`（查询时状态，不写成固定通过声明）；表格与 cli.yml 矩阵人工核对，42 文件迁移覆盖、稳定编号及相对链接保留，git diff --check 通过。纯文档变更未执行 moon info/fmt 或应用测试，不更新平台实现总任务状态。
 
 - [ ] T-025/T-028/T-030 自动发包分项 — 状态：进行中（2026-09-28）。关联 R-N09/R-N11/R-N13、D-08/D-14/D-16、N-18；依赖现有三平台候选验收能力。交付：tag 自动触发、复用候选验证、同提交/版本/哈希门禁、Mooncakes/npm/GitHub Release 发布及操作说明。验收：失败候选不发布、错 tag/产物拒绝、三平台 npm 先于主包、失败可重跑；本机脚本回归与真实 registry 发布分开记录。按用户确认移除任务勾选和 full_release_ready 对日常发行的阻塞，原总任务及最终审计不因此完成。证据见 [自动发布记录](release-automation-20260928.md)。

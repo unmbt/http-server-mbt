@@ -31,6 +31,64 @@ fn should_publish(
 }
 
 ///|
+async fn wait_for_published(
+  lookup : async () -> (Int, Json),
+  pause : async () -> Unit,
+  expected_hash : String,
+  label : String,
+  attempts? : Int = 31,
+) -> Unit {
+  assert_true(attempts > 0)
+  for attempt in 0..<attempts {
+    let (code, response) = lookup()
+    if !should_publish(code, response, expected_hash) {
+      return
+    }
+    if attempt + 1 < attempts {
+      println(
+        "Waiting for npm registry visibility: " +
+        label +
+        " (query " +
+        (attempt + 1).to_string() +
+        "/" +
+        attempts.to_string() +
+        ")",
+      )
+      pause()
+    }
+  }
+  fail(
+    "npm accepted publication but " +
+    label +
+    " is still unavailable after " +
+    attempts.to_string() +
+    " queries; rerun failed jobs after registry processing completes",
+  )
+}
+
+///|
+async test "N-18 npm publication waits for registry visibility without republishing" {
+  let mut queries = 0
+  let mut pauses = 0
+  wait_for_published(
+    fn() {
+      queries += 1
+      if queries < 3 {
+        (1, { "error": { "code": "E404" } })
+      } else {
+        (0, Json::string("hash"))
+      }
+    },
+    fn() { pauses += 1 },
+    "hash",
+    "fixture@0.4.2",
+    attempts=3,
+  )
+  assert_eq(queries, 3)
+  assert_eq(pauses, 2)
+}
+
+///|
 fn validate_package(
   metadata : Json,
   name : String,
@@ -137,12 +195,29 @@ async fn main {
       ],
       cwd=root + "/npm/" + platform,
     ).run()
-    let remote = @shell.Cmd(
-      "npm",
-      ["view", name + "@" + version, "dist.shasum", "--json", ..options],
-    ).output()
-    remote.check()
-    assert_false(should_publish(0, @json.parse(remote.stdout()), hash))
+    // npm may acknowledge publish before registry reads can see the version.
+    // Poll only; never repeat the successful publish command.
+    wait_for_published(
+      async fn() {
+        let remote = @shell.Cmd(
+          "npm",
+          [
+            "view",
+            name + "@" + version,
+            "dist.shasum",
+            "--json",
+            "--prefer-online",
+            "--fetch-retries=0",
+            "--fetch-timeout=10000",
+            ..options,
+          ],
+        ).output(timeout_ms=20000)
+        (remote.exit_code(), @json.parse(remote.stdout()))
+      },
+      async fn() { @async.sleep(10000) },
+      hash,
+      name + "@" + version,
+    )
   }
 }
 
@@ -201,4 +276,37 @@ test "N-18 npm tarball identity rejects wrong package and wrong version" {
       _ => true
     },
   )
+}
+
+///|
+async test "N-18 npm visibility polling is bounded and never retries auth or hash failure" {
+  for
+    response in [
+      Json::string("wrong-hash"),
+      { "error": { "code": "E401" } },
+      { "error": { "code": "E404" } },
+    ] {
+    let mut queries = 0
+    let mut pauses = 0
+    let code = if response is String(_) { 0 } else { 1 }
+    let rejected = try {
+      wait_for_published(
+        fn() {
+          queries += 1
+          (code, response)
+        },
+        fn() { pauses += 1 },
+        "hash",
+        "fixture",
+        attempts=3,
+      )
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+    let pending = response is { "error": { "code": String("E404"), .. }, .. }
+    assert_eq(queries, if pending { 3 } else { 1 })
+    assert_eq(pauses, if pending { 2 } else { 0 })
+  }
 }

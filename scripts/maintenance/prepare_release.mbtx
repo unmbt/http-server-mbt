@@ -1,0 +1,14 @@
+///|
+// R-N13 / D-16 / T-025: moon-bump calls this after replacing versions and
+// before committing/tagging. Keep generated metadata in that same commit.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/shell",
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--sync"]).run()
+  @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
+  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn"]).run()
+}

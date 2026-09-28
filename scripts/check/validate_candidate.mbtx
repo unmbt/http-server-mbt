@@ -8,6 +8,10 @@ import {
 
 ///|
 async fn main {
+  @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
+  @shell.Cmd("moon", [
+    "test", "scripts/maintenance/gen_version.mbtx", "--deny-warn",
+  ]).run()
   let version = @shell.Cmd("moon", ["version", "--all"]).output()
   version.check()
   if !version.stdout().contains("0.1.20260920") {
@@ -24,7 +28,9 @@ async fn main {
   @shell.Cmd("moon", ["test", "--target", "native", "--deny-warn"]).run()
   @shell.Cmd("moon", ["check", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
-  @shell.Cmd("moon", ["test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn"]).run()
+  @shell.Cmd("moon", [
+    "test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn",
+  ]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_native_sanitizers.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_cli.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_cabi.mbtx"]).run()

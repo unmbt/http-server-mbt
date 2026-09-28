@@ -3,6 +3,7 @@ import {
   "moonbitlang/async@0.21.3",
   "moonbitlang/async@0.21.3/fs",
   "moonbitlang/core/env",
+  "moonbitlang/core/json",
 }
 
 ///|
@@ -29,10 +30,25 @@ impl Show for GenVersionError with fn output(self, logger) {
 /// which is also the working directory of the rule command.
 async fn main {
   let args = @env.args()
+  if args.length() == 2 && (args[1] == "--sync" || args[1] == "--check") {
+    sync_release_versions(".", check=args[1] == "--check")
+    return
+  }
   guard args.length() == 3 else {
     abort(
-      "usage: moon run scripts/maintenance/gen_version.mbtx <moon.mod> <output.mbt>",
+      "usage: gen_version.mbtx <moon.mod> <output.mbt> | --print <moon.mod> | --consumer <moon.mod> | --sync | --check",
     )
+  }
+  if args[1] == "--print" || args[1] == "--consumer" {
+    let version = parse_version(@fs.read_file(args[2]).text())
+    println(
+      if args[1] == "--print" {
+        version
+      } else {
+        consumer_manifest(version).trim().to_owned()
+      },
+    )
+    return
   }
   let input = args[1]
   let output = args[2]
@@ -67,6 +83,7 @@ fn is_key_separator(c : UInt16) -> Bool {
 /// manifest format changes surface at build time instead of shipping a stale
 /// or empty version string.
 fn parse_version(manifest : String) -> String raise GenVersionError {
+  let mut found : String? = None
   for line in manifest.split("\n") {
     let trimmed = line.trim().to_owned()
     if !trimmed.has_prefix("version") {
@@ -87,11 +104,17 @@ fn parse_version(manifest : String) -> String raise GenVersionError {
         if value.length() == 0 {
           raise MalformedVersionLine(trimmed)
         }
-        return value
+        if found is Some(_) {
+          raise MalformedVersionLine(trimmed)
+        }
+        found = Some(value)
       }
     }
   }
-  raise MissingVersion
+  match found {
+    Some(version) => version
+    None => raise MissingVersion
+  }
 }
 
 ///|
@@ -106,4 +129,210 @@ fn generate(version : String) -> String {
     $|let server_version : String = "\{version}"
     $|
   )
+}
+
+///|
+fn consumer_manifest(version : String) -> String {
+  (
+    $|name = "acceptance/consumer"
+    $|version = "0.0.0"
+    $|import { "unmbt/http-server-mbt@\{version}", "moonbitlang/async@0.21.3" }
+    $|preferred_target = "native"
+    $|
+  )
+}
+
+///|
+fn npm_version(source : String, version : String, main~ : Bool) -> String raise {
+  let value = @json.parse(source)
+  guard value is Object(fields) else { fail("npm manifest must be an object") }
+  let original = @json.parse(source)
+  fields["version"] = Json::string(version)
+  if main {
+    guard fields.get("optionalDependencies") is Some(Object(dependencies)) else {
+      fail("npm main package is missing optionalDependencies")
+    }
+    for platform in ["win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+      let name = "@unmbt/http-server-mbt-" + platform
+      guard dependencies.contains(name) else {
+        fail("missing npm dependency: " + name)
+      }
+      dependencies[name] = Json::string(version)
+    }
+  }
+  // Keep formatting and line endings byte-stable when versions already agree.
+  if value == original {
+    source
+  } else {
+    value.stringify(indent=2) + "\n"
+  }
+}
+
+///|
+// R-N13 / D-16 / T-025: plan every change before writing; --check never repairs
+// the checkout, so CI cannot hide stale release metadata.
+async fn sync_release_versions(root : String, check~ : Bool) -> Unit {
+  let version = parse_version(@fs.read_file(root + "/moon.mod").text())
+  let changes : Array[(String, String)] = []
+  for
+    (path, expected) in [
+      ("cmd/common/generated_version.mbt", generate(version)),
+      ("tests/consumers/moonbit/moon.mod", consumer_manifest(version)),
+    ] {
+    let existing = @fs.read_file(root + "/" + path).text()
+    if existing.replace_all(old="\r\n", new="\n") != expected {
+      changes.push((path, expected))
+    }
+  }
+  for pkg in ["http-server", "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+    let path = "npm/" + pkg + "/package.json"
+    let existing = @fs.read_file(root + "/" + path).text()
+    let expected = npm_version(existing, version, main=pkg == "http-server")
+    if existing != expected {
+      changes.push((path, expected))
+    }
+  }
+  if check && !changes.is_empty() {
+    fail(
+      "release version drift from moon.mod (" +
+      version +
+      "): " +
+      changes.map(change => change.0).join(", ") +
+      "; run moon run scripts/maintenance/gen_version.mbtx --sync",
+    )
+  }
+  for (path, expected) in changes {
+    @fs.write_file(root + "/" + path, expected)
+    println("gen_version: synced " + path)
+  }
+  println("Release versions agree with moon.mod: " + version)
+}
+
+///|
+test "N-18 version parsing rejects missing empty and duplicate versions" {
+  for
+    invalid in [
+      "name = \"sample\"", "version = \"\"", "version = 42", "version = \"1.0.0\"\nversion = \"2.0.0\"",
+    ] {
+    let rejected = try {
+      ignore(parse_version(invalid))
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+  }
+  assert_eq(
+    parse_version("version_extra = \"wrong\"\r\n version = \"1.2.3-rc.1\"\r\n"),
+    "1.2.3-rc.1",
+  )
+}
+
+///|
+async test "N-18 future releases sync all versions and drift checks are read only" {
+  let root = @fs.realpath(@fs.tmpdir(prefix="hs-release-version-"))
+  // Only remove this test's freshly created, resolved temporary directory.
+  assert_true(
+    root
+    .replace_all(old="\\", new="/")
+    .split("/")
+    .to_array()
+    .last()
+    .unwrap()
+    .has_prefix("hs-release-version-"),
+  )
+  defer (@fs.rmdir(root, recursive=true) catch { _ => () })
+  for
+    path in [
+      "cmd/common", "tests/consumers/moonbit", "npm/http-server", "npm/win32-x64-msvc",
+      "npm/linux-x64-gnu", "npm/darwin-arm64",
+    ] {
+    @fs.mkdir(root + "/" + path, recursive=true)
+  }
+  let files = [
+    "cmd/common/generated_version.mbt", "tests/consumers/moonbit/moon.mod", "npm/http-server/package.json",
+    "npm/win32-x64-msvc/package.json", "npm/linux-x64-gnu/package.json", "npm/darwin-arm64/package.json",
+  ]
+  @fs.write_file(root + "/cmd/common/generated_version.mbt", generate("0.0.1"))
+  @fs.write_file(
+    root + "/tests/consumers/moonbit/moon.mod",
+    consumer_manifest("0.0.1"),
+  )
+  for pkg in ["http-server", "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+    let fixture : Json = {
+      "name": pkg,
+      "version": "0.0.1",
+      "license": "MIT",
+      "optionalDependencies": {
+        "@unmbt/http-server-mbt-win32-x64-msvc": "0.0.1",
+        "@unmbt/http-server-mbt-linux-x64-gnu": "0.0.1",
+        "@unmbt/http-server-mbt-darwin-arm64": "0.0.1",
+        "unrelated": "3.2.1",
+      },
+    }
+    @fs.write_file(
+      root + "/npm/" + pkg + "/package.json",
+      fixture.stringify(indent=2) + "\n",
+    )
+  }
+  for version in ["0.3.4", "0.4.0", "1.2.3-rc.1", "2.0.0"] {
+    @fs.write_file(root + "/moon.mod", "version = \"" + version + "\"\n")
+    let before : Array[String] = []
+    for path in files {
+      before.push(@fs.read_file(root + "/" + path).text())
+    }
+    let rejected = try {
+      sync_release_versions(root, check=true)
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
+    for i in 0..<files.length() {
+      assert_eq(@fs.read_file(root + "/" + files[i]).text(), before[i])
+    }
+    sync_release_versions(root, check=false)
+    sync_release_versions(root, check=true)
+    assert_true(
+      @fs.read_file(root + "/cmd/common/generated_version.mbt")
+      .text()
+      .contains("let server_version : String = \"" + version + "\""),
+    )
+    assert_true(
+      @fs.read_file(root + "/tests/consumers/moonbit/moon.mod")
+      .text()
+      .contains("unmbt/http-server-mbt@" + version + "\""),
+    )
+    for
+      pkg in ["http-server", "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+      let manifest = @json.parse(
+        @fs.read_file(root + "/npm/" + pkg + "/package.json").text(),
+      )
+      guard manifest is { "version": String(actual), .. } else {
+        fail("missing npm version")
+      }
+      assert_eq(actual, version)
+      assert_true(manifest is { "license": String("MIT"), .. })
+      if pkg == "http-server" {
+        guard manifest is { "optionalDependencies": Object(dependencies), .. } else {
+          fail("missing dependencies")
+        }
+        for platform in ["win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+          assert_eq(
+            dependencies.get("@unmbt/http-server-mbt-" + platform),
+            Some(Json::string(version)),
+          )
+        }
+        assert_eq(dependencies.get("unrelated"), Some(Json::string("3.2.1")))
+      }
+    }
+    let synced : Array[String] = []
+    for path in files {
+      synced.push(@fs.read_file(root + "/" + path).text())
+    }
+    sync_release_versions(root, check=false)
+    for i in 0..<files.length() {
+      assert_eq(@fs.read_file(root + "/" + files[i]).text(), synced[i])
+    }
+  }
 }

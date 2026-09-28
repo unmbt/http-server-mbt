@@ -9,6 +9,10 @@ import {
 
 ///|
 async fn main {
+  let version = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  version.check()
   let expected = @env.get_env_var("RELEASE_COMMIT").unwrap_or(
     @shell.Cmd("git", ["rev-parse", "HEAD"]).output().stdout().trim().to_owned(),
   )
@@ -19,6 +23,7 @@ async fn main {
     guard manifest
       is {
         "commit": String(sha),
+        "version": String(candidate_version),
         "dirty": False,
         "os": String(os),
         "cpu": String(cpu),
@@ -28,6 +33,7 @@ async fn main {
       fail("invalid or dirty candidate: " + dir)
     }
     assert_eq(sha, expected)
+    assert_eq(candidate_version, version.stdout().trim().to_owned())
     let platform = os + "/" + cpu.to_lower()
     if seen.contains(platform) {
       fail("duplicate platform candidate")

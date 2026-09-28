@@ -10,6 +10,10 @@ import {
 
 ///|
 async fn main {
+  let manifest = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--consumer", "moon.mod",
+  ]).output()
+  manifest.check()
   let temp = @env.get_env_var("TEMP").unwrap_or("/tmp")
   let mut serial = 0
   while @fs.exists("\{temp}/http-server-consumer-\{serial}") {
@@ -70,10 +74,7 @@ async fn main {
     }
     @fs.write_file(workspace + "/candidate/" + path, @fs.read_file(path))
   }
-  @fs.write_file(
-    workspace + "/consumer/moon.mod",
-    "name = \"acceptance/consumer\"\nversion = \"0.0.0\"\nimport { \"unmbt/http-server-mbt@0.3.4\", \"moonbitlang/async@0.21.3\" }\npreferred_target = \"native\"\n",
-  )
+  @fs.write_file(workspace + "/consumer/moon.mod", manifest.stdout())
   for file in ["moon.pkg", "main.mbt"] {
     @fs.write_file(
       workspace + "/consumer/" + file,

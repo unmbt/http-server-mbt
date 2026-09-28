@@ -9,6 +9,11 @@ import {
 
 ///|
 async fn main {
+  let manifest_version = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  manifest_version.check()
+  let expected_version = manifest_version.stdout().trim().to_owned()
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
   let os = if windows {
     "windows"
@@ -97,7 +102,7 @@ async fn main {
     }
     let version = @shell.Cmd(source, ["--version"]).output()
     version.check()
-    assert_eq(version.stdout().trim(), "0.3.4")
+    assert_eq(version.stdout().trim(), expected_version)
     @shell.Cmd(source, ["--help"]).run()
     if name.has_suffix("-thin") {
       for

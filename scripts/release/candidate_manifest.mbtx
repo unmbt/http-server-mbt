@@ -44,6 +44,10 @@ async fn digest(path : String, windows : Bool, mac : Bool) -> String {
 
 ///|
 async fn main {
+  let version = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  version.check()
   @shell.Cmd("moon", ["run", "scripts/maintenance/stage_licenses.mbtx"]).run()
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
   let os = if windows {
@@ -201,6 +205,7 @@ async fn main {
   )
   let manifest : Json = {
     "schema": 1,
+    "version": version.stdout().trim().to_owned(),
     "commit": sha,
     "dirty": dirty,
     "os": os,

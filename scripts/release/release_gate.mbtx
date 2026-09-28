@@ -13,6 +13,12 @@ async fn main {
   let run = @env.get_env_var("CANDIDATE_RUN").unwrap()
   let tag = @env.get_env_var("RELEASE_TAG").unwrap()
   let repo = @env.get_env_var("GITHUB_REPOSITORY").unwrap()
+  let version = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  version.check()
+  assert_eq(tag, "v" + version.stdout().trim().to_owned())
+  @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
   if !run.iter().all(c => c >= '0' && c <= '9') ||
     sha.length() != 40 ||
     !tag.has_prefix("v") {

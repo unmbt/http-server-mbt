@@ -1,8 +1,9 @@
 {
-  "execute": "moon check",
+  "execute": "moon run scripts/maintenance/prepare_release.mbtx",
   "all": true,
   "files": [
     "moon.mod",
+    "cmd/common/generated_version.mbt",
     "npm/http-server/package.json",
     "npm/win32-x64-msvc/package.json",
     "npm/linux-x64-gnu/package.json",

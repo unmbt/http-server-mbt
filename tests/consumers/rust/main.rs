@@ -24,7 +24,7 @@ fn main() {
     let config=format!("{{\"root\":\".\",\"port\":{port},\"silent\":true}}");
     let mut server=std::ptr::null_mut();
     unsafe {
-        assert_eq!(hs_abi_version(),0x10000);
+        assert_eq!(hs_abi_version() >> 16,1);
         assert_eq!(hs_server_start(b"{bad".as_ptr().cast(),4,&mut server),1);
         assert!(server.is_null());
         assert_eq!(hs_server_start(config.as_ptr().cast(),config.len(),&mut server),0);

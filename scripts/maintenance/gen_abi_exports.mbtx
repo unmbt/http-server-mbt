@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+}
+async fn main {
+  let names=@fs.read_file("c_abi/exports.txt").text().split("\n").map(s=>s.trim().to_owned()).filter(s=>s!="").to_array()
+  for variant in ["thin","full"] {
+    let root="c_abi/"+variant+"/hs_"+variant
+    @fs.write_file(root+".def","LIBRARY hs_"+variant+"\nEXPORTS\n"+names.map(n=>"    "+n).join("\n")+"\n")
+    @fs.write_file(root+".version","{\n  global:\n"+names.map(n=>"    "+n+";").join("\n")+"\n  local:\n    *;\n};\n")
+    @fs.write_file(root+"_macos.syms",names.map(n=>"_"+n).join("\n")+"\n")
+  }
+}

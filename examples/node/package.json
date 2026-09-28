@@ -1,0 +1,6 @@
+{
+  "name": "http-server-mbt-express-example",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": { "express": "5.1.0" }
+}

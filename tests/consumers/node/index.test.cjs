@@ -11,7 +11,7 @@ async function runTests() {
   console.log('Test 1: Verifying ABI Version...');
   const abiVer = getAbiVersion();
   console.log(`  ABI Version: 0x${abiVer.toString(16)} (${abiVer})`);
-  assert.strictEqual(abiVer, 0x00010000, 'ABI version must be 0x00010000');
+  assert.strictEqual(abiVer, 0x00010001, 'ABI version must be 0x00010001');
   console.log('  -> PASS');
 
   // Test 2: HTTP Server Start, Fetch, and Stop
@@ -21,16 +21,15 @@ async function runTests() {
     port: port1,
     root: '.',
     silent: true,
-    cors: true
+    cors: true,
+    custom_headers: { 'X-Long-Config': 'x'.repeat(5000) }
   });
   assert(server1 instanceof HttpServer, 'Must return HttpServer instance');
-
-  // Wait a brief moment for socket readiness
-  await new Promise(r => setTimeout(r, 100));
 
   try {
     const res = await fetch(`http://127.0.0.1:${port1}/README.md`);
     assert.strictEqual(res.status, 200, 'Response status must be 200');
+    assert.strictEqual(res.headers.get('x-long-config').length, 5000, 'Legacy configuration must not be truncated');
     const text = await res.text();
     assert(text.length > 0, 'Response body must not be empty');
     assert(text.includes('http-server'), 'Response body must contain http-server');
@@ -122,7 +121,7 @@ async function runTests() {
   const esmModule = await import('../../../npm/http-server/index.mjs');
   assert.strictEqual(typeof esmModule.createServer, 'function', 'ESM createServer must be a function');
   assert.strictEqual(typeof esmModule.getAbiVersion, 'function', 'ESM getAbiVersion must be a function');
-  assert.strictEqual(esmModule.getAbiVersion(), 0x00010000, 'ESM getAbiVersion must return 0x10000');
+  assert.strictEqual(esmModule.getAbiVersion(), 0x00010001, 'ESM getAbiVersion must return 0x10001');
   console.log('  ESM named exports and default exports loaded successfully');
   console.log('  -> PASS');
 

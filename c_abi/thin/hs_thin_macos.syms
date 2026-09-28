@@ -3,3 +3,17 @@ _hs_server_start
 _hs_server_stop
 _hs_server_destroy
 _hs_error_copy
+_hs_engine_create_async
+_hs_engine_close_async
+_hs_engine_release
+_hs_submit_async
+_hs_operation_cancel
+_hs_operation_release
+_hs_response_meta
+_hs_response_read_async
+_hs_response_release
+_hs_chunk_data
+_hs_chunk_release
+_hs_server_start_async
+_hs_server_stop_async
+_hs_server_release

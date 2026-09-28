@@ -83,6 +83,52 @@ async fn main {
       .has_prefix("PASS " + version),
     )
   }
+  let frameworks = "target/candidate/frameworks"
+  for
+    name in [
+      "libevent-static", "libevent-dynamic", "fastapi-uvicorn", "express",
+    ] {
+    assert_true(
+      @fs.read_file(frameworks + "/" + name + ".log").text().contains("exit=0"),
+    )
+  }
+  for mode in ["static", "dynamic"] {
+    let file = "libevent_" + mode + (if windows { ".exe" } else { "" })
+    @fs.write_file(
+      frameworks + "/" + file,
+      @fs.read_file("target/framework-examples/" + file),
+    )
+  }
+  @fs.write_file(
+    frameworks + "/libevent-LICENSE.txt",
+    @fs.read_file("target/libevent-2.1.12-stable/LICENSE"),
+  )
+  @fs.write_file(
+    frameworks + "/PROVENANCE.md",
+    @fs.read_file("examples/c/PROVENANCE.md"),
+  )
+  @fs.write_file(
+    frameworks + "/async-abi-1.1.md",
+    @fs.read_file("docs/async-abi-1.1.md"),
+  )
+  @shell.Cmd("tar", [
+    "-czf",
+    frameworks + "/examples.tar.gz",
+    "--exclude=node_modules",
+    "--exclude=__pycache__",
+    "examples",
+  ]).run()
+  if !@fs.exists("target/candidate/sanitizer") {
+    @fs.mkdir("target/candidate/sanitizer", recursive=true)
+  }
+  for file in @fs.readdir("target/sanitizer") {
+    if file.has_suffix(".log") {
+      @fs.write_file(
+        "target/candidate/sanitizer/" + file,
+        @fs.read_file("target/sanitizer/" + file),
+      )
+    }
+  }
   for variant in ["thin", "full"] {
     let lib = if windows {
       "hs_" + variant + ".dll"
@@ -171,8 +217,8 @@ async fn main {
     },
     "pic": !windows,
     "async": "0.21.3",
-    "scope": "CLI and complete-server C/Node hosts; owned Native MoonBit engine",
-    "excluded": ["C/Node asynchronous embedding", "io_uring", "wasm-gc engine"],
+    "scope": "CLI; ABI 1.1 async engine and complete-server C/Node hosts; libevent/ASGI/Express; owned Native MoonBit engine",
+    "excluded": ["io_uring", "wasm-gc engine", "registry publication"],
     "full_release_ready": false,
     "actions_run": if run == "" {
       "not run locally"

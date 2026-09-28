@@ -11,7 +11,7 @@ int main(void) {
     printf("[test_static_thin] Testing hs_abi_version...\n");
     uint32_t ver = hs_abi_version();
     printf("[test_static_thin] ABI version: 0x%08X\n", ver);
-    assert(ver == 0x00010000);
+    assert((ver >> 16) == 1);
 
     printf("[test_static_thin] Testing hs_error_copy...\n");
     char err_buf[64];

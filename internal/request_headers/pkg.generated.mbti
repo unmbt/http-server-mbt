@@ -1,0 +1,16 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/internal/request_headers"
+
+// Values
+pub fn add(Map[String, String], String, String) -> Unit raise InvalidHeader
+
+pub fn token(String) -> Bool
+
+// Errors
+pub suberror InvalidHeader
+
+// Types and methods
+
+// Type aliases
+
+// Traits

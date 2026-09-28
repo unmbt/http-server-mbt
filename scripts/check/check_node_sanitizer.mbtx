@@ -1,0 +1,43 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  // Real addon instrumentation complements the mock-dispatch C harness.
+  // MSVC ASan needs its runtime DLL on PATH (the compiler bin directory).
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    fail("this addon sanitizer driver requires Windows MSVC ASan")
+  }
+  if !@fs.exists("target/sanitizer") {
+    @fs.mkdir("target/sanitizer", recursive=true)
+  }
+  @shell.Cmd(
+    "moon",
+    ["run", "scripts/build/build_node.mbtx"],
+    env=Map([("HS_NODE_ASAN", "1")]),
+  ).run()
+  let result = @shell.Cmd("node", [
+    "--test", "tests/consumers/node/async.test.cjs",
+  ]).output(timeout_ms=120000)
+  let version = @shell.Cmd("node", ["--version"])
+    .output()
+    .stdout()
+    .trim()
+    .to_owned()
+  @fs.write_file(
+    "target/sanitizer/node-" + version + ".log",
+    result.stdout() + result.stderr(),
+  )
+  // Never leave an instrumented binary in the candidate packaging directory.
+  @shell.Cmd(
+    "moon",
+    ["run", "scripts/build/build_node.mbtx"],
+    env=Map([("HS_NODE_ASAN", "0")]),
+  ).run()
+  result.check()
+}

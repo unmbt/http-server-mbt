@@ -1,0 +1,87 @@
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn verify(command : @shell.Cmd, curl : String, label : String, body : String, dynamic : String, mounted? : Bool = false) -> Unit {
+  let mut ready = false
+  let log = StringBuilder()
+  errdefer @fs.write_file("target/candidate/frameworks/" + label + ".log", log.to_string() + "FAIL before successful completion\n")
+  let code = command.each_line(async fn(line) {
+    log.write_string(line + "\n")
+    println(label + ": " + line)
+    if line.has_prefix("LISTENING ") {
+      assert_true(!ready)
+      ready = true
+      let base = "http://127.0.0.1:" + line.strip_prefix("LISTENING ").unwrap().trim().to_owned()
+      let files = base + (if mounted { "/static" } else { "" })
+      for (args, expected) in [
+        ([files + "/hello.txt"], "hello framework\n"),
+        (["-H", "Range: bytes=2-5", files + "/hello.txt"], "llo "),
+        ([files + "/large.txt"], body),
+      ] {
+        let response = @shell.Cmd(curl, ["--fail", "--silent", "--show-error", "--max-time", "10", ..args]).output()
+        if response.exit_code() != 0 { println(response.stderr()) }
+        response.check(); assert_eq(response.stdout(), expected)
+        println("  response verified: " + args.last().unwrap())
+      }
+      let head = @shell.Cmd(curl, ["--fail", "--silent", "--head", files + "/hello.txt"]).output()
+      if head.exit_code() != 0 { println("HEAD: " + head.stdout() + head.stderr()) }
+      head.check(); assert_true(head.stdout().to_lower().contains("content-length: 16"))
+      let next = @shell.Cmd(curl, ["--fail", "--silent", base + "/api/health"]).output()
+      if next.exit_code() != 0 { println("Next: " + next.stdout() + next.stderr()) }
+      next.check(); assert_true(next.stdout().contains(dynamic))
+      // A consumer abandons a multi-block body; a subsequent request must work.
+      let abandoned = @shell.Cmd(curl, ["--silent", "--limit-rate", "1024", "--max-time", "0.15", files + "/large.txt"]).output()
+      assert_eq(abandoned.exit_code(), 28)
+      let after = @shell.Cmd(curl, ["--fail", "--silent", files + "/hello.txt"]).output()
+      if after.exit_code() != 0 { println("After disconnect exit=" + after.exit_code().to_string() + ": " + after.stdout() + after.stderr()) }
+      after.check(); assert_eq(after.stdout(), "hello framework\n")
+      if mounted {
+        let fallback = @shell.Cmd(curl, ["--fail", "--silent", files + "/missing"]).output()
+        fallback.check(); assert_eq(fallback.stdout(), "dynamic Express fallback")
+        let closed = @shell.Cmd(curl, ["--fail", "--silent", base + "/__close"]).output()
+        closed.check()
+        let error = @shell.Cmd(curl, ["--silent", "--write-out", "%{http_code}", files + "/hello.txt"]).output()
+        error.check(); assert_eq(error.stdout(), "HS_CLOSED500")
+      }
+      let stopped = @shell.Cmd(curl, ["--fail", "--silent", base + "/__shutdown"]).output()
+      if stopped.exit_code() != 0 { println("Shutdown exit=" + stopped.exit_code().to_string() + ": " + stopped.stdout() + stopped.stderr()) }
+      stopped.check()
+    }
+  }, timeout_ms=30000)
+  @fs.write_file("target/candidate/frameworks/" + label + ".log", log.to_string() + "GET/HEAD/Range/multiblock/Next/disconnect/shutdown; exit=" + code.to_string() + "\n")
+  assert_true(ready); assert_eq(code, 0)
+  println(label + ": GET/HEAD/Range/multiblock/Next/disconnect/shutdown PASS")
+}
+
+///|
+async fn main {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let mac = !windows && @shell.Cmd("uname", ["-s"]).output().stdout().trim() == "Darwin"
+  let root = @env.current_dir().unwrap().replace_all(old="\\", new="/")
+  let fixture = root + "/target/framework-fixture"
+  if !@fs.exists(fixture) { @fs.mkdir(fixture, recursive=true) }
+  if !@fs.exists("target/candidate/frameworks") { @fs.mkdir("target/candidate/frameworks", recursive=true) }
+  @fs.write_file(fixture + "/hello.txt", "hello framework\n")
+  let body = StringBuilder()
+  for _ in 0..<16384 { body.write_string("0123456789abcdef") }
+  @fs.write_file(fixture + "/large.txt", body.to_string())
+  let library = root + "/target/cabi/" + (if windows { "hs_thin.dll" } else if mac { "libhs_thin.dylib" } else { "libhs_thin.so" })
+  let config : Json = { "root": fixture, "handle_error": false, "cache_control": "no-cache" }
+  let curl = if windows { "curl.exe" } else { "curl" }
+  for mode in ["static", "dynamic"] {
+    verify(@shell.Cmd("target/framework-examples/libevent_" + mode + (if windows { ".exe" } else { "" }),
+      [config.stringify(), "0", library]), curl, "libevent-" + mode, body.to_string(), "dynamic libevent")
+  }
+  let python = "target/asgi-venv/" + (if windows { "Scripts/python.exe" } else { "bin/python" })
+  @shell.Cmd(python, ["tests/consumers/python/async_consumer.py", library]).run(timeout_ms=30000)
+  verify(@shell.Cmd(python, ["examples/python/app.py"], env=Map([("HS_LIBRARY", library), ("HS_ROOT", fixture)])),
+    curl, "fastapi-uvicorn", body.to_string(), "FastAPI")
+  verify(@shell.Cmd("node", ["examples/node/app.cjs"], env=Map([("HS_ROOT", fixture)])),
+    curl, "express", body.to_string(), "Express", mounted=true)
+}

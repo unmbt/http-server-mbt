@@ -4,11 +4,15 @@ const fs = require('fs');
 
 let nativeBinding = null;
 let loadError = null;
+const libc = platform === 'linux'
+  ? (process.report?.getReport().header.glibcVersionRuntime ? 'glibc' : 'musl')
+  : null;
 
 function getPlatformPackageName() {
   if (platform === 'win32' && arch === 'x64') {
     return '@unmbt/http-server-mbt-win32-x64-msvc';
   } else if (platform === 'linux' && arch === 'x64') {
+    if (libc !== 'glibc') return null;
     return '@unmbt/http-server-mbt-linux-x64-gnu';
   } else if (platform === 'darwin' && arch === 'arm64') {
     return '@unmbt/http-server-mbt-darwin-arm64';
@@ -35,7 +39,7 @@ if (!nativeBinding) {
       path.join(__dirname, '../win32-x64-msvc/http_server.win32-x64-msvc.node'),
       path.join(__dirname, '../../target/node/http_server.win32-x64-msvc.node')
     );
-  } else if (platform === 'linux' && arch === 'x64') {
+  } else if (platform === 'linux' && arch === 'x64' && pkgName) {
     localCandidates.push(
       path.join(__dirname, '../linux-x64-gnu/http_server.linux-x64-gnu.node'),
       path.join(__dirname, '../../target/node/http_server.linux-x64-gnu.node')
@@ -61,11 +65,12 @@ if (!nativeBinding) {
 
 if (!nativeBinding) {
   const supported = ['win32-x64 (Windows x86_64)', 'linux-x64 (Linux x86_64 glibc)', 'darwin-arm64 (macOS Apple Silicon)'];
-  let msg = `Unsupported or missing native binary for platform '${platform}-${arch}'.\nSupported platforms: ${supported.join(', ')}.`;
+  let msg = `Unsupported or missing native binary for platform '${platform}-${arch}${libc ? '-' + libc : ''}'.\nSupported platforms: ${supported.join(', ')}.`;
+  if (libc === 'musl') msg += '\nNo musl prebuild is shipped. The glibc binary cannot be used on musl; build a matching native addon from source.';
   if (loadError) {
     msg += `\nOriginal error: ${loadError.message}`;
   }
-  throw new Error(msg);
+  throw Object.assign(new Error(msg), { code: 'HS_UNSUPPORTED_PLATFORM' });
 }
 
 class HttpServer {
@@ -91,5 +96,6 @@ function createServer(options = {}) {
 module.exports = {
   getAbiVersion: nativeBinding.getAbiVersion,
   createServer,
-  HttpServer
+  HttpServer,
+  ...require('./engine.cjs')(nativeBinding)
 };

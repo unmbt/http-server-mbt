@@ -56,6 +56,8 @@ Native 为生产服务器后端；wasm-gc 为需要宿主提供文件/计时/网
 | R-N16 | 必须以故障注入、模型事件序列与模糊测试验证状态机；保存种子、最小复现和回归语料，纳入三平台 Actions | D-10、D-18 | T-004、T-016、T-025、T-034 |
 | R-N17 | Thin / Full 功能档位须形成真实编译依赖边界；共享协议与 CLI 逻辑，使用真实 TLS upstream，并持续记录产物大小、哈希和依赖；不设置额外硬性体积目标 | D-08、D-15、D-20 | T-012、T-013、T-014、T-035 |
 
+2026-09-28 R-N14 实施范围：增量 ABI 1.1 保留旧五个导出与错误码；交付 Node Promise/Readable/AbortSignal/Connect、C libevent 2.1.12 与 Python asyncio/ctypes/ASGI/FastAPI。验收必须证明拒绝无回调、接纳恰好一次回调、关闭后无业务通知、释放屏障后可卸载、宿主信号不变、错误不退出宿主，以及 GET/HEAD/Range/Next、背压、取消和 FILE_CHANGED。Windows 本机与三平台候选证据分开；本轮不扩展 io_uring、wasm-gc 引擎或 registry 发布。沿用上述 R/D/T 编号，详见 [ABI 1.1 实施记录](async-abi-1.1.md)。
+
 ### 3.1 原版兼容边界
 
 完整兼容包覆盖静态文件、默认扩展名、目录索引/列表、MIME 与字符集、ETag/条件请求、Range、预压缩、错误委托、配置别名、自定义头、Basic Auth、Host 白名单、CORS/COOP/PNA、robots、IPv4/IPv6、端口/超时/CLI、HTTP/HTTPS 代理、规则重写和 WebSocket 转发。

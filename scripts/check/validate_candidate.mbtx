@@ -24,12 +24,15 @@ async fn main {
   @shell.Cmd("moon", ["test", "--target", "native", "--deny-warn"]).run()
   @shell.Cmd("moon", ["check", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_native_sanitizers.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_cli.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_cabi.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_external_consumers.mbtx"]).run()
-  @shell.Cmd("moon", ["run", "scripts/check/check_moonbit_consumer.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_node.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/build/build_framework_examples.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_framework_examples.mbtx"]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_moonbit_consumer.mbtx"]).run()
   println(
     "Platform validation finished. Node 22/24 candidate install and Linux containers remain separate mandatory workflow steps.",
   )

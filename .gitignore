@@ -13,3 +13,6 @@ trace.json
 *.lib
 c_abi/node/lib/
 .agents/
+/examples/node/node_modules/
+/examples/python/__pycache__/
+/tests/consumers/python/__pycache__/

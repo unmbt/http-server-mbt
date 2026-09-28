@@ -85,6 +85,10 @@ async fn main {
   @fs.write_file(workspace + "/README.md", @fs.read_file("README.md"))
   @fs.write_file(workspace + "/LICENSE", @fs.read_file("LICENSE"))
   @shell.Cmd("node", ["consumer.cjs"], cwd=workspace).run(timeout_ms=60000)
+  let async_sample = @fs.read_file("tests/consumers/node/async.test.cjs").text()
+    .replace_all(old="../../../npm/http-server", new="@unmbt/http-server-mbt")
+  @fs.write_file(workspace + "/async.test.cjs", async_sample)
+  @shell.Cmd("node", ["--test", "async.test.cjs"], cwd=workspace).run(timeout_ms=60000)
   if !@fs.exists("target/candidate/node") {
     @fs.mkdir("target/candidate/node", recursive=true)
   }
@@ -104,6 +108,6 @@ async fn main {
     version +
     " " +
     os +
-    "; offline candidate install; complete-server mode only\n",
+    "; offline candidate install; complete server and async static engine/middleware/lifecycle\n",
   )
 }

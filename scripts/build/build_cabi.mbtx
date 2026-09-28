@@ -615,7 +615,15 @@ async fn collect_and_stage_objects(
   }
   for src in matched_objs {
     let dst = "\{staging_dir}/obj_\{idx}\{ext}"
-    @fs.write_file(dst, @fs.read_file(src).binary())
+    let embedded_signal=src.contains("/internal/event_loop/signal.")
+    let embedded_pool=target_os != Windows && src.contains("/internal/event_loop/thread_pool.")
+    if embedded_signal {
+      compile_c_file(tc,"c_abi/runtime/embedded_signal.c",dst)
+    } else if embedded_pool {
+      compile_c_file(tc,"c_abi/runtime/embedded_thread_pool.c",dst)
+    } else {
+      @fs.write_file(dst, @fs.read_file(src).binary())
+    }
     if target_os == Windows && objcopy_exe != "" {
       // Strip .drectve, .voltbl, .gfids using llvm-objcopy for symbol isolation
       let res = @shell.Cmd(objcopy_exe, [
@@ -623,7 +631,7 @@ async fn collect_and_stage_objects(
         dst,
       ]).output()
       res.check()
-    } else if target_os == Linux &&
+    } else if !embedded_signal && !embedded_pool && target_os == Linux &&
       (src.contains("runtime-") || src.contains(".mooncakes")) {
       let c_src = find_c_source_for_obj(src, tc)
       if c_src != "" {
@@ -867,9 +875,12 @@ async fn verify_exports(tc : Toolchain, dylib_path : String) -> Unit {
       fail_pipeline("dumpbin failed on \{dylib_path}: \{out.stderr()}")
     }
     let stdout = out.stdout()
-    guard stdout.contains("5 number of functions") else {
+    for symbol in @fs.read_file("c_abi/exports.txt").text().split("\n").map(s=>s.trim().to_owned()).filter(s=>s!="") {
+      assert_true(stdout.contains(" " + symbol), msg="missing ABI export " + symbol)
+    }
+    guard stdout.contains("19 number of functions") else {
       fail_pipeline(
-        "\{dylib_path} does not export exactly 5 functions!\n\{stdout}",
+        "\{dylib_path} does not export exactly 19 functions!\n\{stdout}",
       )
     }
     guard stdout.contains("hs_abi_version") &&
@@ -921,12 +932,9 @@ async fn verify_exports(tc : Toolchain, dylib_path : String) -> Unit {
       }
       exported.add(symbol)
     }
-    assert_eq(exported.length(), 5)
+    assert_eq(exported.length(), 19)
     for
-      symbol in [
-        "hs_abi_version", "hs_server_start", "hs_server_stop", "hs_server_destroy",
-        "hs_error_copy",
-      ] {
+      symbol in @fs.read_file("c_abi/exports.txt").text().split("\n").map(s=>s.trim().to_owned()).filter(s=>s!="") {
       assert_true(exported.contains(symbol))
     }
   }
@@ -970,6 +978,7 @@ async fn test_c_consumer(
 
   if tc.target_os == Windows {
     let args : Array[String] = ["/nologo", "/I", "c_abi/include"]
+    if is_static { args.push("/DHS_STATIC=") }
     for inc in tc.include_paths {
       args.push("/I")
       args.push(inc)
@@ -1050,7 +1059,7 @@ async fn test_c_consumer(
 
   println("Running consumer test \{test_name}...")
   let run_cmd = if tc.target_os == Windows { exe_path } else { "./\{exe_name}" }
-  let run_out = @shell.Cmd(run_cmd, [], cwd="target/cabi").output()
+  let run_out = @shell.Cmd(run_cmd, [], cwd="target/cabi").output(timeout_ms=30000)
   if run_out.exit_code() != 0 {
     println("Consumer test \{test_name} stdout:\n" + run_out.stdout())
     println("Consumer test \{test_name} stderr:\n" + run_out.stderr())
@@ -1072,6 +1081,16 @@ async fn main {
 
   println("1. Discovering toolchain...")
   let tc = discover_toolchain(target_os)
+  if @env.args().contains("--async-consumers-only") {
+    let (archive,dynamic)=match target_os {
+      Windows=>("hs_thin_static.lib","hs_full.lib")
+      Linux=>("libhs_thin.a","libhs_full.so")
+      MacOS=>("libhs_thin.a","libhs_full.dylib")
+    }
+    test_c_consumer(tc,"test_async_thin","tests/consumers/c/test_async.c",archive,true)
+    test_c_consumer(tc,"test_async_full","tests/consumers/c/test_async.c",dynamic,false)
+    return
+  }
   println("  Compiler: \{tc.cc_exe}")
   println("  Linker: \{tc.link_exe}")
   println("  Archiver: \{tc.lib_exe}")
@@ -1123,6 +1142,7 @@ async fn main {
     Linux | MacOS => ".o"
   }
   emit_foreign_c(tc, "thin")
+  emit_embedded_c(tc, "thin")
   let thin_obj = "target/cabi-build/native/release/build/c_abi/thin/thin\{ext}"
   let thin_bridge = "target/cabi-build/native/release/build/c_abi/thin/bridge\{ext}"
   if file_exists("target/cabi-build/native/release/build/c_abi/thin/thin.c") {
@@ -1138,6 +1158,7 @@ async fn main {
   }
 
   emit_foreign_c(tc, "full")
+  emit_embedded_c(tc, "full")
   let full_obj = "target/cabi-build/native/release/build/c_abi/full/full\{ext}"
   let full_bridge = "target/cabi-build/native/release/build/c_abi/full/bridge\{ext}"
   if file_exists("target/cabi-build/native/release/build/c_abi/full/full.c") {
@@ -1214,6 +1235,8 @@ async fn main {
   test_c_consumer(
     tc, "test_static_full", "tests/consumers/c/test_static_full.c", stat_full, true,
   )
+  test_c_consumer(tc,"test_async_thin","tests/consumers/c/test_async.c",stat_thin,true)
+  test_c_consumer(tc,"test_async_full","tests/consumers/c/test_async.c",link_dyn_full,false)
 
   println("==================================================================")
   println("C ABI Build and Verification SUCCEEDED!")
@@ -1289,4 +1312,66 @@ async fn emit_foreign_c(tc : Toolchain, variant : String) -> Unit {
   if !file_exists(generated) {
     fail_pipeline("foreign-library C was not generated")
   }
+}
+
+///|
+// Compile upstream source with an owned integration entry into the ABI-only
+// build tree. Never edit the dependency cache or generated C. -no-mi preserves
+// the public interface already checked by Moon; only this core is substituted.
+async fn compile_embedded_entry(tc : Toolchain) -> Unit {
+  let source = ".mooncakes/moonbitlang/async/src"
+  let manifest = @fs.read_file(".mooncakes/moonbitlang/async/moon.mod").text()
+  guard manifest.contains("version = \"0.21.3\"") else {
+    fail_pipeline("embedded async entry requires reviewed async 0.21.3")
+  }
+  let output = "target/cabi-build/native/release/build/.mooncakes/moonbitlang/async"
+  let args : Array[String] = ["build-package"]
+  for file in @fs.readdir(source) {
+    if file.has_suffix(".mbt") && !file.has_suffix("_test.mbt") &&
+      !file.has_suffix("_wbtest.mbt") && !file.has_prefix("integration.") {
+      args.push(source + "/" + file)
+    }
+  }
+  args.push("c_abi/embedded/integration.mbt")
+  args.append(["-w", "-a", "-o", output + "/async.core", "-pkg", "moonbitlang/async",
+    "-pkg-type", "library", "-target", "native", "-no-mi", "-std-path", tc.moon_lib_dir + "/core/_build/native/release/bundle"])
+  for dep in ["set", "cmp", "prelude"] {
+    args.append(["-i", tc.moon_lib_dir + "/core/_build/native/release/bundle/" + dep + "/" + dep + ".mi:" + dep])
+  }
+  for (path, dep_name) in [("internal/coroutine", "coroutine"), ("internal/event_loop", "event_loop"),
+    ("aqueue", "aqueue"), ("semaphore", "semaphore"), ("cond_var", "cond_var"), ("internal/env_util", "env_util")] {
+    args.append(["-i", output + "/" + path + "/" + dep_name + ".mi:" + dep_name])
+  }
+  @shell.Cmd("moonc", args).run()
+}
+
+///|
+// Moon may rebuild externally changed outputs. Relink directly from its dry-run
+// plan after the controlled source compilation, without re-entering the build.
+async fn emit_embedded_c(tc : Toolchain, variant : String) -> Unit {
+  let plan = @shell.Cmd("moon", ["build", "c_abi/" + variant, "--target", "native", "--release", "--target-dir", "target/cabi-build", "--dry-run"]).output()
+  plan.check()
+  compile_embedded_entry(tc)
+  let home = tc.moon_lib_dir.strip_suffix("/lib").unwrap().to_owned()
+  let mut linked = false
+  for line in plan.stdout().split("\n") {
+    if line.has_prefix("moonc link-core ") {
+      let args : Array[String] = []
+      let mut token = ""
+      let mut quoted = false
+      for c in line.to_owned().replace_all(old="$MOON_HOME", new=home) {
+        if c == '\'' { quoted = !quoted }
+        else if c == ' ' && !quoted {
+          if token.length() > 0 { args.push(token); token = "" }
+        } else { token += c.to_string() }
+      }
+      if token.length() > 0 { args.push(token) }
+      guard !quoted && args[0] == "moonc" else { fail("unrecognized moon dry-run quoting") }
+      @shell.Cmd("moonc", args[1:].to_owned()).run()
+      linked = true
+    }
+  }
+  assert_true(linked)
+  let source = @fs.read_file("target/cabi-build/native/release/build/c_abi/" + variant + "/" + variant + ".c").text()
+  assert_true(!source.contains("exit("), msg="embedded generated C must not call exit")
 }

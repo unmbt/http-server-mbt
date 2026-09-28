@@ -53,15 +53,21 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22.21.1'
-      - name: Native, resource, CLI, C ABI and external MoonBit/C/Rust/Python checks
+      - name: Native, resource, ABI, libevent, ASGI and external consumer checks
         run: moon run scripts/check/validate_candidate.mbtx
       - name: Node 22 offline candidate installation and lifecycle
         run: moon run scripts/check/check_node_candidate.mbtx
+      - name: Node 22 addon ASan and worker teardown regression
+        if: runner.os == 'Windows'
+        run: moon run scripts/check/check_node_sanitizer.mbtx
       - uses: actions/setup-node@v7
         with:
           node-version: '24.10.0'
       - name: Node 24 offline candidate installation and lifecycle
         run: moon run scripts/check/check_node_candidate.mbtx
+      - name: Node 24 addon ASan and worker teardown regression
+        if: runner.os == 'Windows'
+        run: moon run scripts/check/check_node_sanitizer.mbtx
       - name: Linux four-container matrix
         if: runner.os == 'Linux'
         run: moon run scripts/build/build_docker.mbtx
@@ -78,7 +84,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: diagnostics-${{ runner.os }}-${{ runner.arch }}
-          path: target/sanitizer/
+          path: |
+            target/sanitizer/
+            target/framework-*.log
+            target/candidate/frameworks/
           if-no-files-found: warn
 
   candidate-gate:

@@ -1,0 +1,53 @@
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+async fn main {
+  let windows=@env.get_env_var("OS")==Some("Windows_NT")
+  let mac= !windows && @shell.Cmd("uname",["-s"]).output().stdout().trim()=="Darwin"
+  let root=@env.current_dir().unwrap().replace_all(old="\\",new="/")
+  let archive="target/libevent-2.1.12-stable.tar.gz"
+  if !@fs.exists(archive) {
+    @shell.Cmd(if windows {"curl.exe"} else {"curl"},["--fail","--location","--silent","--show-error","https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz","-o",archive]).run()
+  }
+  let hash=if windows {@shell.Cmd("certutil",["-hashfile",archive,"SHA256"]).output()}else if mac {@shell.Cmd("shasum",["-a","256",archive]).output()}else{@shell.Cmd("sha256sum",[archive]).output()}
+  hash.check()
+  assert_true(hash.stdout().to_lower().contains("92e6de1be9ec176428fd2367677e61ceffc2ee1cb119035037a27d346b0403bb"))
+  if !@fs.exists("target/libevent-2.1.12-stable/include/event2/http.h") {
+    @shell.Cmd("tar",["-xf",archive,"-C","target"]).run()
+  }
+  let args=["-S","examples/c","-B","target/framework-examples","-DCMAKE_POLICY_VERSION_MINIMUM=3.5","-DLIBEVENT_SOURCE="+root+"/target/libevent-2.1.12-stable","-DHS_ARCHIVE="+root+"/target/cabi/"+(if windows {"hs_thin_static.lib"}else{"libhs_thin.a"})]
+  let build_env : Map[String,String]=Map([])
+  if windows {
+    let installation=@shell.Cmd("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe",["-latest","-products","*","-property","installationPath"]).output().stdout().trim().to_owned().replace_all(old="\\",new="/")
+    let versions=@fs.readdir(installation+"/VC/Tools/MSVC");versions.sort()
+    let compiler=installation+"/VC/Tools/MSVC/"+versions.last().unwrap()
+    let sdk="C:/Program Files (x86)/Windows Kits/10"
+    let sdks=@fs.readdir(sdk+"/Include");sdks.sort()
+    let version=sdks.last().unwrap()
+    build_env["INCLUDE"]=compiler+"/include;"+sdk+"/Include/"+version+"/ucrt;"+sdk+"/Include/"+version+"/um;"+sdk+"/Include/"+version+"/shared"
+    build_env["LIB"]=compiler+"/lib/x64;"+sdk+"/Lib/"+version+"/ucrt/x64;"+sdk+"/Lib/"+version+"/um/x64"
+    build_env["PATH"]=compiler+"/bin/Hostx64/x64;"+sdk+"/bin/"+version+"/x64;"+@env.get_env_var("PATH").unwrap_or("")
+    if @fs.exists("target/framework-examples/CMakeCache.txt") && !@fs.read_file("target/framework-examples/CMakeCache.txt").text().contains("CMAKE_GENERATOR:INTERNAL=Ninja") { args.push("--fresh") }
+    args.append(["-G","Ninja","-DCMAKE_C_COMPILER="+compiler+"/bin/Hostx64/x64/cl.exe","-DCMAKE_BUILD_TYPE=Release"])
+  }
+  println("Configuring pinned libevent examples")
+  let configured=@shell.Cmd("cmake",args,env=build_env).output(timeout_ms=300000)
+  @fs.write_file("target/framework-configure.log",configured.stdout()+configured.stderr())
+  configured.check()
+  println("Building static and dynamically loaded libevent consumers")
+  let built=@shell.Cmd("cmake",["--build","target/framework-examples","--config","Release","--target","libevent_static","libevent_dynamic","--parallel","4"],env=build_env).output(timeout_ms=300000)
+  @fs.write_file("target/framework-build.log",built.stdout()+built.stderr())
+  built.check()
+  let python=@env.get_env_var("PYTHON").unwrap_or(if windows {"python"}else{"python3"})
+  if !@fs.exists("target/asgi-venv/pyvenv.cfg") {@shell.Cmd(python,["-m","venv","target/asgi-venv"]).run()}
+  let venv="target/asgi-venv/"+(if windows {"Scripts/python.exe"}else{"bin/python"})
+  @shell.Cmd(venv,["-m","pip","install","--disable-pip-version-check","-r","examples/python/requirements.txt"]).run(timeout_ms=300000)
+  let node_path = @shell.Cmd("node", ["-p", "process.execPath"]).output().stdout().trim().to_owned().replace_all(old="\\", new="/")
+  let parts = node_path.split("/").to_array()
+  let npm_args = if windows { [parts[:parts.length()-1].join("/") + "/node_modules/npm/bin/npm-cli.js"] } else { [] }
+  @shell.Cmd(if windows { "node" } else { "npm" }, [..npm_args, "ci", "--ignore-scripts", "--no-audit", "--no-fund"], cwd=root + "/examples/node").run(timeout_ms=180000)
+  println("Built libevent static/dynamic examples and isolated ASGI environment")
+}

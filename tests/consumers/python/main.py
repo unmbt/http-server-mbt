@@ -13,7 +13,7 @@ library.hs_server_stop.argtypes = [ctypes.c_void_p]
 library.hs_server_stop.restype = ctypes.c_int32
 library.hs_server_destroy.argtypes = [ctypes.c_void_p]
 library.hs_server_destroy.restype = None
-assert library.hs_abi_version() == 0x10000
+assert library.hs_abi_version() >> 16 == 1
 server = ctypes.c_void_p()
 assert library.hs_server_start(b"{bad", 4, ctypes.byref(server)) == 1
 assert server.value is None

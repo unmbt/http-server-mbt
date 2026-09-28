@@ -379,6 +379,9 @@ async fn main {
         "/nologo", "/c", "/O2", "/DHS_STATIC", "/D_AMD64_", "/I", "c_abi/node/include",
         "/I", "c_abi/include",
       ]
+      if @env.get_env_var("HS_NODE_ASAN") == Some("1") {
+        cc_args.append(["/fsanitize=address", "/Zi", "/Fdtarget/node/addon.pdb"])
+      }
       for inc in tc.include_paths {
         cc_args.push("/I")
         cc_args.push(inc)
@@ -421,6 +424,9 @@ async fn main {
         "shell32.lib",
         "/NODEFAULTLIB:msvcrt.lib",
       ]
+      if @env.get_env_var("HS_NODE_ASAN") == Some("1") {
+        link_args.append(["/DEBUG", "/PDB:target/node/http_server.pdb"])
+      }
       let link_res = @shell.Cmd(tc.link_exe, link_args).output()
       if link_res.exit_code() != 0 {
         println("ERROR: link.exe failed:")
@@ -493,7 +499,7 @@ async fn main {
   println("  -> Staged copy: \{target_copy}")
 
   println("5. Performing Node.js smoke test...")
-  let test_script = "const addon = require('./\{target_copy}'); const v = addon.getAbiVersion(); if (v !== 0x10000) throw new Error('Bad ABI: ' + v); console.log('Node-API ABI Version OK: 0x' + v.toString(16));"
+  let test_script = "const addon = require('./\{target_copy}'); const v = addon.getAbiVersion(); if (v !== 0x10001) throw new Error('Bad ABI: ' + v); console.log('Node-API ABI Version OK: 0x' + v.toString(16));"
   let smoke_res = @shell.Cmd("node", ["-e", test_script]).output()
   if smoke_res.exit_code() != 0 {
     println("ERROR: Node smoke test failed with code \{smoke_res.exit_code()}:")

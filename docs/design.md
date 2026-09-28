@@ -256,6 +256,12 @@ close 一经调用即拒绝新操作，库自动完成停止、取消和排空�
 
 ### C ABI v1
 
+2026-09-28 实施修订（R-N06/R-N09/R-N14，T-020/T-021/T-028）：采用增量 ABI 1.1，保留 v1.0 的五个导出、错误码和 Node 同步服务入口。新增 engine/operation/response/chunk 托管异步接口；Thin/Full 共享桥接及单 owner，独立通知线程执行回调。请求和配置在接纳前复制，配置在 owner 用 MoonBit JSON/UTF-8 解码；拒绝无通知，接纳恰好一次通知。关闭控制不受业务队列满影响，关闭通知排在此前业务回调之后；已交付 C chunk 在释放前仍有效。C ABI 构建单独隔离 async 信号桥，CLI 保持原行为。D-11 构建/符号清单相应扩展。
+
+实施细则见 [ABI 1.1](async-abi-1.1.md)：D-07 的宿主线程 release 在 closing 状态等待关闭及通知返回，最后实例还 join 通知线程，作为动态卸载屏障；回调中的 release 不等待。D-11 仅在独立 ABI build tree 编译 async 0.21.3 的受控 integration 源码，保留原接口并核查生成 C 无 exit，不修改依赖缓存。D-12 的 Node 正常完成使用非阻塞 TSFN；worker 销毁可能提前终结 TSFN，finalizer 必须等待 native 最终通知，晚通知不得调用已终结的 TSFN。环境清理在宿主侧完成 native 释放屏障后解除 async cleanup hook，不依赖 JS 或额外通知通道，退出排空可等待系统任务自然结束。npm 支持范围限定本轮验收的 Node 22/24，其他版本及 Bun/Deno 另验。N-13/N-14/N-19/N-21 增加关闭/卸载、通知竞态与失败重启验证。请求头归一化由 ABI 与 HTTP framing 共用，拒绝重复 Authorization 和非法控制字符，Cookie 重复值使用分号；对应兼容域之外的歧义输入不静默覆盖。
+
+D-12 同步修订：Node 新增异步 createEngine、handle、close 及 createMiddleware(engine)，正文为有界 Readable，支持 AbortSignal、逐 napi_env 清理；首版复制 chunk 为 Buffer 后释放 C 数据。原 createServer/stop 保留。C/Python 框架示例分别采用固定 libevent 2.1.12-stable 与 asyncio/ctypes、ASGI/FastAPI/Uvicorn；示例显式启用 handle_error=false 和 cache_control=no-cache。验收 Node 22/24 和三平台，不在本次发布 registry。
+
 导出名统一 `hs_*`，使用 C calling convention，Windows 显式导出、POSIX 限制可见符号；不暴露生成 C 的内部符号。`hs_abi_version()` 返回 major/minor；不透明句柄包含 engine、server、operation、response、chunk。配置使用 UTF-8 JSON 指针加长度，入口复制后由库验证；JSON 中无宿主回调/代码。此次修订替换尚未发布的轮询式草案，T-020 冻结前统一采用托管异步 ABI。
 
 请求与元数据边界使用固定宽度整数及长度明确的 UTF-8 span，重复头为数组。对外结构带 `struct_size` 与 ABI major；不传 MoonBit String/Bytes/闭包/GC 指针，不能假定 C `long` 或 `bool` 的跨平台大小。64 位文件偏移与长度固定为 uint64_t；不可表示到平台 API 的值返回错误。

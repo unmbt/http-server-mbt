@@ -1,12 +1,16 @@
 import {
   "unmbt/http-server-mbt/server/plain" @server,
-  "unmbt/http-server-mbt/core",
-  "moonbitlang/async",
+  "unmbt/http-server-mbt/c_abi/runtime",
 }
 
 pkgtype(kind: "foreign_library")
 
 options(
   "native-stub": [ "bridge.c" ],
-  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } },
+  link: {
+    "native": {
+      "cc-flags": "${build.HS_C_FLAGS}",
+      "stub-cc-flags": "${build.HS_C_FLAGS}",
+    },
+  },
 )

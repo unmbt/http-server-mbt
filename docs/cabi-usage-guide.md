@@ -23,7 +23,7 @@
 
 > [!NOTE]
 > **符号隔离与安全性保障**：
-> 动态库严格通过符号隔离机制（Windows `.def` 白名单过滤、Linux GNU ELF `version-script`、macOS `exported_symbols_list`），**只导出 5 个公共 `hs_*` API**，绝对不泄露 MoonBit 内部运行时函数，杜绝任何 `main` 符号冲突。
+> ABI 1.1 保留原五个同步入口，并追加异步引擎、操作、响应与字节块接口，共 19 个公开符号；白名单见 `c_abi/exports.txt`。异步所有权、线程约定、框架示例和验证范围见 [ABI 1.1 实施记录](async-abi-1.1.md)。内部 MoonBit 符号不属于公共 ABI。
 
 ---
 
@@ -54,7 +54,7 @@
 extern "C" {
 #endif
 
-/* 1. ABI 版本检查: 返回 0x00010000 (v1.0) */
+/* 1. ABI 版本检查: 当前返回 0x00010001 (v1.1)，兼容性比较 major */
 HS_EXPORT uint32_t hs_abi_version(void);
 
 /* 不透明服务器句柄 */
@@ -488,7 +488,7 @@ func main() {
 
 项目提供官方的 Node-API (N-API) 原生模块 **`@unmbt/http-server-mbt`**。内部静态集成 `full` 引擎（包含 MbedTLS 4.2.0 传输层与反向代理支持），**自包含单个 `.node` 文件，用户无需安装 Visual Studio、Python 或任何构建工具链，零外部动态库依赖**。
 
-- **ABI 稳定保证**：基于 Node-API Version 8，在 Node.js 16.13.0+、18.x、20.x、22.x、24.x+ 及后续版本上免重新编译即可直接运行。
+- **验收版本**：基于 Node-API Version 8，本轮验证 Node.js 22/24。Node-API 的二进制兼容性不代替其他版本或运行时的生命周期验证。
 - **预编译平台分发**：通过 `optionalDependencies` 自动按系统下载对应预构建二进制（Windows x64、Linux x64 glibc、macOS Apple Silicon arm64）。
 
 #### 安装
@@ -552,7 +552,7 @@ const server: HttpServer = createServer(config);
 
 #### Bun 支持
 
-在 Bun 环境下，既可直接使用该 Node-API 模块（`import { createServer } from '@unmbt/http-server-mbt'`），也可利用 Bun 内置的 `bun:ffi` 直接动态链接 `libhs_full.so` / `libhs_full.dylib`。
+Bun/Deno 不在本轮验收范围；其 Node-API 或 FFI 兼容性需另行验证。
 
 ---
 

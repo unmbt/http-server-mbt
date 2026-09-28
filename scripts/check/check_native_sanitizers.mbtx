@@ -49,6 +49,9 @@ async fn main {
   // clang has no default macOS sysroot on the Actions runner.
   let compiler = if mac { "/usr/bin/clang" } else { "clang" }
   @shell.Cmd(compiler, args).run()
+  let abi_binary = "target/sanitizer/abi-owner" + (if windows { ".exe" } else { "" })
+  let abi_args = args.map(arg => if arg == "tests/native_sanitizer/main.c" { "tests/native_sanitizer/abi.c" } else if arg == binary { abi_binary } else { arg })
+  @shell.Cmd(compiler, abi_args).run()
   if windows {
     let resource = @shell.Cmd("clang", ["--print-resource-dir"])
       .output()
@@ -89,6 +92,9 @@ async fn main {
       result.stdout() + result.stderr(),
     )
     result.check()
+    let abi_result = @shell.Cmd(abi_binary, [seed], env=Map([("ASAN_OPTIONS", "detect_leaks=" + (if windows || mac { "0" } else { "1" }))])).output(timeout_ms=60000)
+    @fs.write_file("target/sanitizer/abi-" + seed + ".log", abi_result.stdout() + abi_result.stderr())
+    abi_result.check()
     println(
       result
       .stdout()

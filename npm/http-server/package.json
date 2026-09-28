@@ -15,6 +15,7 @@
   },
   "files": [
     "index.cjs",
+    "engine.cjs",
     "index.mjs",
     "index.js",
     "index.d.ts",
@@ -39,7 +40,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=16.13.0"
+    "node": "^22.0.0 || ^24.0.0"
   },
   "optionalDependencies": {
     "@unmbt/http-server-mbt-win32-x64-msvc": "0.3.4",

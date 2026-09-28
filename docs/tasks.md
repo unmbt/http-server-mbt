@@ -8,6 +8,10 @@
 
 ## 1. 任务状态与证据
 
+2026-09-28：开始实施 T-020/T-021/T-028 的 ABI 1.1 异步静态引擎、Node 框架接入、C/libevent 与 Python/ASGI 示例。关联 T-002/T-016/T-025/T-027/T-033/T-034、D-07/D-11/D-12、N-13/N-14/N-19/N-20/N-21；保留旧同步入口。任务保持进行中，证据记录在 `docs/async-abi-1.1.md`；候选构建与三平台行为验收分别记录，不以接口声明或本机结果勾选总任务。
+
+该轮 Windows 分项已实现并复验：ABI/Node/框架链路、Native 266/266、Node 22/24 离线消费及真实 addon ASan。worker 在途退出曾触发 TSFN finalizer 提前释放的 UAF，已修复并保留连续 8 次退出回归；四类框架宿主 HTTP 验收通过。三平台工作流已扩展，尚缺同提交远程 run/job 结果，T-020/T-021/T-028 总状态仍为进行中。
+
 2026-09-25 仓库整理分项：状态为已完成（Windows 本地结构整理），复用 T-025/T-026/T-030/T-034，关联 R-SDD/R-COMPAT/R-N11/R-N13 与 D-02/D-08/D-10/D-14/D-16/D-18。交付脚本分类及历史清理、文档归档与入口、测试命名和共享辅助代码、生成接口同步；265/265 Native、28/28 core wasm-gc、18 个维护脚本及根构建钩子检查通过，路径引用及迁移矩阵保持，CLI/C/Node 构建与 MoonBit/C/Rust/Python/Node 外部消费验证通过。环境、命令、日志及未运行的远程平台/sanitizer/Docker 范围见 [仓库整理](repository-layout-20260925.md)；不更改各总任务的跨平台完成状态。
 
 状态只使用未开始、进行中、阻塞、已完成。每个任务包含 R 需求、D 设计、依赖、交付物和验收；缺少任何一项证据不得勾选。文档创建不会自动完成 T-001 或后续任务。前置任务或 D-16 允许的对应平台/能力分项验证完成后，才进入依赖其产物的实施；独立工作可先推进。
@@ -118,12 +122,14 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 ### 阶段六：嵌入、分发、实验后端和交付
 
 - [ ] **T-020 C ABI v1 托管异步动态库** — 状态：进行中（Windows 分项交付，2026-09-18）。需求：R-N06、R-SAFE、R-N14；设计：D-07、D-11；依赖：T-002、T-015、T-016、T-019。
+  - 2026-09-28 Windows ABI 1.1 分项：共用 owner/notifier、19 个导出、异步静态引擎/正文、双读 BUSY、队列耗尽时关闭、保留 chunk、取消、FILE_CHANGED、重启和回调重入已实测。旧四种 C 消费者、Rust/Python 及导出/TLS 隔离检查通过。受控入口、POSIX 信号隔离和线程退出屏障的设计/范围见 [ABI 1.1](async-abi-1.1.md)；POSIX 分项仍待 Actions，未勾选总任务。
   - 交付：静态/动态库及 Node 共用的异步 C 头文件、版本/错误码、跨线程命令与最终通知、chunk 所有权、自动关闭契约和三平台动态库；内部循环与托管布局不导出。
   - 验收：N-03/N-09/N-19，C 程序真实启动服务及嵌入静态引擎，无手动 poll；接纳回调次数、并发提交/关闭、输入复制/借用有效期、取消排空和卸载全部验证，导出无 CLI main/公开循环接口。
   - Windows 分项（2026-09-18，Windows x86_64，MSVC 14.42，Moon 0.1.20260904）：`c_abi/include/http_server.h` 声明 5 项纯 C API（`hs_abi_version`, `hs_server_start`, `hs_server_stop`, `hs_server_destroy`, `hs_error_copy`）与错误码/不透明句柄；`c_abi/thin` 与 `c_abi/full` 分别实现轻量静态与全功能（TLS/代理）运行时桥接；`scripts/build/build_cabi.mbtx` 自动化构建生成 `target/cabi/hs_thin.dll` (1.3MB) 与 `target/cabi/hs_full.dll` (2.6MB)；MSVC .def 模块定义文件与 llvm-objcopy `.drectve` 剥离确保绝对符号隔离，dumpbin 验证严格仅导出 5 项 `hs_*` 符号，0 `main`，0 `moonbit_*` 泄露；独立 C 消费者 `tests/consumers/c/test_dynamic_thin.c` 与 `tests/consumers/c/test_dynamic_full.c` 编译并运行通过（ABI 版本 0x00010000、错误文本拷贝、TLS 预检拦截、服务启动/停止/销毁生命周期全 PASS）。Linux/macOS 分项待 CI 接入，总任务保持未勾选。
   - 跨平台 CI 扩展（2026-09-19）：更新 `scripts/build/build_cabi.mbtx`，通过 `detect_target_os` 自动支持 Windows (MSVC `link.exe` + `.def`)、Linux (Clang `-shared` + ELF `version-script`) 与 macOS (Clang `-dynamiclib` + `exported_symbols_list`)；新增 `c_abi/thin/hs_thin.version`、`c_abi/full/hs_full.version`、`c_abi/thin/hs_thin_macos.syms`、`c_abi/full/hs_full_macos.syms` 确保严格导出 5 项 `hs_*` 符号；在 `.github/workflows/cabi.yml` 中接入 Windows、Linux、macOS 三系统矩阵自动化构建与 C consumer 测试。
 
 - [ ] **T-021 C 与 Python 最小集成示例** — 状态：进行中（2026-09-24 按源码校正；本机分项与三平台总验收分开）。需求：R-N06、R-N14；设计：D-07；依赖：T-020。
+  - 2026-09-28 Windows 分项：libevent 静态链接/动态加载和 FastAPI/Uvicorn 真实 HTTP 用例通过；asyncio 测试覆盖取消、FILE_CHANGED、提前退出和关闭。依赖锁定、构建、进程编排和验证使用 `build_framework_examples.mbtx` / `check_framework_examples.mbtx`，已接入候选矩阵；三平台结果待取得。
   - 交付：C 动态加载与 Python ctypes 的服务启动/停止、框架接入两种示例，异步通知/正文与自动排空关闭；C/Rust 静态消费归 T-027，Node 归 T-028。
   - 验收：N-19 与实际 GET/HEAD/Range、Next、分块、错误/取消、多实例关闭；无调度循环、宿主回调上下文合法、不依赖 Python GC，最终释放 chunk/句柄后才能卸载。
 
@@ -156,6 +162,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 跨平台静态库与多语言文档交付（2026-09-19）：更新 `scripts/build/build_cabi.mbtx` 支持 Linux/macOS `ar rcs` 静态归档；落地详细多语言开发指南 `docs/cabi-usage-guide.md`，提供 C/C++、Rust（RAII safe wrapper + build.rs）、Python（ctypes context manager）、Go（cgo）、Node.js（koffi）与 Bun 的完整可运行示例与静态链接系统库矩阵；CI 流水线解耦发布独立 CLI 单文件（`http-server-mbt`、`http-server-mbt-thin`）与纯净 C ABI SDK 归档（`.zip` / `.tar.gz`），`scripts/install.sh` 与 `install.ps1` 默认安装完整版并新增 `--thin` / `-Thin` 入参支持安装精简版。
 
 - [ ] **T-028 Node-API 插件与 npm 适配包** — 状态：进行中（2026-09-24 按源码校正；本机分项与三平台总验收分开）。需求：R-N09、R-SAFE、R-N14；设计：D-07、D-11、D-12；依赖：T-020、T-027。
+  - 2026-09-28 Windows 分项：Node 22.21.1/24.10.0 离线候选包（旧入口及新增异步测试）通过，Express 真正挂载/Next/错误链/背压/关闭通过。Promise/Readable/AbortSignal、逐环境 TSFN 清理、worker 在途退出/自然退出及 glibc/musl 诊断已实现；三平台最终产物及 run/job 链接待取得。
   - 交付：静态嵌入引擎的 .node，调用库托管 hs_* 异步接口，映射 Promise/流/AbortSignal/close 和按 napi_env 清理；不在 addon 重建手动轮询线程。三平台预构建、Linux glibc/musl 区分与构建说明。
   - 验收：N-14 和 Node 嵌入适用静态行为；Node 22/24、Node-API v8 范围实际验证，主循环不因引擎阻塞，慢消费有背压。多 Worker/实例退出、取消和空闲自然退出均无悬空回调或泄漏；缺少预构建明确报错，候选 npm 包可独立安装加载。实际发布另行记录，Bun/Deno 不纳入此任务承诺。
 

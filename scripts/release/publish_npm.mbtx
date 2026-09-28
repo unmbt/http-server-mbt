@@ -1,0 +1,204 @@
+///|
+// D-12/D-16, T-025/T-028: publish the exact offline-tested tarballs.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+fn should_publish(
+  exit_code : Int,
+  response : Json,
+  expected_hash : String,
+) -> Bool raise {
+  if exit_code == 0 {
+    guard response is String(actual_hash) else {
+      fail("npm registry omitted tarball hash")
+    }
+    assert_eq(actual_hash, expected_hash)
+    false
+  } else {
+    guard response is { "error": { "code": String("E404"), .. }, .. } else {
+      fail(
+        "npm registry lookup failed; refusing to treat network/authentication failure as an absent version",
+      )
+    }
+    true
+  }
+}
+
+///|
+fn validate_package(
+  metadata : Json,
+  name : String,
+  version : String,
+  main_package : Bool,
+) -> Unit raise {
+  guard metadata
+    is { "name": String(actual_name), "version": String(actual_version), .. } else {
+    fail("missing npm package identity")
+  }
+  assert_eq(actual_name, name)
+  assert_eq(actual_version, version)
+  if main_package {
+    guard metadata is { "optionalDependencies": Object(deps), .. } else {
+      fail("missing platform dependencies")
+    }
+    for platform in ["win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+      assert_eq(
+        deps.get("@unmbt/http-server-mbt-" + platform),
+        Some(Json::string(version)),
+      )
+    }
+  }
+}
+
+///|
+async fn main {
+  let version_result = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  version_result.check()
+  let version = version_result.stdout().trim().to_owned()
+  assert_eq(@env.get_env_var("GITHUB_REF").unwrap(), "refs/tags/v" + version)
+  let root = @env.current_dir().unwrap()
+  let config = @fs.tmpdir(prefix="hs-npm-auth-")
+  defer (@fs.rmdir(config, recursive=true) catch { _ => () })
+  // No setup-node registry-url: an empty token config must not mask npm OIDC.
+  let npmrc = if @env.get_env_var("NODE_AUTH_TOKEN").unwrap_or("") == "" {
+    "registry=https://registry.npmjs.org/\n"
+  } else {
+    "registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n"
+  }
+  @fs.write_file(config + "/.npmrc", npmrc)
+  let options = [
+    "--userconfig",
+    config + "/.npmrc",
+    "--registry=https://registry.npmjs.org/",
+  ]
+  let plans : Array[(String, String, String, String)] = []
+  // Preflight every tarball and registry lookup before the first mutation.
+  for
+    platform in [
+      "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64", "http-server",
+    ] {
+    let main_package = platform == "http-server"
+    let suffix = if main_package { "" } else { "-" + platform }
+    let name = "@unmbt/http-server-mbt" + suffix
+    let archive = root +
+      "/target/release/unmbt-http-server-mbt" +
+      suffix +
+      "-" +
+      version +
+      ".tgz"
+    let metadata = @shell.Cmd("tar", ["-xOf", archive, "package/package.json"]).output()
+    metadata.check()
+    validate_package(
+      @json.parse(metadata.stdout()),
+      name,
+      version,
+      main_package,
+    )
+    let digest = @shell.Cmd("sha1sum", [archive]).output()
+    digest.check()
+    let hash = digest.stdout().split(" ").next().unwrap().to_owned()
+    let remote = @shell.Cmd(
+      "npm",
+      ["view", name + "@" + version, "dist.shasum", "--json", ..options],
+    ).output()
+    if should_publish(remote.exit_code(), @json.parse(remote.stdout()), hash) {
+      plans.push((platform, name, archive, hash))
+    } else {
+      println(
+        "Already published with identical tarball: " + name + "@" + version,
+      )
+    }
+  }
+  for (platform, name, archive, hash) in plans {
+    @shell.Cmd(
+      "npm",
+      [
+        "publish",
+        archive,
+        "--access",
+        "public",
+        "--provenance",
+        "--ignore-scripts",
+        "--tag",
+        if version.contains("-") {
+          "next"
+        } else {
+          "latest"
+        },
+        ..options,
+      ],
+      cwd=root + "/npm/" + platform,
+    ).run()
+    let remote = @shell.Cmd(
+      "npm",
+      ["view", name + "@" + version, "dist.shasum", "--json", ..options],
+    ).output()
+    remote.check()
+    assert_false(should_publish(0, @json.parse(remote.stdout()), hash))
+  }
+}
+
+///|
+test "N-18 npm retry skips identical version and rejects mismatched or unavailable registry" {
+  assert_false(should_publish(0, Json::string("same"), "same"))
+  assert_true(should_publish(1, { "error": { "code": "E404" } }, "hash"))
+  for
+    (code, response) in [
+      (0, Json::string("different")),
+      (0, Json::null()),
+      (1, { "error": { "code": "E401" } }),
+      (1, { "error": { "code": "ETIMEDOUT" } }),
+    ] {
+    assert_true(
+      try {
+        should_publish(code, response, "same") |> ignore
+        false
+      } catch {
+        _ => true
+      },
+    )
+  }
+}
+
+///|
+test "N-18 npm tarball identity rejects wrong package and wrong version" {
+  let metadata : Json = {
+    "name": "@unmbt/http-server-mbt-linux-x64-gnu",
+    "version": "0.4.2",
+  }
+  validate_package(
+    metadata, "@unmbt/http-server-mbt-linux-x64-gnu", "0.4.2", false,
+  )
+  for
+    (name, version) in [
+      ("wrong", "0.4.2"),
+      ("@unmbt/http-server-mbt-linux-x64-gnu", "0.4.1"),
+    ] {
+    assert_true(
+      try {
+        validate_package(metadata, name, version, false)
+        false
+      } catch {
+        _ => true
+      },
+    )
+  }
+  assert_true(
+    try {
+      validate_package(
+        metadata, "@unmbt/http-server-mbt-linux-x64-gnu", "0.4.2", true,
+      )
+      false
+    } catch {
+      _ => true
+    },
+  )
+}

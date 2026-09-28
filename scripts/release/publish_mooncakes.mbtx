@@ -1,0 +1,57 @@
+///|
+// D-14/D-16, T-025/T-030: publish the clean-consumer-tested source archive.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  let credentials = @env.get_env_var("MOONCAKES_CREDENTIALS").unwrap_or("")
+  if credentials == "" {
+    fail("Configure repository secret MOONCAKES_CREDENTIALS before releasing")
+  }
+  // Parse without printing credentials in diagnostics.
+  let valid = try {
+    @json.parse(credentials) |> ignore
+    true
+  } catch {
+    _ => false
+  }
+  if !valid {
+    fail("MOONCAKES_CREDENTIALS must contain credentials.json as JSON")
+  }
+  let source = @fs.tmpdir(prefix="hs-mooncakes-release-")
+  defer (@fs.rmdir(source, recursive=true) catch { _ => () })
+  @shell.Cmd("tar", [
+    "-xzf", "target/release/moonbit-source.tar.gz", "-C", source,
+  ]).run()
+  let version = @shell.Cmd("moon", [
+    "run",
+    "scripts/maintenance/gen_version.mbtx",
+    "--print",
+    source + "/moon.mod",
+  ]).output()
+  version.check()
+  assert_eq(
+    @env.get_env_var("GITHUB_REF").unwrap(),
+    "refs/tags/v" + version.stdout().trim().to_owned(),
+  )
+  let moon_home = @env.get_env_var("MOON_HOME").unwrap_or(
+    @env.get_env_var("HOME").unwrap() + "/.moon",
+  )
+  let credential_file = moon_home + "/credentials.json"
+  if @fs.exists(credential_file) {
+    fail("Refusing to overwrite existing Mooncakes credentials")
+  }
+  if !@fs.exists(moon_home) {
+    @fs.mkdir(moon_home, recursive=true)
+  }
+  @fs.write_file(credential_file, credentials)
+  defer (@fs.remove(credential_file) catch { _ => () })
+  @shell.Cmd("chmod", ["600", credential_file]).run()
+  @shell.Cmd("moon", ["publish"], cwd=source).run()
+}

@@ -1,53 +1,99 @@
 name: Release verified candidates
 on:
+  push:
+    tags: ['v*']
+  # Select an existing tag; branch dispatches cannot publish.
   workflow_dispatch:
-    inputs:
-      candidate_run:
-        type: string
-        required: true
-        description: Successful Candidate acceptance run ID
-      commit:
-        type: string
-        required: true
-        description: Full commit SHA from that run
-      tag:
-        type: string
-        required: true
-        description: Existing release tag at the same commit
 permissions:
   contents: read
-  actions: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  release:
+  identity:
     runs-on: ubuntu-24.04
-    environment: release
-    permissions:
-      contents: write
-      actions: read
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon update
+      - name: Reject branch dispatches and mismatched tag versions
+        run: moon run scripts/release/release_gate.mbtx --check-tag
+  candidate:
+    needs: identity
+    uses: ./.github/workflows/cli.yml
+  prepare:
+    needs: candidate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
           fetch-depth: 0
       - uses: hustcer/setup-moonbit@v1
       - run: moon update
       - uses: actions/download-artifact@v8
         with:
           pattern: candidate-*
-          run-id: ${{ inputs.candidate_run }}
-          github-token: ${{ github.token }}
           path: target/verified-candidates
-      - name: Validate source run and full original release dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE_RUN: ${{ inputs.candidate_run }}
-          RELEASE_COMMIT: ${{ inputs.commit }}
-          RELEASE_TAG: ${{ inputs.tag }}
+      - name: Validate tag, commit, run, versions and artifact hashes
         run: moon run scripts/release/release_gate.mbtx
-      - name: Publish already-validated artifacts without rebuilding
-        uses: softprops/action-gh-release@v3
+      - uses: actions/upload-artifact@v7
         with:
-          tag_name: ${{ inputs.tag }}
-          target_commitish: ${{ inputs.commit }}
-          files: target/verified-candidates/**/*
+          name: verified-release
+          path: target/release/
+          if-no-files-found: error
+          retention-days: 14
+  npm:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon update
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-release
+          path: target/release
+      - name: Publish verified platform packages, then main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: moon run scripts/release/publish_npm.mbtx
+  mooncakes:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon update
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-release
+          path: target/release
+      - name: Publish verified MoonBit source
+        env:
+          MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_CREDENTIALS }}
+        run: moon run scripts/release/publish_mooncakes.mbtx
+  github:
+    needs: [prepare, npm, mooncakes]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-release
+          path: target/release
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: target/release/*
           fail_on_unmatched_files: true

@@ -12,6 +12,13 @@ async fn main {
   @shell.Cmd("moon", [
     "test", "scripts/maintenance/gen_version.mbtx", "--deny-warn",
   ]).run()
+  for script in ["release_gate", "publish_npm", "verify_candidates"] {
+    @shell.Cmd("moon", [
+      "test",
+      "scripts/release/" + script + ".mbtx",
+      "--deny-warn",
+    ]).run()
+  }
   let version = @shell.Cmd("moon", ["version", "--all"]).output()
   version.check()
   if !version.stdout().contains("0.1.20260920") {

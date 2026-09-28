@@ -1,4 +1,6 @@
 ///|
+// R-N13 / D-16 / T-025: needs:candidate is the execution gate. This script
+// additionally binds the immutable artifacts to this tag, commit and run.
 import {
   "moonbitlang/async@0.21.3",
   "moonbitlang/async@0.21.3/fs",
@@ -8,76 +10,153 @@ import {
 }
 
 ///|
+fn validate_identity(
+  git_ref : String,
+  version : String,
+  head : String,
+  sha : String,
+) -> Unit raise {
+  assert_eq(git_ref, "refs/tags/v" + version)
+  assert_eq(head, sha)
+  assert_eq(sha.length(), 40)
+}
+
+///|
+fn require_artifact(manifest : Json, path : String) -> Unit raise {
+  guard manifest is { "artifacts": Array(artifacts), .. } else {
+    fail("missing artifact inventory")
+  }
+  assert_true(
+    artifacts.any(item => {
+      item is { "path": String(actual), .. } && actual == path
+    }),
+  )
+}
+
+///|
+fn platform_files(
+  os : String,
+  version : String,
+) -> (String, String, String) raise {
+  match os {
+    "Windows" => ("win32-x64-msvc", "windows-amd64", ".exe")
+    "Linux" => ("linux-x64-gnu", "linux-amd64", "")
+    "Darwin" => ("darwin-arm64", "macos-arm64", "")
+    _ => fail("unsupported platform for " + version + ": " + os)
+  }
+}
+
+///|
 async fn main {
-  let sha = @env.get_env_var("RELEASE_COMMIT").unwrap()
-  let run = @env.get_env_var("CANDIDATE_RUN").unwrap()
-  let tag = @env.get_env_var("RELEASE_TAG").unwrap()
+  let git_ref = @env.get_env_var("GITHUB_REF").unwrap()
+  let sha = @env.get_env_var("GITHUB_SHA").unwrap()
+  let run = @env.get_env_var("GITHUB_RUN_ID").unwrap()
   let repo = @env.get_env_var("GITHUB_REPOSITORY").unwrap()
-  let version = @shell.Cmd("moon", [
+  let version_result = @shell.Cmd("moon", [
     "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
   ]).output()
-  version.check()
-  assert_eq(tag, "v" + version.stdout().trim().to_owned())
+  version_result.check()
+  let version = version_result.stdout().trim().to_owned()
+  let head = @shell.Cmd("git", ["rev-parse", "HEAD"]).output()
+  head.check()
+  validate_identity(git_ref, version, head.stdout().trim().to_owned(), sha)
+  let tag = @shell.Cmd("git", ["rev-parse", git_ref + "^{commit}"]).output()
+  tag.check()
+  assert_eq(tag.stdout().trim(), sha)
   @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
-  if !run.iter().all(c => c >= '0' && c <= '9') ||
-    sha.length() != 40 ||
-    !tag.has_prefix("v") {
-    fail("invalid release identifiers")
+  let args = @env.args()
+  if args.length() == 2 && args[1] == "--check-tag" {
+    println("Release tag and source versions agree.")
+    return
   }
-  let commit = @shell.Cmd("git", ["rev-parse", tag + "^{commit}"]).output()
-  commit.check()
-  assert_eq(commit.stdout().trim(), sha)
-  let response = @shell.Cmd("curl", [
-    "--fail",
-    "--silent",
-    "--show-error",
-    "-H",
-    "Authorization: Bearer " + @env.get_env_var("GH_TOKEN").unwrap(),
-    "https://api.github.com/repos/\{repo}/actions/runs/\{run}",
-  ]).output()
-  response.check()
-  guard @json.parse(response.stdout())
-    is {
-      "head_sha": String(actual),
-      "conclusion": String("success"),
-      "path": String(".github/workflows/cli.yml"),
-      ..
-    } &&
-    actual == sha else {
-    fail("candidate run must be the successful same-commit acceptance workflow")
-  }
+  assert_eq(args.length(), 1)
   @shell.Cmd("moon", ["run", "scripts/release/verify_candidates.mbtx"]).run()
-  let tasks = @fs.read_file("docs/tasks.md").text()
-  let completed : Set[String] = Set([])
-  for line in tasks.split("\n") {
-    if line.has_prefix("- [x] **T-") {
-      completed.add(line[8:13].to_owned())
-    }
-  }
-  for id in 1..<=35 {
-    if id == 24 {
-      continue
-    } // Explicitly withdrawn performance task, never reused.
-    let task = "T-" + (if id < 10 { "00" } else { "0" }) + id.to_string()
-    if !completed.contains(task) {
-      fail(
-        "full release blocked by " +
-        task +
-        "; candidate-only acceptance cannot waive original dependencies",
-      )
-    }
-  }
+  @fs.mkdir("target/release", recursive=true)
   for dir in @fs.readdir("target/verified-candidates") {
-    let manifest = @json.parse(
-      @fs.read_file("target/verified-candidates/" + dir + "/manifest.json").text(),
+    let root = "target/verified-candidates/" + dir
+    let manifest = @json.parse(@fs.read_file(root + "/manifest.json").text())
+    guard manifest
+      is { "os": String(os), "actions_run": String(source_run), .. } else {
+      fail("missing release provenance")
+    }
+    assert_eq(source_run, "https://github.com/" + repo + "/actions/runs/" + run)
+    let (platform, cli_platform, extension) = platform_files(os, version)
+    let archive = "unmbt-http-server-mbt-" + platform + "-" + version + ".tgz"
+    require_artifact(manifest, "node/" + archive)
+    @fs.write_file(
+      "target/release/" + archive,
+      @fs.read_file(root + "/node/" + archive),
     )
-    guard manifest is { "full_release_ready": True, .. } else {
-      fail(
-        "candidate explicitly excludes required capabilities; full release prohibited",
+    for name in ["http-server-mbt", "http-server-mbt-thin"] {
+      let filename = name + "-" + cli_platform + extension
+      require_artifact(manifest, "cli/" + filename)
+      @fs.write_file(
+        "target/release/" + filename,
+        @fs.read_file(root + "/cli/" + filename),
       )
     }
+    if os == "Linux" {
+      let main_package = "unmbt-http-server-mbt-" + version + ".tgz"
+      for path in ["node/" + main_package, "moonbit-source.tar.gz"] {
+        require_artifact(manifest, path)
+      }
+      @fs.write_file(
+        "target/release/" + main_package,
+        @fs.read_file(root + "/node/" + main_package),
+      )
+      @fs.write_file(
+        "target/release/moonbit-source.tar.gz",
+        @fs.read_file(root + "/moonbit-source.tar.gz"),
+      )
+    }
+    // Bundle per platform so repeated SDK/report basenames do not collide.
+    @shell.Cmd("tar", [
+      "-czf",
+      "target/release/candidate-" + platform + ".tar.gz",
+      "-C",
+      root,
+      ".",
+    ]).run()
   }
   println(
-    "Full release gate passed; the workflow may consume these exact artifacts.",
+    "Release scope verified; outstanding roadmap tasks remain tracked separately.",
+  )
+}
+
+///|
+test "N-18 release identity rejects branch, wrong version and different commit" {
+  let sha = "0123456789012345678901234567890123456789"
+  validate_identity("refs/tags/v0.4.2", "0.4.2", sha, sha)
+  for
+    (git_ref, version, head) in [
+      ("refs/heads/master", "0.4.2", sha),
+      ("refs/tags/v0.4.1", "0.4.2", sha),
+      ("refs/tags/v0.4.2", "0.4.2", "other"),
+    ] {
+    assert_true(
+      try {
+        validate_identity(git_ref, version, head, sha)
+        false
+      } catch {
+        _ => true
+      },
+    )
+  }
+}
+
+///|
+test "N-18 release requires published files in verified inventory without roadmap flag" {
+  let manifest : Json = {
+    "full_release_ready": false,
+    "artifacts": [{ "path": "node/package.tgz" }],
+  }
+  require_artifact(manifest, "node/package.tgz")
+  assert_true(
+    try {
+      require_artifact(manifest, "moonbit-source.tar.gz")
+      false
+    } catch {
+      _ => true
+    },
   )
 }

@@ -8,17 +8,40 @@ import {
 }
 
 ///|
-async fn main {
-  let version = @shell.Cmd("moon", [
-    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
-  ]).output()
-  version.check()
-  let expected = @env.get_env_var("RELEASE_COMMIT").unwrap_or(
-    @shell.Cmd("git", ["rev-parse", "HEAD"]).output().stdout().trim().to_owned(),
-  )
+async fn hash_file(path : String) -> String {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let output = if windows {
+    @shell.Cmd("certutil", ["-hashfile", path, "SHA256"]).output()
+  } else {
+    @shell.Cmd(
+      // Available on both Linux and macOS runners.
+      "shasum",
+      ["-a", "256", path],
+    ).output()
+  }
+  output.check()
+  for line in output.stdout().split("\n") {
+    let token = line
+      .trim()
+      .to_owned()
+      .split(" ")
+      .next()
+      .unwrap_or("")
+      .to_owned()
+      .to_lower()
+    if token.length() == 64 &&
+      token.iter().all(c => "0123456789abcdef".contains(c.to_string())) {
+      return token
+    }
+  }
+  fail("missing SHA-256 for " + path)
+}
+
+///|
+async fn verify_all(base : String, expected : String, version : String) -> Unit {
   let seen : Set[String] = Set([])
-  for dir in @fs.readdir("target/verified-candidates") {
-    let root = "target/verified-candidates/" + dir
+  for dir in @fs.readdir(base) {
+    let root = base + "/" + dir
     let manifest = @json.parse(@fs.read_file(root + "/manifest.json").text())
     guard manifest
       is {
@@ -33,8 +56,11 @@ async fn main {
       fail("invalid or dirty candidate: " + dir)
     }
     assert_eq(sha, expected)
-    assert_eq(candidate_version, version.stdout().trim().to_owned())
+    assert_eq(candidate_version, version)
     let platform = os + "/" + cpu.to_lower()
+    assert_true(
+      ["Windows/amd64", "Linux/x86_64", "Darwin/arm64"].contains(platform),
+    )
     if seen.contains(platform) {
       fail("duplicate platform candidate")
     }
@@ -42,6 +68,7 @@ async fn main {
     if artifacts.is_empty() {
       fail("empty artifact inventory")
     }
+    let paths : Set[String] = Set([])
     for artifact in artifacts {
       guard artifact
         is {
@@ -52,27 +79,146 @@ async fn main {
         } else {
         fail("invalid artifact record")
       }
-      if path.has_prefix("/") ||
+      if path == "" ||
+        path.has_prefix("/") ||
         path.contains("\\") ||
         path.contains(":") ||
-        path.split("/").any(p => p == "..") {
+        path.split("/").any(p => p == ".." || p == "." || p == "") ||
+        path == "manifest.json" {
         fail("unsafe artifact path")
       }
+      assert_false(paths.contains(path))
+      paths.add(path)
+      assert_true(@fs.kind(root + "/" + path) == @fs.Regular)
       assert_eq(
         @fs.read_file(root + "/" + path).binary().length().to_double(),
         size,
       )
-      let result = @shell.Cmd("sha256sum", [root + "/" + path]).output()
-      result.check()
-      assert_eq(result.stdout().split(" ").next().unwrap(), hash)
+      assert_eq(hash_file(root + "/" + path), hash)
     }
+    // Release bundles must not pick up files outside the verified inventory.
+    @fs.walk(
+      root,
+      async fn(dir, files) {
+        for file in files {
+          let full = dir + "/" + file
+          if @fs.kind(full) == @fs.Directory {
+            continue
+          }
+          let path = full[root.length() + 1:].to_owned()
+          if path != "manifest.json" {
+            assert_true(paths.contains(path))
+          }
+        }
+      },
+      max_concurrency=1,
+    )
   }
-  for platform in ["Windows/amd64", "Linux/x86_64", "Darwin/arm64"] {
-    if !seen.contains(platform) {
-      fail("missing platform: " + platform)
+  assert_eq(seen.length(), 3)
+}
+
+///|
+async fn main {
+  let version = @shell.Cmd("moon", [
+    "run", "scripts/maintenance/gen_version.mbtx", "--print", "moon.mod",
+  ]).output()
+  version.check()
+  let head = @shell.Cmd("git", ["rev-parse", "HEAD"]).output()
+  head.check()
+  verify_all(
+    "target/verified-candidates",
+    head.stdout().trim().to_owned(),
+    version.stdout().trim().to_owned(),
+  )
+  println("All three same-commit candidate inventories and hashes verified.")
+}
+
+///|
+async test "N-18 inventories reject missing platform, altered bytes, foreign commit and extra files" {
+  let root = @fs.tmpdir(prefix="hs-release-inventory-")
+  defer (@fs.rmdir(root, recursive=true) catch { _ => () })
+  let manifests : Array[(String, String)] = []
+  for
+    (os, cpu) in [
+      ("Windows", "amd64"),
+      ("Linux", "x86_64"),
+      ("Darwin", "arm64"),
+    ] {
+    let dir = root + "/" + os
+    @fs.mkdir(dir, recursive=true)
+    @fs.write_file(dir + "/artifact.txt", "original")
+    let manifest : Json = {
+      "commit": "test-commit",
+      "version": "0.4.2",
+      "dirty": false,
+      "os": os,
+      "cpu": cpu,
+      "full_release_ready": false,
+      "artifacts": [
+        {
+          "path": "artifact.txt",
+          "bytes": 8,
+          "sha256": hash_file(dir + "/artifact.txt"),
+        },
+      ],
     }
+    let content = manifest.stringify()
+    @fs.write_file(dir + "/manifest.json", content)
+    manifests.push((dir, content))
   }
-  println(
-    "All three same-commit candidate inventories verified. This is not full-release approval.",
+  verify_all(root, "test-commit", "0.4.2")
+  for (commit, version) in [("other", "0.4.2"), ("test-commit", "0.4.1")] {
+    assert_true(
+      try {
+        verify_all(root, commit, version)
+        false
+      } catch {
+        _ => true
+      },
+    )
+  }
+  @fs.write_file(root + "/Linux/artifact.txt", "modified")
+  assert_true(
+    try {
+      verify_all(root, "test-commit", "0.4.2")
+      false
+    } catch {
+      _ => true
+    },
+  )
+  @fs.write_file(root + "/Linux/artifact.txt", "original")
+  @fs.write_file(root + "/Linux/extra.txt", "unverified")
+  assert_true(
+    try {
+      verify_all(root, "test-commit", "0.4.2")
+      false
+    } catch {
+      _ => true
+    },
+  )
+  @fs.remove(root + "/Linux/extra.txt")
+  for (dir, content) in manifests {
+    @fs.write_file(
+      dir + "/manifest.json",
+      content.replace_all(old="\"dirty\":false", new="\"dirty\":true"),
+    )
+    assert_true(
+      try {
+        verify_all(root, "test-commit", "0.4.2")
+        false
+      } catch {
+        _ => true
+      },
+    )
+    @fs.write_file(dir + "/manifest.json", content)
+  }
+  @fs.rmdir(root + "/Darwin", recursive=true)
+  assert_true(
+    try {
+      verify_all(root, "test-commit", "0.4.2")
+      false
+    } catch {
+      _ => true
+    },
   )
 }

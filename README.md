@@ -8,22 +8,30 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
-[![Build Status](https://img.shields.io/badge/Tests-240%2F240%20Pass-brightgreen)](#)
+[![Candidate acceptance](https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml/badge.svg?branch=master&event=push)](https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml?query=branch%3Amaster+event%3Apush)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-platform-support-matrix)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](#platform-support)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
 </div>
 
+<a id="platform-support"></a>
+
 ## 🖥️ Platform Support Matrix
 
-| Platform | Arch | Status | Core I/O & Transfer Mechanism | Verification & Quality Gates |
-| :--- | :--- | :---: | :--- | :--- |
-| **Windows** | x86_64 | **✅ Local Native verified** | Win32 `TransmitFile` + IOCP Overlapped asynchronous kernel zero-copy, 100ms anti-hang protection | 240/240 tests pass locally; release Full/Thin dependency and size audit is recorded in `docs/architecture-review.md` |
-| **Linux** | x86_64 | **🔶 Actions evidence required** | `sendfile(2)` explicit-offset path + `epoll` event loop | Platform-specific release, TLS and container evidence remains tracked by T-032/T-035 |
-| **macOS** | arm64 / x86_64 | **🔶 Actions evidence required** | Darwin `sendfile` + `kqueue` event loop | Platform-specific release, TLS and container evidence remains tracked by T-032/T-035 |
+The CI badge above tracks the latest `master` push to **Candidate acceptance**, including all three platform jobs and the artifact gate. Open a run below for each platform's result, commit, logs and candidate artifacts.
 
-> 📌 **Cross-Platform Roadmap**: Windows has the current local Native evidence. Linux and macOS remain subject to the Actions matrix and release gates; a Windows run does not count as a three-platform completion.
+| Platform | CI Arch | Actions Runner / Job | Core I/O & Transfer Mechanism |
+| :--- | :--- | :--- | :--- |
+| **Windows** | x86_64 | [native (windows-2025)][candidate-runs] | Win32 `TransmitFile` + IOCP |
+| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | `sendfile(2)` explicit-offset path + `epoll` |
+| **macOS** | arm64 | [native (macos-15)][candidate-runs] | Darwin `sendfile` + `kqueue` |
+
+All three jobs run Native tests, resource/sanitizer checks, Full/Thin builds, external consumers and Node 22/24 candidate installation. Linux also verifies the four container variants. The final artifact gate checks platform coverage, commit, version and hashes; see the [workflow](.github/workflows/cli.yml) for the current checks.
+
+The badge reports the whole workflow, not an individual job or a published release. For a released version, consult its [release run](https://github.com/unmbt/http-server-mbt/actions/workflows/release.yml) and artifact manifests. macOS x86_64 is not currently covered by this CI matrix. Outstanding work remains tracked in the [task list](docs/tasks.md).
+
+[candidate-runs]: https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml?query=branch%3Amaster+event%3Apush
 
 ---
 

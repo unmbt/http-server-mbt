@@ -1,5 +1,11 @@
 # http-server-mbt 重构设计
 
+## 2026-09-28 自动发包修订（D-08、D-14、D-16）
+
+按用户确认恢复 tag 自动发布，关联 R-N09/R-N11/R-N13、T-025/T-028/T-030、N-18。本修订优先于历史“全部任务完成才可发行”的描述：日常版本发布以同一 tag 提交的三平台候选工作流全部通过为门槛，继续要求 Native/资源/sanitizer、Node 22/24、外部消费、Linux 四容器、版本与 SHA-256 校验。T-001～T-035 的总任务勾选和 `full_release_ready` 不再阻塞日常发包；原需求、未实现能力和最终 T-026 审计保持追踪，不宣称整个重构已完成。
+
+`release.yml` 接收 `v*` push，调用现有候选工作流，通过 `needs` 等待完整成功，再校验 tag、HEAD、版本、候选 run 及产物。发行直接消费已验证的 MoonBit 源码归档和 npm tarball，不重新构建；npm 三个平台包先于主包。Mooncakes/npm/GitHub Release 分 job 执行，失败可重跑失败 job；npm 已存在版本仅在远程 tarball 哈希一致时跳过。手动入口只允许选择 tag，无需填写 commit/run ID。发布权限及凭据仅进入发布 job；npm 支持 OIDC Trusted Publishing 或 NPM_TOKEN，Mooncakes 使用 MOONCAKES_CREDENTIALS。预发行 npm 使用 next，GitHub Release 标为 prerelease。
+
 ## 2026-09-25 仓库组织修订（D-02、D-08、D-10、D-14、D-16、D-18）
 
 关联 R-SDD/R-COMPAT/R-N11/R-N13、T-025/T-026/T-030/T-034。公开 MoonBit 包路径、运行时行为和发行门槛不变。自动化入口按 build/check/release/maintenance/diagnostics 分类，安装脚本 URL 保持稳定；完成的一次性源码迁移器由 Git 保存，不作为可重复执行的维护入口。文档区分当前规范与历史快照。包内单元/黑盒/白盒测试保持 MoonBit 包边界，独立资源探针和外部消费者统一置于 tests，静态 fixtures 保留在 testdata。重命名以行为为依据，保留测试用例及 R/D/T/C/N 编号；共享辅助代码只合并已核对等价的实现。候选源码打包随路径迁移调整，生成接口由当前工具链重建。执行与验证记录见 [仓库整理](repository-layout-20260925.md)。

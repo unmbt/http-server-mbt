@@ -8,6 +8,10 @@
 
 ## 1. 任务状态与证据
 
+- [x] T-025/T-032 README 状态展示分项 — 状态：已完成（2026-09-28，文档分项，R-N13/D-16/N-18）。中英文 README 使用 GitHub 原生 master/push 工作流徽章替换固定测试数量与本机状态，表格列出当前三平台 runner/job 并链接 Actions；macOS CI 架构校正为 arm64。动态徽章仅表示整个候选 workflow，版本证据仍查对应 release run/manifest。验证：徽章端点成功返回 `Candidate acceptance - passing`（查询时状态，不写成固定通过声明）；表格与 cli.yml 矩阵人工核对，42 文件迁移覆盖、稳定编号及相对链接保留，git diff --check 通过。纯文档变更未执行 moon info/fmt 或应用测试，不更新平台实现总任务状态。
+
+- [ ] T-025/T-028/T-030 自动发包分项 — 状态：进行中（2026-09-28）。关联 R-N09/R-N11/R-N13、D-08/D-14/D-16、N-18；依赖现有三平台候选验收能力。交付：tag 自动触发、复用候选验证、同提交/版本/哈希门禁、Mooncakes/npm/GitHub Release 发布及操作说明。验收：失败候选不发布、错 tag/产物拒绝、三平台 npm 先于主包、失败可重跑；本机脚本回归与真实 registry 发布分开记录。按用户确认移除任务勾选和 full_release_ready 对日常发行的阻塞，原总任务及最终审计不因此完成。证据见 [自动发布记录](release-automation-20260928.md)。
+
 2026-09-28：开始实施 T-020/T-021/T-028 的 ABI 1.1 异步静态引擎、Node 框架接入、C/libevent 与 Python/ASGI 示例。关联 T-002/T-016/T-025/T-027/T-033/T-034、D-07/D-11/D-12、N-13/N-14/N-19/N-20/N-21；保留旧同步入口。任务保持进行中，证据记录在 `docs/async-abi-1.1.md`；候选构建与三平台行为验收分别记录，不以接口声明或本机结果勾选总任务。
 
 该轮 Windows 分项已实现并复验：ABI/Node/框架链路、Native 266/266、Node 22/24 离线消费及真实 addon ASan。worker 在途退出曾触发 TSFN finalizer 提前释放的 UAF，已修复并保留连续 8 次退出回归；四类框架宿主 HTTP 验收通过。三平台工作流已扩展，尚缺同提交远程 run/job 结果，T-020/T-021/T-028 总状态仍为进行中。

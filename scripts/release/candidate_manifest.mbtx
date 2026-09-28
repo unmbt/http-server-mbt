@@ -175,10 +175,8 @@ async fn main {
         if @fs.kind(path) != @fs.Regular {
           continue
         }
-        // Toolchain bootstrap downloads are not candidate artifacts.
-        if file.has_prefix("moonbit-") && file != "moonbit-source.tar.gz" {
-          continue
-        }
+        // Inventory every candidate file, including moonbit-consumer.txt.
+        // Bootstrap tools belong outside target/candidate.
         artifacts.push({
           "path": path["target/candidate/".length():].to_owned(),
           "bytes": @fs.read_file(path).binary().length(),

@@ -8,22 +8,30 @@
 
 [![MoonBit](https://img.shields.io/badge/Language-MoonBit-f86800?logo=moonbit&logoColor=white)](https://moonbitlang.com)
 [![mooncakes.io](https://img.shields.io/badge/mooncakes.io-unmbt%2Fhttp--server--mbt-f86800)](https://mooncakes.io/docs/unmbt/http-server-mbt)
-[![Build Status](https://img.shields.io/badge/Tests-240%2F240%20Pass-brightgreen)](#)
+[![Candidate acceptance](https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml/badge.svg?branch=master&event=push)](https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml?query=branch%3Amaster+event%3Apush)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20(Verified)-brightgreen)](#-平台支持矩阵)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](#platform-support)
 [![Native Speed](https://img.shields.io/badge/Backend-Native_C_FFI-8a2be2)](#)
 
 </div>
 
+<a id="platform-support"></a>
+
 ## 🖥️ 平台支持矩阵 (Platform Support)
 
-| 平台 | 架构 | 状态 | 核心传输机制 | 质量门禁与测试 |
-| :--- | :--- | :---: | :--- | :--- |
-| **Windows** | x86_64 | **✅ 本机 Native 已验证** | Win32 `TransmitFile` + IOCP Overlapped 异步内核级零拷贝 | 当前本机 240/240 通过；Full/Thin 依赖和体积审计见 `docs/architecture-review.md` |
-| **Linux** | x86_64 | **🔶 等待 Actions 证据** | `sendfile(2)` + `epoll` | 平台发布、TLS 和容器证据由 T-032/T-035 跟踪 |
-| **macOS** | arm64 / x86_64 | **🔶 等待 Actions 证据** | Darwin `sendfile` + `kqueue` | 平台发布、TLS 和容器证据由 T-032/T-035 跟踪 |
+上方 CI 徽章动态显示 `master` 最近一次 push 对应的 **Candidate acceptance** 状态，覆盖三个平台 job 和产物门禁。点击下面的运行入口，可查看各平台的结果、提交、日志和候选产物。
 
-> 📌 **跨平台说明**：当前可复核证据是 Windows 本机 Native。Linux/macOS 仍需 Actions 矩阵和发行门禁；Windows 结果不计作三平台整体完成。
+| 平台 | CI 架构 | Actions Runner / Job | 核心传输机制 |
+| :--- | :--- | :--- | :--- |
+| **Windows** | x86_64 | [native (windows-2025)][candidate-runs] | Win32 `TransmitFile` + IOCP |
+| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | 显式偏移 `sendfile(2)` + `epoll` |
+| **macOS** | arm64 | [native (macos-15)][candidate-runs] | Darwin `sendfile` + `kqueue` |
+
+三个平台均执行 Native 测试、资源/sanitizer 检查、Full/Thin 构建、外部消费及 Node 22/24 候选安装验证；Linux 另验证四种容器组合。最终产物门禁核对平台覆盖、提交、版本和哈希，当前检查项以[工作流](.github/workflows/cli.yml)为准。
+
+徽章表示整个工作流的状态，不代表某个独立 job 或已发布版本。核对发行版时，请查看对应的[发布运行](https://github.com/unmbt/http-server-mbt/actions/workflows/release.yml)及产物清单。当前 CI 矩阵不覆盖 macOS x86_64；未完成工作继续在[任务清单](docs/tasks.md)中追踪。
+
+[candidate-runs]: https://github.com/unmbt/http-server-mbt/actions/workflows/cli.yml?query=branch%3Amaster+event%3Apush
 
 ---
 

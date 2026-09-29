@@ -130,6 +130,16 @@ async fn main {
     head.stdout().trim().to_owned(),
     version.stdout().trim().to_owned(),
   )
+  for dir in @fs.readdir("target/verified-candidates") {
+    for subdir in ["licenses", "cli/licenses", "cabi/licenses"] {
+      @shell.Cmd("moon", [
+        "run",
+        "scripts/check/check_licenses.mbtx",
+        "--bundle",
+        "target/verified-candidates/" + dir + "/" + subdir,
+      ]).run()
+    }
+  }
   println("All three same-commit candidate inventories and hashes verified.")
 }
 

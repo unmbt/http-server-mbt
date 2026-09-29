@@ -8,6 +8,12 @@ import {
 
 ///|
 async fn main {
+  for
+    script in [
+      "scripts/maintenance/stage_licenses.mbtx", "scripts/check/check_licenses.mbtx",
+    ] {
+    @shell.Cmd("moon", ["test", script, "--deny-warn"]).run()
+  }
   @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
   @shell.Cmd("moon", [
     "test", "scripts/maintenance/gen_version.mbtx", "--deny-warn",

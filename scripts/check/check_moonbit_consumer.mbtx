@@ -55,12 +55,14 @@ async fn main {
       path == "moon.mod" ||
       path == "moon.pkg" ||
       path == "LICENSE" ||
+      path == "THIRD_PARTY_NOTICES.md" ||
       path == "README.md"
     } else {
-      ["core/", "internal/", "server/", "full/", "tls/", "cmd/", "c_abi/"].any(prefix => {
-        path.has_prefix(prefix)
-      }) ||
-      path == "scripts/maintenance/gen_version.mbtx"
+      [
+        "core/", "internal/", "server/", "full/", "tls/", "cmd/", "c_abi/", "third_party/",
+      ].any(prefix => path.has_prefix(prefix)) ||
+      path == "scripts/maintenance/gen_version.mbtx" ||
+      path == "scripts/maintenance/embed_ca.mbtx"
     }
     if !allowed || !@fs.exists(path) {
       continue
@@ -98,6 +100,12 @@ async fn main {
     "-C",
     workspace + "/candidate",
     ".",
+  ]).run()
+  @shell.Cmd("moon", [
+    "run",
+    "scripts/check/check_licenses.mbtx",
+    "--source",
+    workspace + "/candidate",
   ]).run()
   @fs.write_file(
     "target/candidate/moonbit-consumer.txt",

@@ -1,34 +1,249 @@
 ///|
+// R-SDD/R-N02/R-N13, D-08/D-14/D-15, T-025/T-030, N-18.
+// No network access: copy actual build inputs, and fail on missing notices.
 import {
   "moonbitlang/async@0.21.3",
   "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn sha256(path : String, windows : Bool) -> String {
+  let result = if windows {
+    @shell.Cmd("certutil", ["-hashfile", path, "SHA256"]).output()
+  } else {
+    @shell.Cmd("shasum", ["-a", "256", path]).output()
+  }
+  result.check()
+  for line in result.stdout().split("\n") {
+    let token = line
+      .trim()
+      .to_owned()
+      .split(" ")
+      .next()
+      .unwrap_or("")
+      .to_owned()
+      .to_lower()
+    if token.length() == 64 &&
+      token.iter().all(c => "0123456789abcdef".contains(c.to_string())) {
+      return token
+    }
+  }
+  fail("Missing SHA-256: " + path)
+}
+
+///|
+fn initial_comment(source : String) -> String raise {
+  guard source.has_prefix("/*") else {
+    fail("Missing upstream copyright header")
+  }
+  guard source.find("*/") is Some(end) else {
+    fail("Unterminated copyright header")
+  }
+  let notice = source[:end + 2].to_owned()
+  assert_true(notice.contains("Copyright"))
+  assert_true(notice.contains("License") || notice.contains("Redistribution"))
+  notice + "\n"
+}
+
+///|
+async fn toolchain_root(windows : Bool) -> String {
+  for name in ["MOON_HOME", "MOON_TOOLCHAIN_ROOT"] {
+    if @env.get_env_var(name) is Some(root) &&
+      @fs.exists(root + "/lib/libmoonbitrun.o") {
+      return root.replace_all(old="\\", new="/")
+    }
+  }
+  let located = @shell.Cmd(if windows { "where.exe" } else { "which" }, ["moon"]).output()
+  located.check()
+  let path = located
+    .stdout()
+    .split("\n")
+    .next()
+    .unwrap()
+    .trim()
+    .to_owned()
+    .replace_all(old="\\", new="/")
+  let suffix = if windows { "/bin/moon.exe" } else { "/bin/moon" }
+  guard path.strip_suffix(suffix) is Some(root) else {
+    fail(
+      "Cannot locate MoonBit license inputs; set MOON_HOME to the build toolchain",
+    )
+  }
+  root.to_owned()
+}
+
+///|
+async fn stage(destination : String, files : Array[(String, String)]) -> Unit {
+  for (name, content) in files {
+    let parts = name.split("/").to_array()
+    let parent = if parts.length() == 1 {
+      destination
+    } else {
+      destination + "/" + parts[:parts.length() - 1].join("/")
+    }
+    if !@fs.exists(parent) {
+      @fs.mkdir(parent, recursive=true)
+    }
+    @fs.write_file(destination + "/" + name, content)
+  }
 }
 
 ///|
 async fn main {
-  let files = [
-    ("LICENSE", "project-MIT.txt"),
-    ("c_abi/node/LICENSE-NODE.txt", "Node.txt"),
-    ("c_abi/node/PROVENANCE.md", "Node-PROVENANCE.md"),
-    ("full/LICENSE-MPL-2.0.txt", "Mozilla-MPL-2.0.txt"),
-    ("full/CA-PROVENANCE.md", "CA-PROVENANCE.md"),
-    ("tls/mbedtls-4.2.0/LICENSE", "MbedTLS.txt"),
-    ("tls/mbedtls-4.2.0/tf-psa-crypto/LICENSE", "TF-PSA-Crypto.txt"),
-    (".mooncakes/moonbitlang/async/LICENSE", "MoonBit-async.txt"),
-  ]
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let os = if windows {
+    "Windows"
+  } else {
+    let result = @shell.Cmd("uname", ["-s"]).output()
+    result.check()
+    result.stdout().trim().to_owned()
+  }
+  let root = toolchain_root(windows)
+  let files : Array[(String, String)] = []
+  let provenance = StringBuilder()
+  let version = @shell.Cmd("moon", ["version", "--all"]).output()
+  version.check()
+  provenance.write_string(
+    "License inputs for this build\nOS: " + os + "\n" + version.stdout() + "\n",
+  )
   for
-    destination in [
-      "target/candidate/licenses", "npm/http-server/licenses", "npm/win32-x64-msvc/licenses",
-      "npm/linux-x64-gnu/licenses", "npm/darwin-arm64/licenses",
+    (source, name) in [
+      ("LICENSE", "project-MIT.txt"),
+      ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+      ("third_party/PROVENANCE.md", "FIXED-PROVENANCE.md"),
+      ("third_party/HTTP-server-MIT.txt", "HTTP-server-MIT.txt"),
+      ("third_party/simdutf-MIT.txt", "simdutf-MIT.txt"),
+      ("c_abi/node/LICENSE-NODE.txt", "Node.txt"),
+      ("c_abi/node/PROVENANCE.md", "Node-PROVENANCE.md"),
+      ("full/LICENSE-MPL-2.0.txt", "Mozilla-MPL-2.0.txt"),
+      ("full/CA-PROVENANCE.md", "CA-PROVENANCE.md"),
+      ("full/cacert.pem", "mozilla-source/cacert.pem"),
+      ("full/ca_bundle.mbt", "mozilla-source/ca_bundle.mbt"),
+      ("scripts/maintenance/embed_ca.mbtx", "mozilla-source/embed_ca.mbtx"),
+      ("tls/mbedtls-4.2.0/LICENSE", "MbedTLS.txt"),
+      ("tls/mbedtls-4.2.0/tf-psa-crypto/LICENSE", "TF-PSA-Crypto.txt"),
+      (".mooncakes/moonbitlang/async/LICENSE", "MoonBit-async.txt"),
+      (root + "/lib/core/LICENSE", "MoonBit-core-LICENSE.txt"),
+      (root + "/lib/core/NOTICE", "MoonBit-core-NOTICE.txt"),
+      (root + "/lib/core/moon.mod", "MoonBit-core-version.txt"),
+      ("docs/container-provenance.md", "container-provenance.md"),
     ] {
-    if !@fs.exists(destination) {
-      @fs.mkdir(destination, recursive=true)
+    let content = @fs.read_file(source).text()
+    if content.trim() == "" {
+      fail("Empty license input: " + source)
     }
-    for (source, name) in files {
-      @fs.write_file(destination + "/" + name, @fs.read_file(source))
+    files.push((name, content))
+    provenance.write_string(name + " SHA256 " + sha256(source, windows) + "\n")
+  }
+  let runtime = StringBuilder()
+  for name in ["runtime.c", "env.c", "utf.c", "sync_io.c", "backtrace.c"] {
+    let path = root + "/lib/runtime/" + name
+    runtime.write_string(
+      name + "\n" + initial_comment(@fs.read_file(path).text()) + "\n",
+    )
+    provenance.write_string(
+      "runtime/" + name + " SHA256 " + sha256(path, windows) + "\n",
+    )
+  }
+  files.push(("MoonBit-runtime-NOTICE.txt", runtime.to_string()))
+  files.push(
+    (
+      "libbacktrace-BSD.txt",
+      initial_comment(@fs.read_file(root + "/include/backtrace.h").text()),
+    ),
+  )
+  for object in ["libmoonbitrun.o", "simdutf.o", "moonbit_simdutf.o"] {
+    let path = root + "/lib/" + object
+    if @fs.exists(path) {
+      provenance.write_string(
+        object + " SHA256 " + sha256(path, windows) + "\n",
+      )
+    } else {
+      provenance.write_string(
+        object + ": not supplied by this toolchain (optional linker input)\n",
+      )
     }
   }
-  for pkg in ["http-server", "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
-    @fs.write_file("npm/" + pkg + "/LICENSE", @fs.read_file("LICENSE"))
+  provenance.write_string(
+    "simdutf upstream version: not independently exposed by the toolchain; object identity is the SHA256 above. License text source is recorded in FIXED-PROVENANCE.md.\n",
+  )
+  if os == "Linux" {
+    let musl = "/usr/share/doc/musl/copyright"
+    files.push(("musl-copyright.txt", @fs.read_file(musl).text()))
+    let packages = @shell.Cmd("dpkg-query", ["-W", "musl", "musl-dev"]).output()
+    packages.check()
+    provenance.write_string(
+      packages.stdout() +
+      "musl copyright SHA256 " +
+      sha256(musl, windows) +
+      "\n",
+    )
+  }
+  files.push(("BUILD-PROVENANCE.txt", provenance.to_string()))
+  let args = @env.args()
+  if args.length() == 3 && args[1] == "--output" {
+    stage(args[2], files)
+  } else {
+    assert_eq(args.length(), 1)
+    let platform = match os {
+      "Windows" => "win32-x64-msvc"
+      "Linux" => "linux-x64-gnu"
+      "Darwin" => "darwin-arm64"
+      _ => fail("Unsupported license platform: " + os)
+    }
+    for
+      destination in [
+        "target/candidate/licenses",
+        "target/candidate/cli/licenses",
+        "target/candidate/cabi/licenses",
+        "npm/http-server/licenses",
+        "npm/" + platform + "/licenses",
+      ] {
+      stage(destination, files)
+    }
+    for
+      pkg in ["http-server", "win32-x64-msvc", "linux-x64-gnu", "darwin-arm64"] {
+      @fs.write_file("npm/" + pkg + "/LICENSE", @fs.read_file("LICENSE"))
+    }
+  }
+  println("Staged third-party licenses and MPL source (" + os + ")")
+}
+
+///|
+test "N-18 runtime notice extraction rejects missing or malformed attribution" {
+  assert_eq(
+    initial_comment("/* Copyright Author. License: Apache-2.0 */\ncode"),
+    "/* Copyright Author. License: Apache-2.0 */\n",
+  )
+  for
+    source in [
+      "code only", "/* Copyright missing terminator", "/* no attribution */",
+    ] {
+    assert_true(
+      try {
+        ignore(initial_comment(source))
+        false
+      } catch {
+        _ => true
+      },
+    )
+  }
+}
+
+///|
+async test "N-18 staging creates a new nested bundle and is repeatable" {
+  let root = @fs.tmpdir(prefix="hs-license-stage-")
+  defer (@fs.rmdir(root, recursive=true) catch { _ => () })
+  let destination = root + "/new/licenses"
+  let files = [
+    ("notice.txt", "copyright\n"),
+    ("mozilla-source/input.pem", "source\n"),
+  ]
+  stage(destination, files)
+  stage(destination, files)
+  for (name, content) in files {
+    assert_eq(@fs.read_file(destination + "/" + name).text(), content)
   }
 }

@@ -8,6 +8,9 @@
 
 ## 1. 任务状态与证据
 
+- [ ] T-001/T-025/T-026/T-030 第三方许可分发分项 — 状态：进行中（2026-09-29）。关联 R-SDD/R-COMPAT/R-N02/R-N11/R-N13、D-08/D-14～D-16、N-18；依赖现有候选打包。交付：第三方声明、原版 MIT、实际工具链许可与来源、MPL 对应源码、npm/CLI/SDK/镜像许可打包及缺失检测。验收：本机归档/离线 npm 与负例检查、三平台 Actions 包内检查和 Linux 四镜像验证；证据见 [许可补齐记录](license-distribution-20260929.md)，本机通过不代替跨平台总验收。
+  - Windows 本机分项已交付：Native check、许可脚本 3/3、既有发行门禁回归 3/3、26 个维护脚本检查、实际 npm tarball/Node 22 离线消费、MoonBit 源码消费及 CLI/SDK 归档许可检查通过；无公开接口差异。Linux/macOS Actions 与四容器待远程运行，总状态仍为进行中。
+
 - [x] T-025/T-028 npm 发布后可见性回归 — 状态：已完成（本机脚本分项，N-18，2026-09-28）。v0.4.2 日志显示 Windows 包 publish 成功后立即查询失败；registry 读回 SHA-1 与日志一致，发布者为 wyatex 且有 provenance。新增 404→404→同哈希案例先复现一次性检查失败，再实现有界只读轮询；脚本 4/4 回归通过，覆盖超时上限、认证失败及哈希冲突立即拒绝。未重复发布、未更改 npm Trusted Publisher 配置、未补发剩余包；远程执行保持待验证。
 
 - [x] T-025/T-032 README 状态展示分项 — 状态：已完成（2026-09-28，文档分项，R-N13/D-16/N-18）。中英文 README 使用 GitHub 原生 master/push 工作流徽章替换固定测试数量与本机状态，表格列出当前三平台 runner/job 并链接 Actions；macOS CI 架构校正为 arm64。动态徽章仅表示整个候选 workflow，版本证据仍查对应 release run/manifest。验证：徽章端点成功返回 `Candidate acceptance - passing`（查询时状态，不写成固定通过声明）；表格与 cli.yml 矩阵人工核对，42 文件迁移覆盖、稳定编号及相对链接保留，git diff --check 通过。纯文档变更未执行 moon info/fmt 或应用测试，不更新平台实现总任务状态。

@@ -223,4 +223,4 @@ moon build --target native --release
 
 开发入口：[文档导航](docs/README.md)、[脚本说明](scripts/README.md)、[测试布局](tests/README.md)。
 
-本项目基于 [MIT 许可证](LICENSE) 开源，依赖的底层异步库 `moonbitlang/async` 基于 Apache-2.0 许可证。
+项目原创代码采用 [MIT 许可证](LICENSE)，依赖保留各自许可，详见[第三方声明](THIRD_PARTY_NOTICES.md)。Mbed TLS 与 TF-PSA-Crypto 选择 Apache-2.0；Mozilla 信任根数据及生成源码保持 MPL-2.0，随二进制包放在 `licenses/mozilla-source/`。下载 `cli-full-<platform>.tar.gz` 或 `cli-thin-<platform>.tar.gz` 可同时取得程序与许可；单独下载可执行文件时，须同时保留对应的 `licenses-<platform>.tar.gz`。

@@ -34,11 +34,13 @@ async fn main {
   let os = @shell.Cmd("uname", ["-s"]).output()
   os.check()
   assert_eq(os.stdout().trim(), "Linux")
+  @shell.Cmd("moon", ["run", "scripts/maintenance/stage_licenses.mbtx"]).run()
   let out = "target/candidate/containers"
   if !@fs.exists(out) {
     @fs.mkdir(out, recursive=true)
   }
   let context = @fs.tmpdir(prefix="hs-container-")
+  @shell.Cmd("cp", ["-R", "target/candidate/licenses", context + "/licenses"]).run()
   let fixtures = context + "/fixtures"
   @fs.mkdir(fixtures)
   @fs.write_file(fixtures + "/hello.txt", "hello moonbit\n")
@@ -90,7 +92,15 @@ async fn main {
     )
     for base in ["distroless", "scratch"] {
       let tag = "http-server-mbt-candidate:" + flavor + "-" + base
-      let args = ["build", "--build-arg", "BINARY_PATH=" + name, "-t", tag]
+      let args = [
+        "build",
+        "--build-arg",
+        "BINARY_PATH=" + name,
+        "--build-arg",
+        "LICENSE_PATH=licenses",
+        "-t",
+        tag,
+      ]
       if base == "scratch" {
         args.push("--build-arg")
         args.push("BASE_IMAGE=scratch")
@@ -153,6 +163,17 @@ async fn main {
       let actual = @shell.Cmd("sha256sum", [context + "/from-image"]).output()
       actual.check()
       assert_eq(actual.stdout().split(" ").next().unwrap(), expected)
+      let received_licenses = context + "/licenses-" + flavor + "-" + base
+      ignore(
+        command([
+          "cp",
+          id + ":/usr/share/licenses/http-server-mbt",
+          received_licenses,
+        ]),
+      )
+      @shell.Cmd("moon", [
+        "run", "scripts/check/check_licenses.mbtx", "--bundle", received_licenses,
+      ]).run()
       ignore(command(["stop", "--time", "8", id]))
       let stopped = @json.parse(command(["inspect", id]))
       guard stopped
@@ -230,6 +251,7 @@ async fn main {
         "readonly": true,
         "pid1_sigterm": true,
         "dns_explicit_ca_tls": flavor == "full",
+        "licenses_and_mpl_source": true,
       })
     }
   }

@@ -4,7 +4,10 @@
 .codegraph
 .mooncakes
 node_modules
-target
+target/*
+!target/candidate/
+target/candidate/*
+!target/candidate/licenses/
 *.log
 *.tmp
 _build/**/*.o

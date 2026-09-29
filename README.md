@@ -223,4 +223,10 @@ The compiled binary will be located at `_build/native/release/build/cmd/http-ser
 
 Developer navigation: [documentation](docs/README.md), [scripts](scripts/README.md), [tests](tests/README.md).
 
-This project is licensed under the [MIT License](LICENSE). The underlying asynchronous networking library `moonbitlang/async` is licensed under Apache-2.0.
+Original project code is licensed under [MIT](LICENSE). Dependencies retain their
+own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). Mbed TLS and
+TF-PSA-Crypto use their Apache-2.0 option. Mozilla trust-store data and generated
+source remain MPL-2.0 and are supplied in binary packages under
+`licenses/mozilla-source/`. Use `cli-full-<platform>.tar.gz` or
+`cli-thin-<platform>.tar.gz` for an executable with its licenses; when downloading
+a bare executable, keep the matching `licenses-<platform>.tar.gz` alongside it.

@@ -18,6 +18,10 @@ moon run scripts/check/check_node_candidate.mbtx
 
 Node 候选检查在 `build_node` 之后分别使用 Node 22/24；Linux 另运行 `build/build_docker.mbtx`。完整远程流程由 Actions 编排，单独运行 `validate_candidate` 不代表完成所有候选门槛。发行脚本需要 workflow 提供的环境变量和候选文件，不是本地开发的一般命令。
 
+许可打包（D-08/D-14～D-16、T-025/T-030、N-18）：`moon run scripts/maintenance/stage_licenses.mbtx` 从当前工具链收集 core LICENSE/NOTICE、runtime 版权及对象哈希，Linux 还要求已安装 musl/musl-dev 和 `/usr/share/doc/musl/copyright`。它写入候选根目录、CLI/SDK 目录、npm 主包及当前平台包的 `licenses/`；新生成的 npm 许可材料被 Git 忽略，构建时重新收集，不会用 Windows 的工具链记录替代 Linux/macOS。`--output DIR` 可只生成一个独立许可目录。
+
+`moon run scripts/check/check_licenses.mbtx --bundle DIR` 检查许可及对应 MPL 源码；`--archive FILE.tgz package/licenses` 检查真实 npm tarball，`--source DIR` 检查 Mooncakes 候选源码。候选工作流执行缺失/空白许可回归、实际包检查；Linux 容器从镜像中取回文件复验。手动从仓库构建 Docker 时先生成许可目录，默认 `LICENSE_PATH=target/candidate/licenses`；自定义构建上下文须传入对应 `LICENSE_PATH`。发行保留旧裸可执行文件，同时提供 `cli-full-<platform>.tar.gz`、`cli-thin-<platform>.tar.gz` 和对应的 `licenses-<platform>.tar.gz`。裸程序转发时需携带配套许可；完整候选归档内的 `cabi/licenses/` 随 SDK 一起保留。
+
 `gen_version` 由 `cmd/common/moon.pkg` 调用，`build.mbtx` 留在根目录供模块预构建使用。维护生成器会写入对应生成文件；升级依赖/CA/TLS 数据时同步来源、许可证和设计证据。
 
 日常发版沿用根目录的 [moon-bump 配置](../bump.config.json)（本机验证版本 0.1.3）：

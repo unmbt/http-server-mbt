@@ -1,0 +1,120 @@
+///|
+// N-18 / T-025: inspect the files users actually receive, not only inputs.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+let required : Array[String] = [
+  "project-MIT.txt", "THIRD_PARTY_NOTICES.md", "FIXED-PROVENANCE.md", "HTTP-server-MIT.txt",
+  "simdutf-MIT.txt", "Node.txt", "Node-PROVENANCE.md", "MbedTLS.txt", "TF-PSA-Crypto.txt",
+  "MoonBit-async.txt", "MoonBit-core-LICENSE.txt", "MoonBit-core-NOTICE.txt", "MoonBit-core-version.txt",
+  "MoonBit-runtime-NOTICE.txt", "libbacktrace-BSD.txt", "BUILD-PROVENANCE.txt", "Mozilla-MPL-2.0.txt",
+  "CA-PROVENANCE.md", "container-provenance.md", "mozilla-source/cacert.pem", "mozilla-source/ca_bundle.mbt",
+  "mozilla-source/embed_ca.mbtx",
+]
+
+///|
+async fn require_files(root : String, names : Array[String]) -> Unit {
+  for name in names {
+    let path = root + "/" + name
+    if !@fs.exists(path) || @fs.kind(path) != @fs.Regular {
+      fail("Missing license/source: " + path)
+    }
+    if @fs.read_file(path).text().trim() == "" {
+      fail("Empty license/source: " + path)
+    }
+  }
+}
+
+///|
+async fn check_bundle(root : String) -> Unit {
+  require_files(root, required)
+  let provenance = @fs.read_file(root + "/BUILD-PROVENANCE.txt").text()
+  if provenance.contains("OS: Linux\n") {
+    require_files(root, ["musl-copyright.txt"])
+  }
+  for
+    (source, name) in [
+      ("LICENSE", "project-MIT.txt"),
+      ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+      ("third_party/HTTP-server-MIT.txt", "HTTP-server-MIT.txt"),
+      ("third_party/simdutf-MIT.txt", "simdutf-MIT.txt"),
+      ("full/cacert.pem", "mozilla-source/cacert.pem"),
+      ("full/ca_bundle.mbt", "mozilla-source/ca_bundle.mbt"),
+      ("scripts/maintenance/embed_ca.mbtx", "mozilla-source/embed_ca.mbtx"),
+    ] {
+    assert_eq(
+      @fs.read_file(root + "/" + name).binary(),
+      @fs.read_file(source).binary(),
+    )
+  }
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  if args.length() == 3 && args[1] == "--bundle" {
+    check_bundle(args[2])
+  } else if args.length() == 4 && args[1] == "--archive" {
+    let temp = @fs.tmpdir(prefix="hs-license-archive-")
+    defer (@fs.rmdir(temp, recursive=true) catch { _ => () })
+    @shell.Cmd("tar", ["-xzf", args[2], "-C", temp]).run()
+    check_bundle(temp + "/" + args[3])
+  } else if args.length() == 3 && args[1] == "--source" {
+    require_files(args[2], [
+      "LICENSE", "THIRD_PARTY_NOTICES.md", "third_party/HTTP-server-MIT.txt", "third_party/simdutf-MIT.txt",
+      "third_party/PROVENANCE.md", "full/cacert.pem", "full/ca_bundle.mbt", "full/LICENSE-MPL-2.0.txt",
+      "full/CA-PROVENANCE.md", "scripts/maintenance/embed_ca.mbtx", "tls/mbedtls-4.2.0/LICENSE",
+      "tls/mbedtls-4.2.0/tf-psa-crypto/LICENSE", "c_abi/node/LICENSE-NODE.txt",
+    ])
+  } else {
+    fail(
+      "Usage: check_licenses.mbtx --bundle DIR | --archive TAR LICENSE_SUBDIR | --source DIR",
+    )
+  }
+  println("PASS: distributed licenses and corresponding MPL source")
+}
+
+///|
+async test "N-18 missing core NOTICE, missing MPL source and empty notices fail" {
+  let root = @fs.tmpdir(prefix="hs-license-regression-")
+  defer (@fs.rmdir(root, recursive=true) catch { _ => () })
+  for name in required {
+    let parts = name.split("/").to_array()
+    let parent = root + "/" + parts[:parts.length() - 1].join("/")
+    if !@fs.exists(parent) {
+      @fs.mkdir(parent, recursive=true)
+    }
+    @fs.write_file(root + "/" + name, "fixture")
+  }
+  require_files(root, required)
+  for
+    name in [
+      "MoonBit-core-NOTICE.txt", "mozilla-source/ca_bundle.mbt", "HTTP-server-MIT.txt",
+    ] {
+    @fs.remove(root + "/" + name)
+    assert_true(
+      try {
+        require_files(root, required)
+        false
+      } catch {
+        _ => true
+      },
+    )
+    @fs.write_file(root + "/" + name, " \n")
+    assert_true(
+      try {
+        require_files(root, required)
+        false
+      } catch {
+        _ => true
+      },
+    )
+    @fs.write_file(root + "/" + name, "restored")
+  }
+  require_files(root, required)
+}

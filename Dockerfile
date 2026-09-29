@@ -9,12 +9,14 @@ ARG BASE_IMAGE=gcr.io/distroless/static-debian12@sha256:afa5c872c891853ca7fcf1f1
 FROM ${BASE_IMAGE}
 
 ARG BINARY_PATH=http-server-mbt
+ARG LICENSE_PATH=target/candidate/licenses
 
 # Default directory to serve files from
 WORKDIR /data
 
 # Copy pre-compiled binary from host / CI build artifact
 COPY --chmod=0555 ${BINARY_PATH} /usr/local/bin/http-server-mbt
+COPY ${LICENSE_PATH}/ /usr/share/licenses/http-server-mbt/
 
 # UID 65532 is nonroot user in Distroless
 USER 65532:65532

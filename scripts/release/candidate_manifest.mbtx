@@ -49,6 +49,14 @@ async fn main {
   ]).output()
   version.check()
   @shell.Cmd("moon", ["run", "scripts/maintenance/stage_licenses.mbtx"]).run()
+  for dir in ["licenses", "cli/licenses", "cabi/licenses"] {
+    @shell.Cmd("moon", [
+      "run",
+      "scripts/check/check_licenses.mbtx",
+      "--bundle",
+      "target/candidate/" + dir,
+    ]).run()
+  }
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
   let os = if windows {
     "Windows"

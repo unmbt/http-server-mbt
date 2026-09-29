@@ -88,6 +88,8 @@ wasm-gc 必须由支持 WasmGC 的宿主运行，文件/网络通过显式导入
 
 ## 5. 交付顺序与完成定义
 
+2026-09-29 补充 R-SDD/R-COMPAT/R-N02/R-N11/R-N13 的分发验收：项目 MIT 不覆盖第三方授权。源码、npm、CLI/SDK 归档和四种容器须带入适用的版权/许可，Full 同时提供 MPL 对应源码；记录实际工具链许可与 runtime 对象身份。缺失材料使候选失败，具体按 D-08/D-14～D-16、T-001/T-025/T-026/T-030 和 N-18 执行，不改变原 42 文件迁移范围。
+
 1. 在 Windows 本机固定测试资产及差异、运行原版基线，完成 Windows Native 必需探针；库导出等独立可行性实验分别推进。
 2. 建立配置、HTTP、路径安全及静态引擎，先跑通 Windows IOCP/TransmitFile 的真实 HTTP 传输，复用到后续生产代码。
 3. 接入 GitHub Actions 三平台基础矩阵，复跑原版基线与已迁移案例，补齐 Linux/macOS 探针，逐步完成 TLS、代理、WebSocket及中间件。

@@ -1,5 +1,11 @@
 # http-server-mbt 重构设计
 
+## 2026-09-29 第三方许可分发修订（D-08、D-14～D-16）
+
+关联 R-SDD/R-COMPAT/R-N02/R-N11/R-N13、T-001/T-025/T-026/T-030、N-18。项目原创代码保持 MIT；第三方代码与资源保留原许可，MbedTLS/TF-PSA 选择 Apache-2.0。源码候选包含第三方声明及原版迁移资产的 MIT 版权；二进制候选、npm、CLI/SDK 归档及四种容器包含许可目录。Mozilla MPL 资源同时提供固定 PEM、生成的 MoonBit 源码及再生脚本，不以根 MIT 覆盖它们。
+
+构建时从实际 MoonBit 工具链收集 core LICENSE/NOTICE、runtime 声明和版本；Linux 另收集实际 musl Debian copyright。记录预编译 runtime/simdutf 对象哈希，不把许可证文本来源版本冒充对象版本。构建产生的工具链材料不写成跨平台共用的固定版权快照。N-18 检查包内许可、MPL 源码与缺失材料失败，镜像检查实际复制的文件；三平台远程结果与 Windows 本机证据分开记录，见 [许可补齐记录](license-distribution-20260929.md)。
+
 ## 2026-09-28 自动发包修订（D-08、D-14、D-16）
 
 发布后可见性修复（T-025/T-028、N-18）：npm publish 返回成功后，registry 仍可能暂时返回 E404。对已成功提交的包只轮询查询，不重复 publish；最多查询 31 次，间隔 10 秒，每次查询禁用 npm 内部重试并限定 fetch 10 秒/进程 20 秒。哈希不符、认证/其他查询错误立即失败；耗尽时明确提示等待后重跑失败 job。发布身份和 provenance 分开：个人 token 可生成 Actions 来源证明，但不会因此改为 OIDC Trusted Publisher；切换须先配置四个包的可信 workflow，再停止传入 NPM_TOKEN。

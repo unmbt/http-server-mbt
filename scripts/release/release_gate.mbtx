@@ -94,7 +94,31 @@ async fn main {
         "target/release/" + filename,
         @fs.read_file(root + "/cli/" + filename),
       )
+      let flavor = if name.has_suffix("-thin") { "thin" } else { "full" }
+      let cli_archive = "target/release/cli-" +
+        flavor +
+        "-" +
+        cli_platform +
+        ".tar.gz"
+      @shell.Cmd("tar", [
+        "-czf",
+        cli_archive,
+        "-C",
+        root + "/cli",
+        filename,
+        "licenses",
+      ]).run()
+      @shell.Cmd("moon", [
+        "run", "scripts/check/check_licenses.mbtx", "--archive", cli_archive, "licenses",
+      ]).run()
     }
+    @shell.Cmd("tar", [
+      "-czf",
+      "target/release/licenses-" + cli_platform + ".tar.gz",
+      "-C",
+      root,
+      "licenses",
+    ]).run()
     if os == "Linux" {
       let main_package = "unmbt-http-server-mbt-" + version + ".tgz"
       for path in ["node/" + main_package, "moonbit-source.tar.gz"] {

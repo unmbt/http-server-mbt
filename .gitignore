@@ -16,3 +16,5 @@ c_abi/node/lib/
 /examples/node/node_modules/
 /examples/python/__pycache__/
 /tests/consumers/python/__pycache__/
+# Generated from the actual build toolchain; existing fixed copies stay tracked.
+/npm/*/licenses/

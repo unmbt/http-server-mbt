@@ -17,6 +17,9 @@ jobs:
         with:
           fetch-depth: 0
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - name: Reject branch dispatches and mismatched tag versions
         run: moon run scripts/release/release_gate.mbtx --check-tag
@@ -31,6 +34,9 @@ jobs:
         with:
           fetch-depth: 0
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - uses: actions/download-artifact@v8
         with:
@@ -53,6 +59,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - uses: actions/setup-node@v7
         with:
@@ -71,6 +80,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - uses: actions/download-artifact@v8
         with:

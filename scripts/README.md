@@ -18,6 +18,8 @@ moon run scripts/check/check_node_candidate.mbtx
 
 Node 候选检查在 `build_node` 之后分别使用 Node 22/24；Linux 另运行 `build/build_docker.mbtx`。完整远程流程由 Actions 编排，单独运行 `validate_candidate` 不代表完成所有候选门槛。发行脚本需要 workflow 提供的环境变量和候选文件，不是本地开发的一般命令。
 
+Wasm 示例：`moon run scripts/build/build_wasm.mbtx` 生成可搬移的 `target/wasm/`；`moon run scripts/check/check_wasm_candidate.mbtx` 在 Node 22.21.1/24.10.0 装载并验证候选。可通过 `HS_WASM_NODE` 指定 Node 可执行文件。`check_wasm_host.mbtx` 是 `--target js` 的 MoonBit 测试脚本，宿主 API 的 FFI 调用以外的测试控制逻辑仍使用 MoonBit；其余维护脚本保持默认脚本后端。共享决策另运行 `moon test internal/static_plan --target wasm-gc --deny-warn`。
+
 许可打包（D-08/D-14～D-16、T-025/T-030、N-18）：`moon run scripts/maintenance/stage_licenses.mbtx` 从当前工具链收集 core LICENSE/NOTICE、runtime 版权及对象哈希，Linux 还要求已安装 musl/musl-dev 和 `/usr/share/doc/musl/copyright`。它写入候选根目录、CLI/SDK 目录、npm 主包及当前平台包的 `licenses/`；新生成的 npm 许可材料被 Git 忽略，构建时重新收集，不会用 Windows 的工具链记录替代 Linux/macOS。`--output DIR` 可只生成一个独立许可目录。
 
 `moon run scripts/check/check_licenses.mbtx --bundle DIR` 检查许可及对应 MPL 源码；`--archive FILE.tgz package/licenses` 检查真实 npm tarball，`--source DIR` 检查 Mooncakes 候选源码。候选工作流执行缺失/空白许可回归、实际包检查；Linux 容器从镜像中取回文件复验。手动从仓库构建 Docker 时先生成许可目录，默认 `LICENSE_PATH=target/candidate/licenses`；自定义构建上下文须传入对应 `LICENSE_PATH`。发行保留旧裸可执行文件，同时提供 `cli-full-<platform>.tar.gz`、`cli-thin-<platform>.tar.gz` 和对应的 `licenses-<platform>.tar.gz`。裸程序转发时需携带配套许可；完整候选归档内的 `cabi/licenses/` 随 SDK 一起保留。

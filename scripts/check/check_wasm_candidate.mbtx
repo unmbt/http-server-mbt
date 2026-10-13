@@ -1,0 +1,99 @@
+///|
+// R-N10/R-N13, T-029/T-025: build, execute, stage and retain exact host evidence.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn main {
+  let node = @env.get_env_var("HS_WASM_NODE").unwrap_or("node")
+  let version = @shell.Cmd(node, ["--version"]).output()
+  version.check()
+  let version = version.stdout().trim().to_owned()
+  assert_true(
+    version == "v22.21.1" || version == "v24.10.0",
+    msg="Wasm acceptance requires Node 22.21.1 or 24.10.0; set HS_WASM_NODE",
+  )
+  @shell.Cmd("moon", ["run", "scripts/build/build_wasm.mbtx"]).run()
+  @shell.Cmd("moon", [
+    "build", "scripts/check/check_wasm_host.mbtx", "--target", "js", "--release",
+    "--deny-warn", "--target-dir", "target/wasm-host-test",
+  ]).run()
+  let out = "target/candidate/wasm"
+  if !@fs.exists(out) {
+    @fs.mkdir(out, recursive=true)
+  }
+  for
+    name in [
+      "engine.wasm", "app.mjs", "index.mjs", "host.mjs", "loader.mjs", "index.d.ts",
+      "README.md", "LICENSE",
+    ] {
+    @fs.write_file(out + "/" + name, @fs.read_file("target/wasm/" + name))
+  }
+  if !@fs.exists(out + "/licenses") {
+    @fs.mkdir(out + "/licenses", recursive=true)
+  }
+  for name in ["MoonBit-core-LICENSE.txt", "MoonBit-core-NOTICE.txt"] {
+    @fs.write_file(
+      out + "/licenses/" + name,
+      @fs.read_file("target/wasm/licenses/" + name),
+    )
+  }
+  let result = @shell.Cmd(
+    node,
+    [
+      "target/wasm-host-test/check_wasm_host.mbtx/js/release/build/single/single.js",
+    ],
+    env=Map([("HS_WASM_ENTRY", out)]),
+  ).output(timeout_ms=120000)
+  let commit = @shell.Cmd("git", ["rev-parse", "HEAD"]).output()
+  commit.check()
+  let toolchain = @shell.Cmd("moon", ["version", "--all"]).output()
+  toolchain.check()
+  let dirty = @shell.Cmd("git", ["status", "--porcelain"]).output()
+  dirty.check()
+  let log = "commit=" +
+    commit.stdout() +
+    "dirty=" +
+    (!dirty.stdout().trim().is_empty()).to_string() +
+    "\n" +
+    toolchain.stdout() +
+    result.stdout() +
+    result.stderr() +
+    "exit=" +
+    result.exit_code().to_string() +
+    "\n"
+  @fs.write_file(out + "/" + version + ".log", log)
+  println(result.stdout())
+  if result.exit_code() != 0 {
+    println(result.stderr())
+  }
+  result.check()
+  // A separate process loads the Native addon for differential assertions;
+  // the standalone Wasm acceptance process above never loads a .node file.
+  let parity = @shell.Cmd(
+    node,
+    [
+      "target/wasm-host-test/check_wasm_host.mbtx/js/release/build/single/single.js",
+    ],
+    env=Map([("HS_WASM_ENTRY", out), ("HS_WASM_PARITY", "1")]),
+  ).output(timeout_ms=120000)
+  @fs.write_file(
+    out + "/" + version + "-parity.log",
+    log +
+    parity.stdout() +
+    parity.stderr() +
+    "parity-exit=" +
+    parity.exit_code().to_string() +
+    "\n",
+  )
+  println(parity.stdout())
+  if parity.exit_code() != 0 {
+    println(parity.stderr())
+  }
+  parity.check()
+  println("Wasm candidate and host evidence staged; no registry publication.")
+}

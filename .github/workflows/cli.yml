@@ -34,6 +34,9 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
@@ -57,6 +60,8 @@ jobs:
         run: moon run scripts/check/validate_candidate.mbtx
       - name: Node 22 offline candidate installation and lifecycle
         run: moon run scripts/check/check_node_candidate.mbtx
+      - name: Node 22 WasmGC static engine and lifecycle
+        run: moon run scripts/check/check_wasm_candidate.mbtx
       - name: Node 22 addon ASan and worker teardown regression
         if: runner.os == 'Windows'
         run: moon run scripts/check/check_node_sanitizer.mbtx
@@ -65,6 +70,8 @@ jobs:
           node-version: '24.10.0'
       - name: Node 24 offline candidate installation and lifecycle
         run: moon run scripts/check/check_node_candidate.mbtx
+      - name: Node 24 WasmGC static engine and lifecycle
+        run: moon run scripts/check/check_wasm_candidate.mbtx
       - name: Node 24 addon ASan and worker teardown regression
         if: runner.os == 'Windows'
         run: moon run scripts/check/check_node_sanitizer.mbtx
@@ -88,6 +95,7 @@ jobs:
             target/sanitizer/
             target/framework-*.log
             target/candidate/frameworks/
+            target/candidate/wasm/
           if-no-files-found: warn
 
   candidate-gate:
@@ -96,6 +104,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: '0.10.14+7d59c7ec9'
+          core-version: '0.10.14+7d59c7ec9'
       - run: moon update
       - uses: actions/download-artifact@v8
         with:

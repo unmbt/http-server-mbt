@@ -15,6 +15,8 @@
 
 </div>
 
+Experimental [Node WasmGC static-server example](examples/wasm-node/README.md): shared MoonBit decisions, streamed host I/O, Node 22/24, and an explicit trusted-directory boundary. [Implementation and validation](docs/wasm-node-20261013.md).
+
 <a id="platform-support"></a>
 
 ## 🖥️ Platform Support Matrix

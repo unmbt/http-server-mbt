@@ -15,6 +15,8 @@
 
 </div>
 
+实验性 [Node WasmGC 静态服务示例](examples/wasm-node/README.md)：复用 MoonBit 静态决策，宿主流式 I/O，支持 Node 22/24，明确受信目录边界。[实现与验证记录](docs/wasm-node-20261013.md)。
+
 <a id="platform-support"></a>
 
 ## 🖥️ 平台支持矩阵 (Platform Support)

@@ -1,0 +1,82 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/http-server-mbt/internal/static_plan"
+
+import {
+  "unmbt/http-server-mbt/core",
+}
+
+// Values
+pub fn compare_entries(ListingEntry, ListingEntry) -> Int
+
+pub fn decode_config(Json) -> @core.Config raise
+
+pub fn escape_html(String) -> String
+
+pub fn listing_footer(String) -> String
+
+pub fn listing_header(String, String?) -> String
+
+pub fn listing_row(ListingEntry, String?) -> String
+
+pub fn render_directory_listing_html(String, Array[(String, Bool)], raw_query? : String?, host? : String) -> String
+
+pub fn start(@core.Config, @core.Request, @core.MimeRegistry) -> Step
+
+// Errors
+pub suberror Changed
+
+// Types and methods
+pub(all) enum Body {
+  Empty
+  Bytes(Bytes)
+  FileRegion(File, Int64, Int64)
+  Listing(ListingStream)
+}
+
+pub(all) struct File {
+  token : Int
+  kind : Int
+  size : Int64
+  mtime : Int64
+}
+
+pub(all) struct ListingEntry {
+  name : String
+  is_dir : Bool
+  size : Int64
+  mtime_sec : Int64
+  mut is_companion : Bool
+  mut has_br : Bool
+  mut has_gz : Bool
+}
+
+pub(all) struct ListingStream {
+  entries : Array[ListingEntry]
+  title : String
+  query : String?
+  host : String
+  mut stage : Int
+  mut index : Int
+  mut pending : Bytes
+  mut position : Int
+}
+pub fn ListingStream::close(Self) -> Unit
+pub fn ListingStream::read(Self, Int) -> Bytes
+
+pub(all) struct Response {
+  status : Int
+  headers : Map[String, String]
+  body : Body
+}
+
+pub(all) enum Step {
+  Open(String, (File?) -> Step raise)
+  Prefix(File, Int, (Bytes) -> Step raise)
+  List(String, (Array[ListingEntry]) -> Step raise)
+  Done(Response)
+  Next
+}
+
+// Type aliases
+
+// Traits

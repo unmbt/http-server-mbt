@@ -228,8 +228,12 @@ async fn main {
     },
     "pic": !windows,
     "async": "0.21.3",
-    "scope": "CLI; ABI 1.1 async engine and complete-server C/Node hosts; libevent/ASGI/Express; owned Native MoonBit engine",
-    "excluded": ["io_uring", "wasm-gc engine", "registry publication"],
+    "scope": "CLI; ABI 1.1 async engine and complete-server C/Node hosts; libevent/ASGI/Express; owned Native MoonBit engine; experimental Node WasmGC static engine",
+    "excluded": [
+      "io_uring", "registry publication", "Wasm hostile directory replacement isolation",
+      "Wasm cloud/TLS/proxy hosts",
+    ],
+    "wasm_host_boundary": "Trusted deployment tree; symlink/junction rejected; FILE_CHANGED stops the bound handle. Windows Node fs.rename open-target atomic replacement may return EPERM; rename-away is separately verified.",
     "full_release_ready": false,
     "actions_run": if run == "" {
       "not run locally"

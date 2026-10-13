@@ -1,0 +1,9 @@
+import {
+  "unmbt/http-server-mbt/core",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "unmbt/http-server-mbt/core",
+  "moonbitlang/core/encoding/utf8",
+} for "test"

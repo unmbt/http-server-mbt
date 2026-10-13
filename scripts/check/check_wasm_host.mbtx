@@ -1,0 +1,721 @@
+///|
+// R-N10 / N-15/N-19/N-20: test logic is MoonBit; JS FFI only accesses the host API.
+// Compile with --target js, then execute the generated script with Node 22/24.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/js_async",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+}
+
+///|
+#external
+type Value
+
+///|
+extern "js" fn module_load() -> @js_async.Promise[Value] =
+  #|() => import('node:url').then(u => import(u.pathToFileURL(process.cwd() + '/' + (process.env.HS_WASM_ENTRY || 'target/wasm') + '/index.mjs')))
+
+///|
+extern "js" fn fs_load() -> @js_async.Promise[Value] =
+  #|() => import('node:fs/promises')
+
+///|
+extern "js" fn compressed_fixture(
+  fs : Value,
+  path : String,
+  text : String,
+) -> @js_async.Promise[Unit] =
+  #|(fs,p,t) => import('node:zlib').then(z => fs.writeFile(p,z.gzipSync(t)))
+
+///|
+extern "js" fn decoded_gzip(r : Value) -> @js_async.Promise[String] =
+  #|r => import('node:zlib').then(z => r.body.pipe(z.createGunzip()).toArray()).then(parts => Buffer.concat(parts).toString('utf8'))
+
+///|
+extern "js" fn disconnect_http(address : String) -> @js_async.Promise[Unit] =
+  #|u => import('node:http').then(h => new Promise((resolve,reject) => { const req=h.get(u,res => { res.once('data',() => res.destroy()); res.once('close',resolve); res.once('error',reject); }); req.once('error',reject); }))
+
+///|
+extern "js" fn server_engine(server : Value) -> Value =
+  #|s => s.engine
+
+///|
+extern "js" fn parity_mode() -> Bool =
+  #|() => process.env.HS_WASM_PARITY === '1'
+
+///|
+extern "js" fn native_load() -> @js_async.Promise[Value] =
+  #|() => import('node:url').then(u => import(u.pathToFileURL(process.cwd() + '/npm/http-server/index.js'))).then(m => m.default)
+
+///|
+extern "js" fn normalized_headers(r : Value) -> String =
+  #|r => JSON.stringify((r.headers || []).map(([k,v]) => [k.toLowerCase(),v]).sort(([a],[b]) => a.localeCompare(b)))
+
+///|
+extern "js" fn chunk_hex(r : Value) -> @js_async.Promise[String] =
+  #|r => (r.iterator ||= r.body[Symbol.asyncIterator]()).next().then(v => v.done ? '' : v.value.toString('hex'))
+
+///|
+async fn raw_body(r : Value) -> String {
+  let out = StringBuilder()
+  for ;; {
+    let next = chunk_hex(r).wait()
+    if next == "" {
+      break
+    }
+    out.write_string(next)
+  }
+  out.to_string()
+}
+
+///|
+async fn parity(m : Value, root : String) -> Unit {
+  let native = native_load().wait()
+  for
+    options in [
+      ({ "root": root, "brotli": true } : Json),
+      ({ "root": root, "base_url": "/app", "spa": true } : Json),
+      ({ "root": root, "handle_error": false } : Json),
+      ({ "root": root, "basic_auth": ["user", "pass"] } : Json),
+    ] {
+    let wasm = create(m, options.stringify()).wait()
+    let native = create(native, options.stringify()).wait()
+    defer close(wasm).wait()
+    defer close(native).wait()
+    for
+      req in [
+        request("/hello.txt"),
+        request("/hello.txt", verb="HEAD"),
+        request("/hello.txt", headers={ "Range": "bytes=2-5" }),
+        request("/hello.txt", headers={ "Range": "bytes=900-" }),
+        request("/hello.txt", headers={ "If-None-Match": "*" }),
+        request("/compressed.txt", headers={ "Accept-Encoding": "gzip" }),
+        request("/brotli.txt", headers={ "Accept-Encoding": "br" }),
+        request("/"),
+        request("/%E7%9B%AE%E5%BD%95/"),
+        request("/missing"),
+        request("/%2e%2e/secret"),
+        request("/app/missing"),
+        request("/missing", verb="POST"),
+        request("/hello.txt", headers={ "Authorization": "Basic dXNlcjpwYXNz" }),
+      ] {
+      let a = handle(wasm, req).wait()
+      let b = handle(native, req).wait()
+      assert_eq(kind(a), kind(b), msg=req)
+      if kind(a) == "handled" {
+        assert_eq(status(a), status(b), msg=req)
+        assert_eq(normalized_headers(a), normalized_headers(b), msg=req)
+        assert_eq(raw_body(a), raw_body(b), msg=req)
+      }
+    }
+  }
+  println(
+    "Native/Wasm same-fixture status/headers/raw-body parity PASS (56 requests)",
+  )
+}
+
+///|
+extern "js" fn app_load() -> @js_async.Promise[Value] =
+  #|() => import('node:url').then(u => import(u.pathToFileURL(process.cwd() + '/' + (process.env.HS_WASM_ENTRY || 'target/wasm') + '/app.mjs')))
+
+///|
+extern "js" fn loader_load() -> @js_async.Promise[Value] =
+  #|() => import('node:url').then(u => import(u.pathToFileURL(process.cwd() + '/' + (process.env.HS_WASM_ENTRY || 'target/wasm') + '/loader.mjs')))
+
+///|
+extern "js" fn load_binary(
+  m : Value,
+  path : String,
+) -> @js_async.Promise[Value] =
+  #|(m,p) => m.loadEngineModule(p)
+
+///|
+extern "js" fn write_base64(
+  fs : Value,
+  path : String,
+  content : String,
+) -> @js_async.Promise[Unit] =
+  #|(fs,p,c) => fs.writeFile(p,Buffer.from(c,'base64'))
+
+///|
+extern "js" fn seed_override() -> String =
+  #|() => process.env.HS_WASM_SEED || ''
+
+///|
+extern "js" fn create(m : Value, config : String) -> @js_async.Promise[Value] =
+  #|(m,c) => m.createEngine(c)
+
+///|
+extern "js" fn handle(e : Value, request : String) -> @js_async.Promise[Value] =
+  #|(e,r) => e.handle(JSON.parse(r))
+
+///|
+extern "js" fn handle_signal(
+  e : Value,
+  request : String,
+  signal : @js_async.AbortSignal,
+) -> @js_async.Promise[Value] =
+  #|(e,r,s) => e.handle({...JSON.parse(r),signal:s})
+
+///|
+extern "js" fn close(e : Value) -> @js_async.Promise[Unit] =
+  #|e => e.close()
+
+///|
+extern "js" fn status(r : Value) -> Int =
+  #|r => r.status || 0
+
+///|
+extern "js" fn kind(r : Value) -> String =
+  #|r => r.kind
+
+///|
+extern "js" fn header(r : Value, name : String) -> String =
+  #|(r,n) => r.headers.find(([k]) => k.toLowerCase() === n.toLowerCase())?.[1] || ''
+
+///|
+extern "js" fn chunk(r : Value) -> @js_async.Promise[String] =
+  #|r => (r.iterator ||= r.body[Symbol.asyncIterator]()).next().then(v => v.done ? '' : v.value.toString('utf8'))
+
+///|
+extern "js" fn destroy(r : Value) -> Unit =
+  #|r => { r.body.destroy(); }
+
+///|
+extern "js" fn on_close(r : Value, callback : () -> Unit) -> Unit =
+  #|(r,f) => { r.body.once('close',f); }
+
+///|
+extern "js" fn active(e : Value) -> Int =
+  #|e => e.states.size
+
+///|
+extern "js" fn tokens(e : Value) -> Int =
+  #|e => e.host.tokens.size
+
+///|
+extern "js" fn budgets(e : Value) -> Int =
+  #|e => e.host.bodyBytes + e.host.directoryBytes
+
+///|
+extern "js" fn mkdir(fs : Value, path : String) -> @js_async.Promise[Unit] =
+  #|(fs,p) => fs.mkdir(p,{recursive:true})
+
+///|
+extern "js" fn write(
+  fs : Value,
+  path : String,
+  content : String,
+) -> @js_async.Promise[Unit] =
+  #|(fs,p,c) => fs.writeFile(p,c)
+
+///|
+extern "js" fn read_text(
+  fs : Value,
+  path : String,
+) -> @js_async.Promise[String] =
+  #|(fs,p) => fs.readFile(p,'utf8')
+
+///|
+extern "js" fn rename(
+  fs : Value,
+  from : String,
+  to : String,
+) -> @js_async.Promise[Unit] =
+  #|(fs,a,b) => fs.rename(a,b)
+
+///|
+extern "js" fn unlink(fs : Value, path : String) -> @js_async.Promise[Unit] =
+  #|(fs,p) => fs.unlink(p)
+
+///|
+extern "js" fn link(
+  fs : Value,
+  target : String,
+  path : String,
+) -> @js_async.Promise[Unit] =
+  #|(fs,t,p) => fs.symlink(t,p,'junction')
+
+///|
+extern "js" fn absolute(path : String) -> String =
+  #|p => process.cwd().replaceAll('\\','/') + '/' + p
+
+///|
+fn[T] code(p : @js_async.Promise[T]) -> @js_async.Promise[String] {
+  promise_code(to_value(p))
+}
+
+///|
+fn[T] to_value(value : T) -> Value = "%identity"
+
+///|
+extern "js" fn promise_code(p : Value) -> @js_async.Promise[String] =
+  #|p => p.then(() => 'OK', e => e.code || String(e))
+
+///|
+extern "js" fn read_function(e : Value) -> Value =
+  #|e => e.host.read.bind(e.host)
+
+///|
+extern "js" fn read_call(
+  f : Value,
+  state : Value,
+  token : Int,
+  offset : Value,
+  count : Int,
+) -> @js_async.Promise[Value] =
+  #|(f,s,t,o,n) => f(s,t,o,n)
+
+///|
+extern "js" fn set_read(
+  e : Value,
+  f : (Value, Int, Value, Int) -> @js_async.Promise[Value],
+) -> Unit =
+  #|(e,f) => { e.host.read=f; }
+
+///|
+extern "js" fn serve(m : Value, config : String) -> @js_async.Promise[Value] =
+  #|(m,c) => m.serve(JSON.parse(c),{port:0})
+
+///|
+extern "js" fn url(s : Value) -> String =
+  #|s => 'http://127.0.0.1:' + s.server.address().port
+
+///|
+extern "js" fn fetch_text(url : String) -> @js_async.Promise[String] =
+  #|u => fetch(u).then(r => r.text())
+
+///|
+extern "js" fn version() -> String =
+  #|() => process.version + ' ' + process.platform + '/' + process.arch
+
+///|
+extern "js" fn wasm_exports(e : Value) -> Value =
+  #|e => e.wasm
+
+///|
+extern "js" fn invoke_complete(
+  w : Value,
+  id : Int,
+  serial : Int,
+  value : String,
+) -> String =
+  #|(w,i,s,v) => w.complete(i,s,v)
+
+///|
+extern "js" fn invoke_begin(w : Value, id : Int, request : String) -> String =
+  #|(w,i,r) => w.begin_request(i,r)
+
+///|
+extern "js" fn invoke_release(w : Value, id : Int) -> Unit =
+  #|(w,i) => {w.release(i);}
+
+///|
+fn request(
+  target : String,
+  verb? : String = "GET",
+  headers? : Json = {},
+) -> String {
+  ({ "method": verb, "target": target, "headers": headers } : Json).stringify()
+}
+
+///|
+async fn body(r : Value) -> String {
+  let output = StringBuilder()
+  for ;; {
+    let next = chunk(r).wait()
+    if next == "" {
+      break
+    }
+    output.write_string(next)
+  }
+  output.to_string()
+}
+
+///|
+async fn drained(e : Value) -> Unit {
+  for _ in 0..<100 {
+    if active(e) == 0 {
+      break
+    }
+    @async.sleep(1)
+  }
+  assert_eq(active(e), 0)
+  assert_eq(tokens(e), 0)
+  assert_eq(budgets(e), 0)
+}
+
+///|
+async fn main {
+  println("Wasm host acceptance: " + version())
+  let m = module_load().wait()
+  let fs = fs_load().wait()
+  let root = "target/wasm-fixture"
+  mkdir(fs, root + "/目录").wait()
+  write(fs, root + "/hello.txt", "hello moonbit\n").wait()
+  write(fs, root + "/index.html", "<h1>wasm</h1>").wait()
+  write(fs, root + "/目录/中文.txt", "你好").wait()
+  write(fs, root + "/zero.bin", "").wait()
+  compressed_fixture(fs, root + "/compressed.txt.gz", "compressed moonbit").wait()
+  write(fs, root + "/compressed.txt", "compressed moonbit").wait()
+  write(fs, root + "/brotli.txt", "brotli").wait()
+  write_base64(fs, root + "/brotli.txt.br", "CwKAYnJvdGxpAw==").wait()
+  if parity_mode() {
+    parity(m, root)
+    return
+  }
+  let loader = loader_load().wait()
+  assert_eq(
+    code(load_binary(loader, root + "/missing.wasm")).wait(),
+    "HS_UNSUPPORTED",
+  )
+  write_base64(fs, root + "/empty.wasm", "AGFzbQEAAAA=").wait()
+  assert_eq(
+    code(load_binary(loader, root + "/empty.wasm")).wait(),
+    "HS_UNSUPPORTED",
+  )
+  write(fs, root + "/invalid.wasm", "not wasm").wait()
+  assert_eq(
+    code(load_binary(loader, root + "/invalid.wasm")).wait(),
+    "HS_UNSUPPORTED",
+  )
+  let large = StringBuilder()
+  for _ in 0..<32768 {
+    large.write_string("0123456789abcdef")
+  }
+  let large = large.to_string()
+  write(fs, root + "/large.bin", large).wait()
+  let e = create(m, ({ "root": root } : Json).stringify()).wait()
+  defer close(e).wait()
+  let r = handle(e, request("/hello.txt")).wait()
+  assert_eq(status(r), 200)
+  assert_eq(header(r, "Content-Length"), "14")
+  let etag = header(r, "ETag")
+  assert_eq(body(r), "hello moonbit\n")
+  for
+    (target, headers, expected_status, expected_body) in [
+      ("/hello.txt", ({ "Range": "bytes=2-5" } : Json), 206, "llo "),
+      (
+        "/hello.txt",
+        ({ "Range": "bytes=900-" } : Json),
+        416,
+        "Requested range not satisfiable",
+      ),
+      ("/hello.txt", ({ "If-None-Match": etag } : Json), 304, ""),
+      (
+        "/hello.txt",
+        ({ "Range": "bytes=2-5", "If-None-Match": etag } : Json),
+        206,
+        "llo ",
+      ),
+      (
+        "/hello.txt",
+        ({ "Range": "bytes=2-5", "If-Range": etag } : Json),
+        200,
+        "hello moonbit\n",
+      ),
+      ("/zero.bin", ({} : Json), 200, ""),
+      ("/%2e%2e/secret", ({} : Json), 403, "Access denied"),
+      ("/?%", ({} : Json), 400, "Bad Request"),
+    ] {
+    let r = handle(e, request(target, headers~)).wait()
+    assert_eq(status(r), expected_status)
+    assert_eq(body(r), expected_body)
+  }
+  let head = handle(
+    e,
+    request("/hello.txt", verb="HEAD", headers={ "Range": "bytes=2-5" }),
+  ).wait()
+  assert_eq(status(head), 206)
+  assert_eq(header(head, "Content-Length"), "4")
+  assert_eq(body(head), "")
+  let redirect = handle(e, request("/%E7%9B%AE%E5%BD%95?x=1")).wait()
+  assert_eq(status(redirect), 302)
+  assert_eq(header(redirect, "Location"), "/%E7%9B%AE%E5%BD%95/?x=1")
+  ignore(body(redirect))
+  let listing = handle(e, request("/%E7%9B%AE%E5%BD%95/")).wait()
+  assert_eq(status(listing), 200)
+  assert_true(body(listing).contains("中文.txt"))
+  drained(e)
+  println("GET/HEAD/cache/Range/Unicode/directory/security PASS")
+  compressed_fixture(fs, root + "/compressed.txt.gz", "compressed moonbit").wait()
+  write(fs, root + "/compressed.txt", "compressed moonbit").wait()
+  let compressed = handle(
+    e,
+    request("/compressed.txt", headers={ "Accept-Encoding": "gzip" }),
+  ).wait()
+  assert_eq(header(compressed, "Content-Encoding"), "gzip")
+  assert_eq(decoded_gzip(compressed).wait(), "compressed moonbit")
+  drained(e)
+  println("Precompressed file bytes PASS")
+  let spa = create(
+    m,
+    ({ "root": root, "base_url": "/app", "spa": true } : Json).stringify(),
+  ).wait()
+  assert_eq(
+    body(handle(spa, request("/app/missing.js")).wait()),
+    "<h1>wasm</h1>",
+  )
+  let outside = handle(spa, request("/outside")).wait()
+  assert_eq(status(outside), 403)
+  ignore(body(outside))
+  let post = handle(spa, request("/app/missing", verb="POST")).wait()
+  assert_eq(kind(post), "next")
+  close(spa).wait()
+  drained(spa)
+  assert_eq(
+    code(
+      create(
+        m,
+        ({ "root": root, "spa": true, "try_files": "index.html" } : Json).stringify(),
+      ),
+    ).wait(),
+    "HS_INVALID_REQUEST",
+  )
+  assert_eq(
+    code(
+      create(
+        m,
+        ({ "root": root, "proxy": "http://example.com" } : Json).stringify(),
+      ),
+    ).wait(),
+    "HS_INVALID_REQUEST",
+  )
+  let auth = create(
+    m,
+    ({ "root": root, "spa": true, "basic_auth": ["user", "pass"] } : Json).stringify(),
+  ).wait()
+  let denied = handle(auth, request("/missing.js")).wait()
+  assert_eq(status(denied), 401)
+  ignore(body(denied))
+  close(auth).wait()
+  let next = create(
+    m,
+    ({ "root": root, "handle_error": false } : Json).stringify(),
+  ).wait()
+  assert_eq(kind(handle(next, request("/missing")).wait()), "next")
+  close(next).wait()
+  println("BaseURL/SPA/Next/configuration/auth PASS")
+
+  // The bridge rejects delayed, duplicate and recycled request completions.
+  let w = wasm_exports(e)
+  let control = "{\"method\":\"GET\",\"target\":\"/hello.txt\",\"headers\":[]}"
+  assert_true(invoke_begin(w, 1000000, control).contains("\"kind\":\"open\""))
+  assert_true(
+    invoke_complete(w, 1000000, 1, "null").contains("\"kind\":\"error\""),
+  )
+  ignore(invoke_complete(w, 1000000, 0, "null"))
+  assert_true(
+    invoke_complete(w, 1000000, 0, "null").contains("\"kind\":\"error\""),
+  )
+  invoke_release(w, 1000000)
+  assert_true(
+    invoke_complete(w, 1000000, 1, "null").contains("\"kind\":\"error\""),
+  )
+
+  // Same handle survives path replacement; truncate and same-length writes fail.
+  write(fs, root + "/mutable.bin", large).wait()
+  let old = handle(e, request("/mutable.bin")).wait()
+  write(fs, root + "/replacement.bin", "replacement").wait()
+  let replaced = code(
+    rename(fs, root + "/replacement.bin", root + "/mutable.bin"),
+  ).wait()
+  if replaced != "OK" {
+    assert_true(version().contains("win32"))
+    assert_eq(replaced, "EPERM")
+    println(
+      "Windows Node fs.rename cannot atomically replace this open target (EPERM); testing rename-away + replacement separately; atomic replacement remains platform-limited.",
+    )
+    ignore(code(unlink(fs, root + "/retained-old.bin")).wait())
+    rename(fs, root + "/mutable.bin", root + "/retained-old.bin").wait()
+    rename(fs, root + "/replacement.bin", root + "/mutable.bin").wait()
+  }
+  assert_eq(body(old), large)
+  for content in ["short", large] {
+    write(fs, root + "/mutable.bin", large).wait()
+    let changed = handle(e, request("/mutable.bin")).wait()
+    @async.sleep(10)
+    write(fs, root + "/mutable.bin", content).wait()
+    assert_eq(code(chunk(changed)).wait(), "HS_FILE_CHANGED")
+  }
+  drained(e)
+  let abort = @js_async.AbortController::new()
+  let abandoned = handle_signal(e, request("/large.bin"), abort.signal()).wait()
+  abort.abort()
+  assert_eq(code(chunk(abandoned)).wait(), "HS_CANCELLED")
+  drained(e)
+  let never = @js_async.AbortController::new()
+  never.abort()
+  assert_eq(
+    code(handle_signal(e, request("/large.bin"), never.signal())).wait(),
+    "HS_CANCELLED",
+  )
+  let slow = handle(e, request("/large.bin")).wait()
+  @async.sleep(10)
+  assert_eq(active(e), 1)
+  assert_true(tokens(e) > 0)
+  destroy(slow)
+  drained(e)
+  println("FILE_CHANGED/replacement/abort/backpressure/stale completion PASS")
+
+  let limited = create(
+    m,
+    ({ "root": root, "limits": { "connections": 1 } } : Json).stringify(),
+  ).wait()
+  let one = handle(limited, request("/large.bin")).wait()
+  assert_eq(
+    code(handle(limited, request("/hello.txt"))).wait(),
+    "HS_OVERLOADED",
+  )
+  destroy(one)
+  drained(limited)
+  close(limited).wait()
+  let tiny = create(
+    m,
+    ({ "root": root, "limits": { "directory_metadata_bytes": 1 } } : Json).stringify(),
+  ).wait()
+  assert_eq(
+    code(handle(tiny, request("/%E7%9B%AE%E5%BD%95/"))).wait(),
+    "HS_OVERLOADED",
+  )
+  drained(tiny)
+  close(tiny).wait()
+
+  // Inject a read completion after cancellation, with test scheduling in MoonBit.
+  let race = create(m, ({ "root": root } : Json).stringify()).wait()
+  let original = read_function(race)
+  let mut arrived = false
+  let mut released = false
+  set_read(race, fn(state, token, offset, count) {
+    @js_async.Promise::from_async(async fn() {
+      let result = read_call(original, state, token, offset, count).wait()
+      arrived = true
+      while !released {
+        @async.sleep(1)
+      }
+      result
+    })
+  })
+  let response = handle(race, request("/large.bin")).wait()
+  let mut notifications = 0
+  on_close(response, fn() { notifications += 1 })
+  let pending = code(chunk(response))
+  for _ in 0..<100 {
+    if arrived {
+      break
+    }
+    @async.sleep(1)
+  }
+  assert_true(arrived)
+  let stopped = close(race)
+  assert_true(tokens(race) > 0)
+  released = true
+  assert_eq(pending.wait(), "HS_CLOSED")
+  stopped.wait()
+  drained(race)
+  assert_eq(notifications, 1)
+  @async.sleep(5)
+  assert_eq(notifications, 1)
+  assert_eq(code(handle(race, request("/hello.txt"))).wait(), "HS_CLOSED")
+  close(race).wait()
+  println("Resource limits/late completion/close barrier PASS")
+
+  let planning = create(m, ({ "root": root } : Json).stringify()).wait()
+  let original = read_function(planning)
+  let mut planning_arrived = false
+  let mut planning_release = false
+  set_read(planning, fn(s, t, o, n) {
+    @js_async.Promise::from_async(async fn() {
+      let bytes = read_call(original, s, t, o, n).wait()
+      planning_arrived = true
+      while !planning_release {
+        @async.sleep(1)
+      }
+      bytes
+    })
+  })
+  let controller = @js_async.AbortController::new()
+  let submitted = code(
+    handle_signal(planning, request("/hello.txt"), controller.signal()),
+  )
+  for _ in 0..<100 {
+    if planning_arrived {
+      break
+    }
+    @async.sleep(1)
+  }
+  assert_true(planning_arrived)
+  controller.abort()
+  assert_true(tokens(planning) > 0)
+  planning_release = true
+  assert_eq(submitted.wait(), "HS_CANCELLED")
+  close(planning).wait()
+  drained(planning)
+  println("Cancellation during response planning PASS")
+
+  // Saved-seed short-read and cancellation replay. No JS test driver or loops.
+  write(fs, root + "/fragment.bin", large[:4096].to_owned()).wait()
+  let chosen = seed_override()
+  let seeds = if chosen == "" {
+    read_text(fs, "testdata/wasm/seeds.txt").wait()
+  } else {
+    chosen
+  }
+  for line in seeds.split("\n") {
+    if line.trim().is_empty() {
+      continue
+    }
+    let seed = @string.parse_int(line.trim())
+    println("replay seed=" + seed.to_string())
+    let replay = create(m, ({ "root": root } : Json).stringify()).wait()
+    let original = read_function(replay)
+    let mut state = seed
+    let mut reads = 0
+    set_read(replay, fn(s, t, o, n) {
+      state = (state * 1664525 + 1013904223) & 0x7fffffff
+      reads += 1
+      read_call(original, s, t, o, Int::min(n, 1 + state % 127))
+    })
+    let full = handle(replay, request("/fragment.bin")).wait()
+    assert_eq(body(full), large[:4096].to_owned())
+    assert_true(reads > 1)
+    drained(replay)
+    let abort = @js_async.AbortController::new()
+    let partial = handle_signal(
+      replay,
+      request("/fragment.bin"),
+      abort.signal(),
+    ).wait()
+    ignore(chunk(partial).wait())
+    abort.abort()
+    ignore(code(chunk(partial)).wait())
+    close(replay).wait()
+    drained(replay)
+    println("seed=" + seed.to_string() + " short-read/cancel/close PASS")
+  }
+
+  // Junctions work without Windows symlink privilege and cover the same boundary.
+  let linkpath = root + "/linked"
+  ignore(code(unlink(fs, linkpath)).wait())
+  link(fs, absolute(root + "/目录"), linkpath).wait()
+  assert_eq(
+    code(handle(e, request("/linked/%E4%B8%AD%E6%96%87.txt"))).wait(),
+    "HS_FORBIDDEN",
+  )
+  assert_eq(
+    code(create(m, ({ "root": linkpath } : Json).stringify())).wait(),
+    "HS_FORBIDDEN",
+  )
+  unlink(fs, linkpath).wait()
+  drained(e)
+  let app = app_load().wait()
+  let server = serve(app, ({ "root": root } : Json).stringify()).wait()
+  assert_eq(fetch_text(url(server) + "/hello.txt").wait(), "hello moonbit\n")
+  disconnect_http(url(server) + "/large.bin").wait()
+  drained(server_engine(server))
+  close(server).wait()
+  close(e).wait()
+  drained(e)
+  println("Real HTTP/link rejection/multi-instance PASS")
+}

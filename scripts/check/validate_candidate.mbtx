@@ -42,6 +42,9 @@ async fn main {
   @shell.Cmd("moon", ["check", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", [
+    "test", "internal/static_plan", "--target", "wasm-gc", "--deny-warn",
+  ]).run()
+  @shell.Cmd("moon", [
     "test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn",
   ]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_native_sanitizers.mbtx"]).run()

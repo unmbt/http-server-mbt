@@ -1,0 +1,25 @@
+import {
+  "unmbt/http-server-mbt/core",
+  "unmbt/http-server-mbt/internal/static_plan" @plan,
+  "unmbt/http-server-mbt/internal/request_headers",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+}
+
+supported_targets = "wasm-gc"
+
+options(
+  link: {
+    "wasm-gc": {
+      "exports": [
+        "abi_version",
+        "configure",
+        "begin_request",
+        "complete",
+        "take_chunk",
+        "release",
+      ],
+      "use-js-builtin-string": true,
+    },
+  },
+)

@@ -1,0 +1,73 @@
+///|
+// R-N10 / D-13 / T-029. One build entrypoint for local development and CI.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/core/env",
+}
+
+///|
+async fn toolchain_root() -> String {
+  for name in ["MOON_HOME", "MOON_TOOLCHAIN_ROOT"] {
+    if @env.get_env_var(name) is Some(root) &&
+      @fs.exists(root + "/lib/core/LICENSE") {
+      return root
+    }
+  }
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let found = @shell.Cmd(if windows { "where.exe" } else { "which" }, ["moon"]).output()
+  found.check()
+  let path = found
+    .stdout()
+    .split("\n")
+    .next()
+    .unwrap()
+    .trim()
+    .to_owned()
+    .replace_all(old="\\", new="/")
+  guard path.strip_suffix(if windows { "/bin/moon.exe" } else { "/bin/moon" })
+    is Some(root) else {
+    fail("Set MOON_HOME to locate the actual toolchain licenses")
+  }
+  root.to_owned()
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", [
+    "build", "wasm", "--target", "wasm-gc", "--release", "--deny-warn",
+  ]).run()
+  if !@fs.exists("target/wasm") {
+    @fs.mkdir("target/wasm", recursive=true)
+  }
+  @fs.write_file(
+    "target/wasm/engine.wasm",
+    @fs.read_file("_build/wasm-gc/release/build/wasm/wasm.wasm").binary(),
+  )
+  for
+    name in [
+      "app.mjs", "index.mjs", "host.mjs", "loader.mjs", "index.d.ts", "README.md",
+    ] {
+    @fs.write_file(
+      "target/wasm/" + name,
+      @fs.read_file("examples/wasm-node/" + name),
+    )
+  }
+  @fs.write_file("target/wasm/LICENSE", @fs.read_file("LICENSE"))
+  if !@fs.exists("target/wasm/licenses") {
+    @fs.mkdir("target/wasm/licenses", recursive=true)
+  }
+  let root = toolchain_root()
+  for
+    (source, name) in [
+      ("LICENSE", "MoonBit-core-LICENSE.txt"),
+      ("NOTICE", "MoonBit-core-NOTICE.txt"),
+    ] {
+    @fs.write_file(
+      "target/wasm/licenses/" + name,
+      @fs.read_file(root + "/lib/core/" + source),
+    )
+  }
+  println("Built target/wasm/engine.wasm")
+}

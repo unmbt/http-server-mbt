@@ -19,7 +19,12 @@ async fn check_directory(path : String) -> Int {
     if @fs.kind(child) is Directory {
       checked += check_directory(child)
     } else if child.has_suffix(".mbtx") {
-      @shell.Cmd("moon", ["check", child, "--deny-warn"]).run()
+      let target = if entry == "check_wasm_host.mbtx" {
+        ["--target", "js"]
+      } else {
+        []
+      }
+      @shell.Cmd("moon", ["check", child, "--deny-warn", ..target]).run()
       checked += 1
     }
   }

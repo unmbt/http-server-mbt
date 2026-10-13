@@ -177,9 +177,9 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：静态嵌入引擎的 .node，调用库托管 hs_* 异步接口，映射 Promise/流/AbortSignal/close 和按 napi_env 清理；不在 addon 重建手动轮询线程。三平台预构建、Linux glibc/musl 区分与构建说明。
   - 验收：N-14 和 Node 嵌入适用静态行为；Node 22/24、Node-API v8 范围实际验证，主循环不因引擎阻塞，慢消费有背压。多 Worker/实例退出、取消和空闲自然退出均无悬空回调或泄漏；缺少预构建明确报错，候选 npm 包可独立安装加载。实际发布另行记录，Bun/Deno 不纳入此任务承诺。
 
-- [ ] **T-029 可运行 wasm-gc 实验引擎** — 状态：进行中（2026-10-13，Node WasmGC 完整静态示例）。需求：R-N10、R-SAFE、R-N14；设计：D-02、D-04、D-06、D-13；依赖：T-002、T-015、T-018、T-019。
-  - 首次 Actions run 38376725796 三平台因安装器 `latest` 与既有工具链门槛不一致而提前失败；按 D-16 固定 toolchain/core 安装版本，等待修复提交重跑，详见实施记录。
-  - Windows 分项：真实 WasmGC、共享 Native/planner、Node 22.21.1/24.10.0 文件宿主与 HTTP 示例已实现并验证；Native 273/273，共享 wasm-gc 35/35。N-20 文件变化与取消/关闭回放纳入候选。实现、命令、哈希、平台限制及待补远程证据见 [实施记录](wasm-node-20261013.md)。三平台总验收未完成。
+- [x] **T-029 可运行 wasm-gc 实验引擎** — 状态：已完成（2026-10-13，本轮确认的 Node WasmGC 静态示例范围）。需求：R-N10、R-SAFE、R-N14；设计：D-02、D-04、D-06、D-13；依赖：T-002、T-015、T-018、T-019。
+  - 首次 Actions run 38376725796 三平台因安装器 `latest` 与既有工具链门槛不一致而提前失败；按 D-16 固定 toolchain/core 后，[run 38378097351](https://github.com/unmbt/http-server-mbt/actions/runs/38378097351) 在提交 `8fb666c19165f28f5a1dfc6b4138dd234c7ed49a` 三平台及 candidate-gate 全部通过。
+  - 实际 Windows x64、Linux x64、macOS arm64，各运行 Node 22.21.1/24.10.0 宿主与 HTTP 验收、每版 56 个 Native/Wasm 差分请求及固定种子回放；Native 273/273，共享 wasm-gc 35/35。Job 链接、产物哈希、N-20 检测边界和 Windows 原子覆盖 EPERM 限制见 [实施记录](wasm-node-20261013.md)，操作步骤见[使用指南](wasm-node-guide.zh.md)。此状态不扩展到云平台、浏览器宿主或完整项目发行。
   - 交付：共享 core 的真实 wasm-gc、内部 operation/token/有界流协议，Node 22/24 文件宿主适配器自动处理完成/取消及关闭；应用使用异步 API，文件宿主提供变更观察能力，保留确定性内存 fixtures。
   - 验收：N-15/N-19；真实文件/目录请求与 Native 共享语义，无应用手动调度、不加载 .node/未实现 async 路径，能力缺失清楚失败、token 最终回收；文件变更在 T-033 重验，TCP/TLS/代理完整服务器仍在实验范围外。
 

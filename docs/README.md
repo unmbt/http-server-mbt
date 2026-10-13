@@ -7,6 +7,7 @@
 | 文档 | 用途 |
 |---|---|
 | [Node WasmGC 示例](wasm-node-20261013.md) | T-029 共享决策、Node 宿主、受信目录边界与平台验证证据 |
+| [Node WasmGC 中文使用指南](wasm-node-guide.zh.md) | 构建、候选产物、启动配置、Node 嵌入、错误处理与资源限制 |
 | [proposal](proposal.md) | 需求及兼容基线；开头的项目现状是建立规范时的历史背景 |
 | [design](design.md) | 当前行为、接口、平台与资源契约，按日期修订和稳定 D 编号查阅 |
 | [tasks](tasks.md) | T 编号状态、依赖、原版 42 文件及 C/CC/CE 迁移矩阵 |

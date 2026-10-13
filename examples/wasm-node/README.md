@@ -3,12 +3,20 @@
 The HTTP/static decisions execute in a real MoonBit WasmGC module, shared with
 the Native engine. Node provides asynchronous filesystem access and HTTP sockets.
 The example does not load a `.node` addon. Supported acceptance hosts are Node
-22.21.1 and 24.10.0 on Windows x64, Linux x64 and macOS arm64; remote acceptance
-is tracked separately in T-029.
+22.21.1 and 24.10.0 on Windows x64, Linux x64 and macOS arm64. All six host
+combinations passed [candidate acceptance](https://github.com/unmbt/http-server-mbt/actions/runs/38378097351)
+for commit `8fb666c19165f28f5a1dfc6b4138dd234c7ed49a`, including 56 Native/Wasm
+differential requests per combination. This remains an experimental Node host;
+browser execution, cloud platforms, TLS and proxies are outside its scope.
 
 ## Build and run from the repository
 
+Use the validated MoonBit toolchain/core release `0.10.14+7d59c7ec9`
+(`moon version --all` reports Moon `0.1.20260920`) and a supported Node version.
+Run from the repository root:
+
 ```powershell
+moon update
 moon run scripts/build/build_wasm.mbtx
 $env:HS_ROOT = "testdata/public"
 node examples/wasm-node/app.mjs
@@ -26,7 +34,44 @@ together and run `node app.mjs` inside that directory, setting `HS_ROOT` to your
 deployment directory. The loader first uses its adjacent `engine.wasm`; the
 source example uses the repository build output when no adjacent binary exists.
 
+To run without building, download a `candidate-*` artifact from the acceptance
+run above and keep its complete `wasm/` directory, including `LICENSE` and
+`licenses/`. Set `HS_ROOT` to an absolute directory path and run `node app.mjs`
+there. Runtime use needs only Node: no MoonBit, C compiler, npm installation or
+Native addon. CI artifacts currently expire after 14 days; rebuild the same
+commit when they are unavailable. They are candidate artifacts, not an npm release.
+
+For a quick HTTP check, run `curl -I http://127.0.0.1:8080/hello.txt`, then
+`curl -i -H 'Range: bytes=0-4' http://127.0.0.1:8080/hello.txt` (use `curl.exe`
+in PowerShell). Expect 206, `Content-Range: bytes 0-4/14`, and body `hello`.
+
+## Configuration
+
+`HS_ROOT` overrides `HS_CONFIG.root`; relative roots resolve from the process
+working directory. `PORT` defaults to 8080; `PORT=0` selects a free port.
+`HS_CONFIG` is a JSON object containing only static engine options, for example:
+
+```powershell
+$env:HS_ROOT = "D:/sites/public"
+$env:PORT = "8081"
+$env:HS_CONFIG = '{"base_url":"/app","spa":true,"show_dir":false,"cache_seconds":-1}'
+node examples/wasm-node/app.mjs
+```
+
+Open `http://127.0.0.1:8081/app/`; SPA requires a readable root `index.html`.
+Choose either `spa` or `try_files`, not both. The latter names a root-relative
+fallback file. Custom 404 content uses root `404.html`. Defaults include
+`default_ext: "html"`, `auto_index: true`, `show_dir: true`,
+`show_dotfiles: false`, `cache_seconds: 3600`, `gzip: true`, and `brotli: false`.
+Compression selects existing `.gz`/`.br` files; it does not compress on demand.
+Unknown options are rejected. Port/address belong to the HTTP host, not
+`createEngine` or `HS_CONFIG`.
+
 ## Embed the engine
+
+Save this snippet alongside `index.mjs` (in the example or distribution
+directory), or adjust the import to that file. `./public` resolves from the
+process working directory and must exist:
 
 ```javascript
 import { createEngine } from './index.mjs';
@@ -51,6 +96,17 @@ consumption. `next` commits nothing. A handled response has header pairs,
 `bigint | null` content length, and a Node Readable/AsyncIterable body. Consume
 or destroy each body. Always await the idempotent `close()` before unloading.
 There is no application polling loop or permanent timer.
+
+Pass a raw path/query such as `/app/file.txt?download=1` as `target`, not an
+absolute URL. Convert `contentLength` explicitly to a string if putting it in
+JSON. `handle_error: false` delegates applicable unhandled requests as `next`;
+the standalone HTTP example maps `next` to 404.
+
+For programmatic HTTP startup, import `serve` from `app.mjs` and call
+`await serve(config, { port: 8080, address: '127.0.0.1' })`. It returns
+`{ server, engine, close }`; await its `close()` to stop admission and drain.
+When adapting another framework, follow `app.mjs` for raw headers, disconnect
+cancellation, write backpressure and post-header stream failures.
 
 Static options and defaults follow the Native middleware: GET/HEAD, conditional
 requests, Range, MIME/charset, precompressed gzip/Brotli, directory/index pages,
@@ -91,7 +147,7 @@ are never reused within an instance. Exhaustion rejects admission.
 ## Verification and packaging
 
 ```powershell
-$env:HS_WASM_NODE = "D:/path/to/node-22.21.1.exe"
+$env:HS_WASM_NODE = "D:/runtimes/node22/node.exe"
 moon run scripts/check/check_wasm_candidate.mbtx
 ```
 
@@ -112,3 +168,20 @@ the actual compiler installation's core LICENSE/NOTICE. It requires Node and
 WasmGC/JS string builtins; it is not a Native standalone or zero-copy artifact.
 No Native runtime objects, TLS library or async Wasm event-loop implementation
 are linked into this Wasm engine.
+
+## Troubleshooting
+
+| Error | Check |
+| --- | --- |
+| `HS_UNSUPPORTED` | Matching Wasm/host files, supported Node version; inspect `error.cause` |
+| `HS_INVALID_REQUEST` | Option names/types, conflicting fallbacks, missing fallback file |
+| `HS_FORBIDDEN` | Permissions, root boundary, symlinks/junctions |
+| `HS_OVERLOADED` | Consume/destroy bodies, lower concurrency, or adjust `limits` |
+| `HS_FILE_CHANGED` | Discard the response and restart at offset zero if retrying |
+| `HS_CANCELLED` / `HS_CLOSED` | Request was aborted or the engine is closing |
+| `EADDRINUSE` at startup | Change `PORT` or stop the existing listener |
+
+Planning errors reject the handle Promise; body errors propagate through the
+Readable. Default per-engine limits are 4 file workers, 256 queued operations,
+1024 active requests, 64 KiB body blocks, and 64 MiB each for body and directory
+metadata budgets. The `connections` engine limit counts requests, not Node sockets.

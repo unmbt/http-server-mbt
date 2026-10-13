@@ -15,7 +15,7 @@
 
 </div>
 
-Experimental [Node WasmGC static-server example](examples/wasm-node/README.md): shared MoonBit decisions, streamed host I/O, Node 22/24, and an explicit trusted-directory boundary. [Implementation and validation](docs/wasm-node-20261013.md).
+Experimental [Node WasmGC static-server example](examples/wasm-node/README.md): build or run a CI artifact, configure a static site, and embed it in Node without a `.node` addon. Validated on Windows x64, Linux x64 and macOS arm64 with Node 22.21.1/24.10.0. [中文使用指南](docs/wasm-node-guide.zh.md) · [Implementation and validation](docs/wasm-node-20261013.md).
 
 <a id="platform-support"></a>
 

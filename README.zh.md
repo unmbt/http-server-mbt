@@ -15,7 +15,7 @@
 
 </div>
 
-实验性 [Node WasmGC 静态服务示例](examples/wasm-node/README.md)：复用 MoonBit 静态决策，宿主流式 I/O，支持 Node 22/24，明确受信目录边界。[实现与验证记录](docs/wasm-node-20261013.md)。
+实验性 [Node WasmGC 使用指南](docs/wasm-node-guide.zh.md)：包含源码构建、CI 产物直接运行、静态选项和 Node 嵌入示例。Windows x64、Linux x64、macOS arm64 的 Node 22.21.1/24.10.0 均已通过验收；运行时不加载 `.node`。[实现与验证记录](docs/wasm-node-20261013.md)。
 
 <a id="platform-support"></a>
 

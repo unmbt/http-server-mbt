@@ -411,6 +411,8 @@ npm 包包含 JS/类型声明、平台预构建选择和缺失目标诊断；Lin
 
 ## D-13 实验性 wasm-gc 共享引擎
 
+2026-10-13 验收补记：提交 `8fb666c19165f28f5a1dfc6b4138dd234c7ed49a` 的三平台 Node 22/24 候选与汇总检查已通过，T-029 按下述已确认实验范围完成；[证据](wasm-node-20261013.md)和[使用指南](wasm-node-guide.zh.md)分别记录可验证结果与运行方法。实验边界及其他任务门槛保持不变。
+
 2026-10-13 T-029 实施修订（用户确认）：Node 22.21.1/24.10.0 示例使用受信部署目录，拒绝 symlink/junction（含根路径组件），目录结构由部署者控制，不承诺抵御恶意并发目录替换；不冒充 D-03 Native 目录句柄锚定。文件内容可以更新，仍执行 D-17 检测、中断与排空。共享同步决策机提出带继续步骤的文件操作，Native/Wasm 适配器自动完成，不导入 wasm-gc 未实现的 async event loop。Node 暴露 createEngine/handle/close、Readable 和 AbortSignal；操作与文件 token 独立于 GC 管理，64 位元数据无损传递。默认块大小及预算复用 core，默认监听 127.0.0.1:8080，不加载 .node。TLS/代理/云部署/registry 发布不属于此分项；N-15/N-19/N-20 与三平台 Node 22/24 验收，缺远程证据时总任务不勾选。
 
 公开 core 包只包含可移植请求/元数据/选项、路径与表示决策、缓存/Range 和目录渲染。Native 编排与 wasm-gc 适配均调用它；不能维护第二套有不同 BaseURL/SPA/安全语义的引擎。Native 根包和 server 包保持 Native-only，单独检查/构建 core 的 wasm-gc，不要求所有包执行 `--target all`。

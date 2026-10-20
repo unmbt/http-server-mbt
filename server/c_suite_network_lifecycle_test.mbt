@@ -331,8 +331,8 @@ test "C037 & C040: Proxy configuration and protocol scheme preflight checks" {
     }
     assert_true(failed)
   }
-  for target in ["ws://127.0.0.1:8080","wss://localhost:8443"] {
-    @core.validate_config({..base_cfg,proxy:Some(target),websocket:true})
+  for target in ["ws://127.0.0.1:8080", "wss://localhost:8443"] {
+    @core.validate_config({ ..base_cfg, proxy: Some(target), websocket: true, })
   }
 
   // Valid proxy with http and https schemes

@@ -14,6 +14,7 @@ pub(all) suberror ConfigError {
   InvalidTimeout(String)
   InvalidTls(String)
   InvalidLimits(String)
+  InvalidBackend(String)
 } derive(Eq, Debug)
 
 ///|
@@ -31,6 +32,7 @@ pub fn ConfigError::to_string(self : ConfigError) -> String {
     InvalidTimeout(s) => "InvalidTimeout: " + s
     InvalidTls(s) => "InvalidTls: " + s
     InvalidLimits(s) => "InvalidLimits: " + s
+    InvalidBackend(s) => "InvalidBackend: " + s
   }
 }
 
@@ -44,6 +46,7 @@ pub impl Show for ConfigError with fn output(self, logger) {
 /// Contains all configuration settings for protocol, static resolution,
 /// routing mounts, SPA fallback, security policies, and upstream proxies.
 pub(all) struct Config {
+  io_backend : IoBackend
   limits : RuntimeLimits
   // --- Filesystem & Network ---
   root : String // Filesystem root directory (default "." or "public")
@@ -116,6 +119,7 @@ pub(all) struct Config {
 pub fn Config::default(root : String) -> Config {
   {
     root,
+    io_backend: Platform,
     limits: RuntimeLimits::default(),
     port: 8080,
     address: "0.0.0.0",
@@ -215,10 +219,12 @@ pub fn Config::has_tls(self : Config) -> Bool {
 /// Inline/file proxy rules are conservatively treated as HTTPS when their
 /// configuration contains an `https://` target.
 pub fn Config::proxy_targets_include_https(self : Config) -> Bool {
-  if self.proxy is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
+  if self.proxy is Some(url) &&
+    (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
-  if self.proxy_all is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
+  if self.proxy_all is Some(url) &&
+    (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
   match self.proxy_config {
@@ -322,8 +328,13 @@ pub fn validate_try_files_path(path : String) -> String raise ConfigError {
 ///|
 /// Validate upstream proxy URL format (http:// or https:// with valid host/port).
 pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
-  let url=if url.has_prefix("wss://") { "https://"+url[6:].to_owned() }
-    else if url.has_prefix("ws://") { "http://"+url[5:].to_owned() } else { url }
+  let url = if url.has_prefix("wss://") {
+    "https://" + url[6:].to_owned()
+  } else if url.has_prefix("ws://") {
+    "http://" + url[5:].to_owned()
+  } else {
+    url
+  }
   if !url.has_prefix("http://") && !url.has_prefix("https://") {
     raise ConfigError::InvalidProxy(
       "proxy URL must start with http:// or https://",
@@ -374,6 +385,15 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
   config.limits.validate()
   ignore(validate_root(config.root))
   ignore(normalize_base_url(config.base_url))
+
+  // The completion-based network listener is not wired into the public
+  // Server/Plain transports yet. Reject it before any listener is created
+  // instead of silently running the epoll path under an io_uring label.
+  if config.io_backend is IoUring {
+    raise ConfigError::InvalidBackend(
+      "io_uring network backend is not available yet; use io_uring-file for the Linux file-I/O experiment",
+    )
+  }
 
   if config.port < 0 || config.port > 65535 {
     raise ConfigError::InvalidPort("port must be between 0 and 65535")
@@ -464,7 +484,6 @@ pub fn parse_auth_credential(str : String) -> (String, String)? {
     None => None
   }
 }
-
 
 ///|
 pub extend ConfigError with Eq::{not_equal, equal}

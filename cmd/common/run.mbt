@@ -16,10 +16,13 @@ async fn eprint_err(msg : String) -> Unit {
 }
 
 ///|
-pub async fn run(thin~ : Bool, launch : async (@core.Config, Int, async () -> Unit) -> Unit) -> Unit {
+pub async fn run(
+  thin~ : Bool,
+  launch : async (@core.Config, Int, async () -> Unit) -> Unit,
+) -> Unit {
   let argv = @env.args()
   let args = if argv.length() > 1 { argv[1:] } else { [] }
-  let (config, port) = match parse_cli(args,thin~) {
+  let (config, port) = match parse_cli(args, thin~) {
     Ok(Help(msg)) => {
       println(msg)
       return
@@ -83,4 +86,3 @@ pub async fn run(thin~ : Bool, launch : async (@core.Config, Int, async () -> Un
     }
   }
 }
-

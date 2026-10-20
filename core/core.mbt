@@ -32,7 +32,6 @@ pub fn ResponseBody::length(self : ResponseBody) -> Int {
   }
 }
 
-
 ///|
 pub extend Method with Eq::{not_equal, equal}
 

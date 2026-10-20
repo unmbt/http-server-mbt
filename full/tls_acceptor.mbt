@@ -38,10 +38,15 @@ pub impl @server.UpstreamConnector for TlsUpstreamConnector with fn connect(
       reader=tcp,
       writer=tcp,
     )
-    @server.Transport::custom(tls_conn, tls_conn, shutdown_write_fn=() => tls_conn.shutdown_write(), close_fn=fn() {
-      tls_conn.close()
-      tcp.close()
-    })
+    @server.Transport::custom(
+      tls_conn,
+      tls_conn,
+      shutdown_write_fn=() => tls_conn.shutdown_write(),
+      close_fn=fn() {
+        tls_conn.close()
+        tcp.close()
+      },
+    )
   } else {
     @server.Transport::plain(tcp)
   }
@@ -55,10 +60,15 @@ pub impl @server.UpstreamConnector for TlsUpstreamConnector with fn close(self) 
 ///|
 pub impl @server.Acceptor for TlsServerAcceptor with fn accept(self, tcp) {
   let tls_conn = self.tls_acceptor.accept(reader=tcp, writer=tcp)
-  @server.Transport::custom(tls_conn, tls_conn, shutdown_write_fn=() => tls_conn.shutdown_write(), close_fn=fn() {
-    tls_conn.close()
-    tcp.close()
-  })
+  @server.Transport::custom(
+    tls_conn,
+    tls_conn,
+    shutdown_write_fn=() => tls_conn.shutdown_write(),
+    close_fn=fn() {
+      tls_conn.close()
+      tcp.close()
+    },
+  )
 }
 
 ///|
@@ -180,9 +190,15 @@ pub async fn build_upstream_connector(
   TlsUpstreamConnector::new(acceptor)
 }
 
+///|
+pub extend TlsUpstreamConnector with @unmbt/http-server-mbt/server.UpstreamConnector::{
+  close,
+  connect,
+}
 
 ///|
-pub extend TlsUpstreamConnector with @unmbt/http-server-mbt/server.UpstreamConnector::{close, connect}
-
-///|
-pub extend TlsServerAcceptor with @unmbt/http-server-mbt/server.Acceptor::{accept, close, is_tls}
+pub extend TlsServerAcceptor with @unmbt/http-server-mbt/server.Acceptor::{
+  accept,
+  close,
+  is_tls,
+}

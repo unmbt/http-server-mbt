@@ -4,5 +4,11 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
 }
-import { "moonbitlang/async" } for "test"
-options(targets: { "*.mbt": ["native"] })
+
+import {
+  "moonbitlang/async",
+} for "test"
+
+options(
+  targets: { "*.mbt": [ "native" ] },
+)

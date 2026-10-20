@@ -178,14 +178,22 @@ pub async fn TlsConn::shutdown(self : TlsConn) -> Bool {
   let _ = self.drain_output() catch { _ => return false }
   clean
 }
+
 ///|
 /// Send close_notify without consuming peer input; safe alongside one reader.
 pub async fn TlsConn::shutdown_write(self : TlsConn) -> Bool {
-  if self.closed { return false }
+  if self.closed {
+    return false
+  }
   for ;; {
-    let result=tls_shutdown_c(self.handle)
-    if result==0 { self.drain_output();return true }
-    if result!= -2 { return false }
+    let result = tls_shutdown_c(self.handle)
+    if result == 0 {
+      self.drain_output()
+      return true
+    }
+    if result != -2 {
+      return false
+    }
     self.drain_output()
   }
 }
@@ -276,9 +284,21 @@ pub impl @io.Writer for TlsConn with fn write_once(self, buf, offset~, len~) {
   }
 }
 
+///|
+pub extend TlsConn with @moonbitlang/async/io.Reader::{
+  read,
+  read_some,
+  _direct_read,
+  drop,
+  read_all,
+  read_until,
+  read_exactly,
+  _get_internal_buffer,
+}
 
 ///|
-pub extend TlsConn with @moonbitlang/async/io.Reader::{read, read_some, _direct_read, drop, read_all, read_until, read_exactly, _get_internal_buffer}
-
-///|
-pub extend TlsConn with @moonbitlang/async/io.Writer::{write_once, write, write_reader}
+pub extend TlsConn with @moonbitlang/async/io.Writer::{
+  write_once,
+  write,
+  write_reader,
+}

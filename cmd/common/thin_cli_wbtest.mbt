@@ -95,4 +95,6 @@ test "http-server-mbt-thin: rejects --proxy-config" {
 }
 
 ///|
-fn parse_thin_cli(args : ArrayView[String]) -> Result[CliAction,String] { parse_cli(args,thin=true) }
+fn parse_thin_cli(args : ArrayView[String]) -> Result[CliAction, String] {
+  parse_cli(args, thin=true)
+}

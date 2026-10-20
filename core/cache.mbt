@@ -389,7 +389,6 @@ pub fn format_cache_control(policy : CachePolicy) -> String {
   }
 }
 
-
 ///|
 pub extend EntityTag with Eq::{not_equal, equal}
 

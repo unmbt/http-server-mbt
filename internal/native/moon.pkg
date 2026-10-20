@@ -5,6 +5,20 @@ import {
   "moonbitlang/core/encoding/utf8",
 }
 
-options("native-stub": ["native.c"],
-  targets: { "*.mbt": ["native"] },
-link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } })
+options(
+  "native-stub": [
+    "native.c",
+    "uring_setup.c",
+    "uring_queue.c",
+    "uring_register.c",
+    "uring_syscall.c",
+    "uring_version.c",
+  ],
+  targets: { "*.mbt": [ "native" ] },
+  link: {
+    "native": {
+      "cc-flags": "${build.HS_URING_FLAGS}",
+      "stub-cc-flags": "${build.HS_URING_FLAGS}",
+    },
+  },
+)

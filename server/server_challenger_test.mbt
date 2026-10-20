@@ -67,18 +67,24 @@ async fn ch1_test_request(
 
 ///|
 async test "challenger1: Direct TransmitFile return code verification (proves zero-copy not fallback)" {
-  let listener=@socket.TcpServer(@socket.Addr::new(0x7F000001,0))
+  let listener = @socket.TcpServer(@socket.Addr::new(0x7F000001, 0))
   defer listener.close()
   @async.with_task_group() <| group => {
-    let peer=group.spawn(() => {
-      let (tcp,_)=listener.accept()
+    let peer = group.spawn(() => {
+      let (tcp, _) = listener.accept()
       defer tcp.close()
-      assert_eq(tcp.read_exactly(21),b"hello moonbit\nmoonbit")
+      assert_eq(tcp.read_exactly(21), b"hello moonbit\nmoonbit")
     })
-    let conn=@socket.Tcp::connect(listener.addr)
+    let conn = @socket.Tcp::connect(listener.addr)
     defer conn.close()
-    assert_eq(test_transmit_file(conn.fd(),"testdata/public/hello.txt",0L,14L),0)
-    assert_eq(test_transmit_file(conn.fd(),"testdata/public/hello.txt",6L,7L),0)
+    assert_eq(
+      test_transmit_file(conn.fd(), "testdata/public/hello.txt", 0L, 14L),
+      0,
+    )
+    assert_eq(
+      test_transmit_file(conn.fd(), "testdata/public/hello.txt", 6L, 7L),
+      0,
+    )
     peer.wait()
   }
 }

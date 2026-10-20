@@ -106,11 +106,16 @@ fn check_accepts_encoding(accept_header : String, encoding : String) -> Bool {
 }
 
 ///|
-async fn StaticEngine::has_gzip_magic(self : StaticEngine, path : String) -> Bool {
+async fn StaticEngine::has_gzip_magic(
+  self : StaticEngine,
+  path : String,
+) -> Bool {
   try {
     let f = self.open_file(path)
     defer f.close()
-    if f.size < 2L { return false }
+    if f.size < 2L {
+      return false
+    }
     let bytes = f.read(0L, 2)
     bytes.length() == 2 && bytes[0] == b'\x1f' && bytes[1] == b'\x8b'
   } catch {
@@ -256,60 +261,59 @@ fn listing_header(title_path : String, _raw_query : String?) -> String {
 ///|
 fn listing_row(entry : ListingEntry, raw_query : String?) -> String {
   let buf = StringBuilder()
-  let q_suffix = match raw_query { Some(q) if q.length() > 0 => "?" + escape_html(q); _ => "" }
-    if entry.is_companion {
-      return buf.to_string()
-    }
-    if entry.name == ".." {
-      buf.write_string("<tr>")
-      buf.write_string("<td class=\"last-modified\"></td>")
-      buf.write_string("<td class=\"file-size\"></td>")
-      buf.write_string(
-        "<td class=\"display-name\"><a href=\"../" +
-        q_suffix +
-        "\">../</a></td>",
-      )
-      buf.write_string("</tr>\n")
-      return buf.to_string()
-    }
-    let encoded_name = encode_path_segment(entry.name)
-    let href = if entry.is_dir {
-      "./" + encoded_name + "/" + q_suffix
-    } else {
-      "./" + encoded_name
-    }
-    let display_name = escape_html(entry.name) +
-      (if entry.is_dir { "/" } else { "" })
-    let size_str = if entry.is_dir { "" } else { format_file_size(entry.size) }
-    let time_str = format_listing_timestamp(entry.mtime_sec)
-
+  let q_suffix = match raw_query {
+    Some(q) if q.length() > 0 => "?" + escape_html(q)
+    _ => ""
+  }
+  if entry.is_companion {
+    return buf.to_string()
+  }
+  if entry.name == ".." {
     buf.write_string("<tr>")
-    buf.write_string("<td class=\"last-modified\">" + time_str + "</td>")
+    buf.write_string("<td class=\"last-modified\"></td>")
+    buf.write_string("<td class=\"file-size\"></td>")
     buf.write_string(
-      "<td class=\"file-size\"><code>" + size_str + "</code></td>",
+      "<td class=\"display-name\"><a href=\"../" + q_suffix + "\">../</a></td>",
     )
+    buf.write_string("</tr>\n")
+    return buf.to_string()
+  }
+  let encoded_name = encode_path_segment(entry.name)
+  let href = if entry.is_dir {
+    "./" + encoded_name + "/" + q_suffix
+  } else {
+    "./" + encoded_name
+  }
+  let display_name = escape_html(entry.name) +
+    (if entry.is_dir { "/" } else { "" })
+  let size_str = if entry.is_dir { "" } else { format_file_size(entry.size) }
+  let time_str = format_listing_timestamp(entry.mtime_sec)
+
+  buf.write_string("<tr>")
+  buf.write_string("<td class=\"last-modified\">" + time_str + "</td>")
+  buf.write_string("<td class=\"file-size\"><code>" + size_str + "</code></td>")
+  buf.write_string(
+    "<td class=\"display-name\"><a href=\"" +
+    href +
+    "\">" +
+    display_name +
+    "</a>",
+  )
+  if entry.has_br {
     buf.write_string(
-      "<td class=\"display-name\"><a href=\"" +
-      href +
-      "\">" +
-      display_name +
-      "</a>",
+      " <span class=\"badge\"><a href=\"./" +
+      encoded_name +
+      ".br\">[br]</a></span>",
     )
-    if entry.has_br {
-      buf.write_string(
-        " <span class=\"badge\"><a href=\"./" +
-        encoded_name +
-        ".br\">[br]</a></span>",
-      )
-    }
-    if entry.has_gz {
-      buf.write_string(
-        " <span class=\"badge\"><a href=\"./" +
-        encoded_name +
-        ".gz\">[gz]</a></span>",
-      )
-    }
-    buf.write_string("</td></tr>\n")
+  }
+  if entry.has_gz {
+    buf.write_string(
+      " <span class=\"badge\"><a href=\"./" +
+      encoded_name +
+      ".gz\">[gz]</a></span>",
+    )
+  }
+  buf.write_string("</td></tr>\n")
 
   buf.to_string()
 }
@@ -326,10 +330,17 @@ fn listing_footer(host : String) -> String {
 }
 
 ///|
-fn render_directory_html(title_path : String, entries : Array[ListingEntry], raw_query : String?, host : String) -> String {
+fn render_directory_html(
+  title_path : String,
+  entries : Array[ListingEntry],
+  raw_query : String?,
+  host : String,
+) -> String {
   let buf = StringBuilder()
   buf.write_string(listing_header(title_path, raw_query))
-  for entry in entries { buf.write_string(listing_row(entry, raw_query)) }
+  for entry in entries {
+    buf.write_string(listing_row(entry, raw_query))
+  }
   buf.write_string(listing_footer(host))
   buf.to_string()
 }
@@ -407,7 +418,9 @@ async fn StaticEngine::make_404_response(
     } else {
       PlanBody::FileRegion(file, 0L, size)
     }
-    if request.meth is Head { file.close() }
+    if request.meth is Head {
+      file.close()
+    }
     { status: 404, headers, body, }
   } else {
     self.make_terminal_404_response(request)
@@ -630,16 +643,20 @@ async fn StaticEngine::plan_request(
       // D-06: admit all metadata before building a listing. An unconsumed
       // listing retains its reservation, so slow clients cannot grow memory.
       if request.meth is Head {
-        let headers : Map[String,String]=Map([("Content-Type","text/html; charset=UTF-8")])
-        @core.apply_security_headers(headers,self.config,request.meth)
-        return Handled({status:200,headers,body:Empty})
+        let headers : Map[String, String] = Map([
+          ("Content-Type", "text/html; charset=UTF-8"),
+        ])
+        @core.apply_security_headers(headers, self.config, request.meth)
+        return Handled({ status: 200, headers, body: Empty, })
       }
-      let mut metadata_charge=request.target.length()*32+16384
-      self.runtime.reserve(directory=true,metadata_charge)
-      let mut retained=false
-      defer { if !retained { self.runtime.release(directory=true,metadata_charge) } }
+      let mut metadata_charge = request.target.length() * 32 + 16384
+      self.runtime.reserve(directory=true, metadata_charge)
+      let mut retained = false
+      defer (if !retained {
+        self.runtime.release(directory=true, metadata_charge)
+      })
       // Render HTML directory listing
-      let (dir_names,name_charge) = self.readdir(
+      let (dir_names, name_charge) = self.readdir(
         path,
         include_hidden=self.config.show_dotfiles,
       )
@@ -743,9 +760,19 @@ async fn StaticEngine::plan_request(
       let body = if request.meth is Head {
         PlanBody::Empty
       } else {
-        PlanBody::Listing({ entries: final_entries, title: display_title, query: raw_query, host, stage: 0, index: 0, pending: b"", position: 0, metadata_charge })
+        PlanBody::Listing({
+          entries: final_entries,
+          title: display_title,
+          query: raw_query,
+          host,
+          stage: 0,
+          index: 0,
+          pending: b"",
+          position: 0,
+          metadata_charge,
+        })
       }
-      retained=true
+      retained = true
       return Handled({ status: 200, headers, body, })
     }
 
@@ -895,11 +922,15 @@ async fn StaticEngine::serve_file(
 ) -> PlanResult {
   let file = self.open_file(chosen)
   errdefer file.close()
-  if file.kind != 1 { raise ServerError::FileChanged("chosen representation became a directory") }
+  if file.kind != 1 {
+    raise ServerError::FileChanged("chosen representation became a directory")
+  }
   if content_encoding == Some("gzip") {
-    let magic=if file.size >= 2L { file.read(0L,2) } else { b"" }
-    if magic.length()!=2 || magic[0]!=b'\x1f' || magic[1]!=b'\x8b' {
-      raise ServerError::FileChanged("chosen gzip representation changed before opening")
+    let magic = if file.size >= 2L { file.read(0L, 2) } else { b"" }
+    if magic.length() != 2 || magic[0] != b'\x1f' || magic[1] != b'\x8b' {
+      raise ServerError::FileChanged(
+        "chosen gzip representation changed before opening",
+      )
     }
   }
   let file_size = file.size
@@ -940,7 +971,8 @@ async fn StaticEngine::serve_file(
   let mut body : PlanBody = FileRegion(file, 0L, file_size)
 
   // Range evaluation (RFC 7233)
-  if header(request, "if-range") is None && header(request, "range") is Some(range_header) {
+  if header(request, "if-range") is None &&
+    header(request, "range") is Some(range_header) {
     let range_result = @core.parse_range_spec(range_header, file_size)
     match range_result {
       Satisfiable(r) => {
@@ -1009,7 +1041,9 @@ async fn StaticEngine::serve_file(
 
   // D-17 In-Flight Mutation Check
   file.check()
-  if !(body is FileRegion(_, _, _)) { file.close() }
+  if !(body is FileRegion(_, _, _)) {
+    file.close()
+  }
 
   // Apply configured security headers
   @core.apply_security_headers(headers, self.config, request.meth)

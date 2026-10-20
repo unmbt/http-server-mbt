@@ -1,0 +1,263 @@
+// R-N18 / D-09 / T-036 / N-24. Real release CLI, never a toy server.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.21.3/process",
+  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/core/json",
+}
+
+fn field(text : String, key : String) -> String? {
+  for line in text.split("\n") {
+    let line = line.trim().to_owned()
+    if line.has_prefix(key) {
+      return Some(line[key.length():].trim().to_owned())
+    }
+  }
+  None
+}
+
+fn number(text : String, key : String) -> Double raise {
+  let value = field(text, key).unwrap_or("")
+  if value == "" { fail("missing metric: " + key) }
+  let token = value.split(" ").next().unwrap()
+  let value = @string.parse_double(token)
+  if value.is_nan() || value.is_inf() || value < 0 { fail("invalid metric: " + key) }
+  value
+}
+
+fn parse_ab(text : String, size : Int) -> Json raise {
+  let completed = number(text, "Complete requests:")
+  let failed = number(text, "Failed requests:")
+  let non_success = match field(text, "Non-2xx responses:") {
+    None => 0.0
+    Some(_) => number(text, "Non-2xx responses:")
+  }
+  let write_errors = match field(text, "Write errors:") {
+    None => 0.0
+    Some(_) => number(text, "Write errors:")
+  }
+  if completed <= 0 || failed != 0 || non_success != 0 || write_errors != 0 {
+    fail("load run contains failed, non-2xx, or zero requests")
+  }
+  if number(text, "Document Length:") != size.to_double() { fail("wrong response length") }
+  let seconds = number(text, "Time taken for tests:")
+  if seconds <= 0 { fail("measurement duration is zero") }
+  let rps = number(text, "Requests per second:")
+  if rps <= 0 { fail("measurement QPS is zero") }
+  { "requests": completed, "failed": failed, "non_success": non_success,
+    "seconds": seconds, "qps": rps,
+    "payload_bytes_per_second": completed * size.to_double() / seconds,
+    "p50_ms": number(text, "50%"), "p95_ms": number(text, "95%"),
+    "p99_ms": number(text, "99%") }
+}
+
+fn proc_ticks(text : String) -> Int64 raise {
+  // comm may contain spaces and ')'; split at the final closing delimiter.
+  let parts = text.split(") ").to_array()
+  if parts.length() < 2 { fail("invalid /proc/pid/stat") }
+  let fields = parts[parts.length()-1].trim().split(" ").filter(x => x != "").to_array()
+  if fields.length() < 13 { fail("short /proc/pid/stat") }
+  @string.parse_int64(fields[11]) + @string.parse_int64(fields[12])
+}
+
+fn safe_label(label : String) -> Bool {
+  label.length() > 0 && label.length() <= 64 &&
+  label.iter().all(c => "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".contains(c.to_string()))
+}
+
+async fn command(program : String, args : Array[String]) -> String {
+  let result = @shell.Cmd(program, args).output(timeout_ms=120000)
+  if result.exit_code() != 0 {
+    fail(program + " " + args.join(" ") + "\n" + result.stdout() + "\n" + result.stderr())
+  }
+  result.stdout().trim().to_owned()
+}
+
+async fn verify(url : String, size : Int, out : String) -> Unit {
+  let file = "target/benchmark/fixtures/file-\{size}.bin"
+  let response = out + "/verify.bin"
+  let status = command("curl", ["--noproxy", "*", "--silent", "--show-error", "--max-time", "10",
+    "--output", response, "--write-out", "%{http_code}", url])
+  assert_eq(status, "200")
+  assert_eq(@fs.read_file(response).binary(), @fs.read_file(file).binary())
+  let head = command("curl", ["--noproxy", "*", "--silent", "--show-error", "--max-time", "10", "--head", url])
+  assert_true(head.has_prefix("HTTP/1.1 200"))
+  assert_eq(number(head, "Content-Length:"), size.to_double())
+  let partial = command("curl", ["--noproxy", "*", "--silent", "--show-error", "--max-time", "10",
+    "--range", "17-80", "--output", response, "--write-out", "%{http_code}", url])
+  assert_eq(partial, "206")
+  assert_eq(@fs.read_file(response).binary(), Bytes::makei(64, i => (((i+17)*31+17)%251).to_byte()))
+}
+
+async fn main {
+  let args = @env.args()
+  let mut label = ""
+  let mut smoke = false
+  let mut connection_close = false
+  let mut binary = ""
+  let mut backend = "platform"
+  let mut server_cpu = ""
+  let mut client_cpu = ""
+  let mut i = 1
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--smoke" { smoke = true; i += 1; continue }
+    if arg == "--connection-close" { connection_close = true; i += 1; continue }
+    if i + 1 >= args.length() { fail("missing value for " + arg) }
+    let value = args[i+1]
+    match arg {
+      "--label" => label = value
+      "--binary" => binary = value
+      "--backend" => backend = value
+      "--server-cpu" => server_cpu = value
+      "--client-cpu" => client_cpu = value
+      _ => fail("unknown argument: " + arg)
+    }
+    i += 2
+  }
+  if !safe_label(label) { fail("--label must be 1..64 alphanumeric, '-' or '_' characters") }
+  if command("uname", ["-s"]) != "Linux" { fail("live benchmark currently requires Linux; parser tests are portable") }
+  // Explicit backend arguments are only passed when supported by the chosen CLI.
+  if backend != "platform" && backend != "epoll" && backend != "io_uring" && backend != "io_uring-file" {
+    fail("unsupported explicit backend")
+  }
+  let output = "target/benchmark/" + label
+  if @fs.exists(output) { fail("refusing to overwrite an existing measurement: " + output) }
+  @fs.mkdir(output, recursive=true)
+  let ab_version = command("ab", ["-V"])
+  let curl_version = command("curl", ["--version"])
+  command("moon", ["run", "benchmark/fixtures.mbtx"]) |> ignore
+  if binary == "" {
+    @shell.Cmd("moon", ["build", "cmd/http-server-mbt-thin", "--target", "native", "--release", "--target-dir", "target/benchmark/build"]).run()
+    binary = "target/benchmark/build/native/release/build/cmd/http-server-mbt-thin/http-server-mbt-thin.exe"
+  }
+  let executable = @fs.realpath(binary)
+  let hash = command("sha256sum", [executable]).split(" ").next().unwrap().to_owned()
+  @fs.write_file(output + "/server.exe", @fs.read_file(executable))
+  @shell.Cmd("chmod", ["+x", output + "/server.exe"]).run()
+  let executable = @fs.realpath(output + "/server.exe")
+  let version = command(executable, ["--version"])
+  let config = @json.parse(@fs.read_file("benchmark/scenarios/static.json").text())
+  let (sizes, concurrency, rounds, seconds) = match config {
+    { "sizes": Array(s), "concurrency": Array(c), "rounds": Number(r, ..), "seconds": Number(t, ..), .. } =>
+      (s.map(v => match v { Number(n, ..) => n.to_int(); _ => 0 }), c.map(v => match v { Number(n, ..) => n.to_int(); _ => 0 }), r.to_int(), t.to_int())
+    _ => fail("invalid scenario")
+  }
+  let sizes = if smoke { [1024, 65536] } else { sizes }
+  let concurrency = if smoke { [1, 32] } else { concurrency }
+  let rounds = if smoke { 2 } else { rounds }
+  if rounds < 2 || seconds < 1 || sizes.any(n => n <= 0) || concurrency.any(n => n <= 0) { fail("invalid scenario limits") }
+  // Allocate a local port. A bind race is possible after closing; startup checks
+  // below verify the child is alive, never benchmarking an already-running server.
+  let reservation = @socket.TcpServer(@socket.Addr::new(0x7f000001, 0))
+  let port = reservation.addr.port()
+  reservation.close()
+  let root = @fs.realpath("target/benchmark/fixtures")
+  let server_args = [root, "--silent", "-p", port.to_string()]
+  if backend != "platform" { server_args.push("--io-backend"); server_args.push(backend) }
+  let tick_hz = @string.parse_double(command("getconf", ["CLK_TCK"]))
+  let runs : Array[Json] = []
+  let manifest : Json = { "schema": 1, "label": label, "smoke": smoke,
+    "commit": command("git", ["rev-parse", "HEAD"]),
+    "dirty": command("git", ["status", "--porcelain"]) != "",
+    "kernel": command("uname", ["-srmo"]), "cpu": command("lscpu", []),
+    "moon": command("moon", ["version"]), "compiler": command("cc", ["--version"]),
+    "ab": ab_version, "curl": curl_version, "binary_sha256": hash, "version": version,
+    "requested_backend": backend, "server_args": server_args, "keep_alive": !connection_close,
+    "server_cpu": server_cpu, "client_cpu": client_cpu,
+    "scenario": config, "clock_ticks_per_second": tick_hz,
+    "scope": "Linux loopback warm plaintext GET, closed-loop ApacheBench; HEAD/Range preflight",
+    "limits": "production defaults; no safety checks disabled",
+    "limitations": ["not an open-loop latency experiment", "client and server share a machine", "CPU ticks omit external io-wq/SQPOLL workers", "latency precision is ApacheBench milliseconds", "no perf/syscall trace captured"] }
+  @fs.write_file(output + "/manifest.json", manifest.stringify(indent=2))
+  @fs.write_file(output + "/working-tree.patch", command("git", ["diff", "--binary", "HEAD"]))
+  @fs.write_file(output + "/untracked.txt", command("git", ["ls-files", "--others", "--exclude-standard"]))
+  @async.with_task_group() <| group => {
+    let log = @process.redirect_to_file(output + "/server.log")
+    defer log.close()
+    let server = if server_cpu == "" {
+      @process.spawn(group, executable, server_args[:], stdout=log, stderr=log, cancel_handler=@process.graceful_cancel(timeout=5000))
+    } else {
+      @process.spawn(group, "taskset", (["-c", server_cpu, executable] + server_args)[:], stdout=log, stderr=log, cancel_handler=@process.graceful_cancel(timeout=5000))
+    }
+    defer server.cancel()
+    let base = "http://127.0.0.1:\{port}"
+    let mut ready = false
+    for _ in 0..<100 {
+      if server.try_wait() is Some(_) { fail("server exited during startup; see server.log") }
+      let check = @shell.Cmd("curl", ["--noproxy", "*", "--silent", "--fail", "--max-time", "1", "--output", "/dev/null", base + "/file-1024.bin"]).output()
+      if check.exit_code() == 0 { ready = true; break }
+      @async.sleep(50)
+    }
+    if !ready { fail("server did not become ready") }
+    for round in 0..<rounds {
+      // Alternate ordering so later scenarios do not always get warmer CPUs.
+      let ordered = if round % 2 == 0 { sizes } else { sizes.rev() }
+      for size in ordered {
+        let url = base + "/file-\{size}.bin"
+        verify(url, size, output)
+        for clients in concurrency {
+          let warmup = ["-q", "-n", "64", "-c", clients.to_string(), "-s", "5"]
+          if !connection_close { warmup.push("-k") }
+          warmup.push(url)
+          command("ab", warmup) |> ignore
+          let load = ["-q", "-n", if smoke { "128" } else { "1000000" }, "-c", clients.to_string(), "-s", "10"]
+          if !connection_close { load.push("-k") }
+          if !smoke { load.push("-t"); load.push(seconds.to_string()) }
+          load.push(url)
+          let before = proc_ticks(@fs.read_file("/proc/\{server.pid}/stat").text())
+          let result = if client_cpu == "" { @shell.Cmd("ab", load).output(timeout_ms=(seconds+30)*1000) }
+            else { @shell.Cmd("taskset", ["-c", client_cpu, "ab"] + load).output(timeout_ms=(seconds+30)*1000) }
+          let after = proc_ticks(@fs.read_file("/proc/\{server.pid}/stat").text())
+          let name = "r\{round}-b\{size}-c\{clients}"
+          @fs.write_file(output + "/" + name + ".txt", result.stdout() + "\n" + result.stderr())
+          result.check()
+          let metrics = parse_ab(result.stdout(), size)
+          let status = @fs.read_file("/proc/\{server.pid}/status").text()
+          @fs.write_file(output + "/" + name + ".status", status)
+          runs.push({ "round": round, "bytes": size, "concurrency": clients,
+            "metrics": metrics, "server_cpu_seconds": (after-before).to_double()/tick_hz,
+            "rss_high_water_kib": number(status, "VmHWM:"), "command": load })
+          let results : Json = { "schema": 1, "label": label, "runs": runs }
+          @fs.write_file(output + "/results.json", results.stringify(indent=2))
+          println(name + " " + metrics.stringify())
+        }
+      }
+    }
+    if server.try_wait() is Some(_) { fail("server exited during benchmark") }
+  }
+  @fs.write_file(output + "/COMPLETE", "N-24 correctness and load run completed; not a performance gate\n")
+  println("saved " + output)
+}
+
+let sample : String =
+  #|Document Length:        1024 bytes
+  #|Time taken for tests:   2.000 seconds
+  #|Complete requests:      100
+  #|Failed requests:        0
+  #|Requests per second:    50.00 [#/sec] (mean)
+  #|  50%     1
+  #|  95%     3
+  #|  99%     5
+
+test "N-24 AB parser requires successful complete responses" {
+  assert_true(parse_ab(sample, 1024) is { "qps": 50, "p99_ms": 5, .. })
+  for (text, size) in [
+    (sample.replace_all(old="Failed requests:        0", new="Failed requests:        2"), 1024),
+    (sample + "\nNon-2xx responses: 100", 1024), (sample, 64), ("", 1024),
+    (sample.replace_all(old="2.000", new="0.000"), 1024),
+  ] {
+    try parse_ab(text, size) catch { _ => () } noraise { _ => fail("accepted invalid AB output") }
+  }
+}
+
+test "N-24 labels cannot overwrite arbitrary paths and proc comm can contain spaces" {
+  assert_true(safe_label("epoll-baseline"))
+  assert_false(safe_label("../outside"))
+  assert_false(safe_label(""))
+  assert_eq(proc_ticks("123 (name with ) space) S 0 0 0 0 0 0 0 0 0 0 12 8 0"), 20L)
+}

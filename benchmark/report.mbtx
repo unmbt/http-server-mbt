@@ -1,0 +1,80 @@
+// R-N18 / T-036 / N-24: summarize repetitions, never compare unlike scenarios.
+import {
+  "moonbitlang/async@0.21.3", "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/core/json", "moonbitlang/core/env",
+}
+
+fn median(values : Array[Double]) -> Double raise {
+  if values.is_empty() { fail("empty samples") }
+  let sorted = values.copy()
+  sorted.sort()
+  let middle = sorted.length()/2
+  if sorted.length()%2 == 0 { (sorted[middle-1]+sorted[middle])/2.0 } else { sorted[middle] }
+}
+
+fn json_bool(value : Json) -> String raise {
+  match value {
+    True => "true"
+    False => "false"
+    _ => fail("expected JSON boolean")
+  }
+}
+
+fn groups(data : Json) -> Map[String, Array[(Double, Double, Double)]] raise {
+  let groups : Map[String, Array[(Double, Double, Double)]] = Map([])
+  guard data is { "schema": 1, "runs": Array(runs), .. } else { fail("unknown result schema") }
+  if runs.is_empty() { fail("no measured runs") }
+  for run in runs {
+    match run {
+      { "bytes": Number(bytes, ..), "concurrency": Number(concurrency, ..),
+        "metrics": { "qps": Number(qps, ..), "p99_ms": Number(p99, ..), "requests": Number(requests, ..),
+          "failed": 0, "non_success": 0, .. }, "server_cpu_seconds": Number(cpu, ..), .. } => {
+        if qps <= 0 || requests <= 0 { fail("invalid successful measurement") }
+        let key = "\{bytes.to_int()} bytes / concurrency \{concurrency.to_int()}"
+        if !groups.contains(key) { groups[key] = [] }
+        groups[key].push((qps, p99, cpu/requests))
+      }
+      _ => fail("malformed or unsuccessful measurement")
+    }
+  }
+  groups
+}
+
+async fn main {
+  let args = @env.args()
+  if args.length() < 2 { fail("usage: moon run benchmark/report.mbtx target/benchmark/LABEL [...]") }
+  let output = StringBuilder()
+  output.write_string("# Benchmark repetitions\n\nNo automatic speedup claim; compare only matching environments, traffic and transfer policies.\n\n")
+  for path in args[1:] {
+    if !@fs.exists(path + "/COMPLETE") { fail("incomplete run: " + path) }
+    let manifest = @json.parse(@fs.read_file(path + "/manifest.json").text())
+    let results = @json.parse(@fs.read_file(path + "/results.json").text())
+    let measurements = groups(results)
+    output.write_string("## " + path + "\n\n")
+    match manifest {
+      { "requested_backend": String(backend), "binary_sha256": String(hash), "keep_alive": keep, "smoke": smoke, .. } =>
+        output.write_string("Backend request: `" + backend + "`; keep-alive: " + json_bool(keep) + "; smoke: " + json_bool(smoke) + "; binary SHA-256: `" + hash + "`.\n\n")
+      _ => fail("invalid manifest: " + path)
+    }
+    output.write_string("| Scenario | Runs | Median QPS | Min–max QPS | Median run P99 (ms) | Median CPU seconds/request |\n|---|---:|---:|---|---:|---:|\n")
+    let keys = measurements.keys().to_array()
+    keys.sort()
+    for key in keys {
+      let samples = measurements[key]
+      if samples.length() < 2 { fail("at least two repetitions required: " + key) }
+      let rates = samples.map(s => s.0)
+      rates.sort()
+      output.write_string("| " + key + " | \{samples.length()} | \{median(rates)} | \{rates[0]}–\{rates[rates.length()-1]} | \{median(samples.map(s => s.1))} | \{median(samples.map(s => s.2))} |\n")
+    }
+    output.write_string("\nP99 is the median of per-run P99s, not a pooled latency percentile. CPU clock ticks can quantize short runs to zero; smoke runs are not performance evidence.\n\n")
+  }
+  println(output.to_string())
+}
+
+test "N-24 median and report reject missing data" {
+  assert_eq(median([4.0, 1.0, 3.0, 2.0]), 2.5)
+  assert_eq(median([3.0, 1.0, 2.0]), 2.0)
+  try median([]) catch { _ => () } noraise { _ => fail("accepted empty samples") }
+  try groups({ "schema": 1, "runs": [] }) catch { _ => () } noraise { _ => fail("accepted empty results") }
+  try groups({ "schema": 1, "runs": [{ "failed": 1 }] }) catch { _ => () } noraise { _ => fail("accepted failed results") }
+}

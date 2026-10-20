@@ -11,6 +11,8 @@ fn main {
   let dirs=["include","tf-psa-crypto/include","library","tf-psa-crypto/core","tf-psa-crypto/dispatch","tf-psa-crypto/platform","tf-psa-crypto/utilities","tf-psa-crypto/extras","tf-psa-crypto/drivers/builtin/include","tf-psa-crypto/drivers/builtin/src"]
   let includes=dirs.map(dir => "-I \""+root+"/tls/mbedtls-4.2.0/"+dir+"\"").join(" ")
   let cli_link=if @env.get_env_var("HTTP_SERVER_STATIC_MUSL")==Some("1") { "-static" } else { "" }
-  let output : Json={"vars":{"HS_C_FLAGS":flags,"HS_TLS_FLAGS":flags+" "+includes,"HS_CLI_LINK":cli_link}}
+  let uring_disabled=if @env.get_env_var("HTTP_SERVER_IO_URING")==Some("0") { if msvc { " /DHS_DISABLE_IO_URING" } else { " -DHS_DISABLE_IO_URING" } } else { "" }
+  let uring_flags=flags+uring_disabled+" -I \""+root+"/internal/native/liburing-2.9/src/include\""
+  let output : Json={"vars":{"HS_C_FLAGS":flags,"HS_TLS_FLAGS":flags+" "+includes,"HS_URING_FLAGS":uring_flags,"HS_CLI_LINK":cli_link}}
   println(output.stringify())
 }

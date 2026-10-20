@@ -68,7 +68,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
     Handled(res) => {
       assert_eq(res.status, 401)
       assert_eq(res.headers["WWW-Authenticate"], "Basic realm=\"\"")
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 401 on missing route without auth")
   }
@@ -105,7 +108,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r4 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 401 on wrong password")
   }
@@ -167,7 +173,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r8 {
     Handled(res) => {
       assert_eq(res.status, 401)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 401 on try_files without auth")
   }
@@ -182,7 +191,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 401 Unauthorized"
   match r9 {
     Handled(res) => {
       assert_eq(res.status, 200)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "hello moonbit\n")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "hello moonbit\n",
+      )
     }
     _ => fail("expected 200 hello.txt with valid auth")
   }
@@ -295,7 +307,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r1 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 403 on traversal")
   }
@@ -309,7 +324,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r2 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 403 on percent traversal")
   }
@@ -323,7 +341,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r3 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 403 on uppercase percent traversal")
   }
@@ -381,7 +402,10 @@ async test "adversarial: SPA and try-files fallback NEVER mask 403 Traversal and
   match r8 {
     Handled(res) => {
       assert_eq(res.status, 400)
-      assert_eq(adv_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Bad Request")
+      assert_eq(
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Bad Request",
+      )
     }
     _ => fail("expected 400 on malformed URI")
   }
@@ -417,7 +441,9 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     Handled(res) => {
       assert_eq(res.status, 404)
       assert_true(
-        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains("File not found"),
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains(
+          "File not found",
+        ),
       )
     }
     _ => fail("expected terminal 404")
@@ -439,7 +465,9 @@ async test "adversarial: Terminal 404 when fallback file does not exist" {
     Handled(res) => {
       assert_eq(res.status, 404)
       assert_true(
-        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains("File not found"),
+        adv_bytes_to_string(res.to_bytes(max_bytes=16777216)).contains(
+          "File not found",
+        ),
       )
     }
     _ => fail("expected terminal 404 for try_files")

@@ -149,23 +149,29 @@ pub async fn with_server_at_with_connector(
   @async.with_task_group() <| group => {
     let server_task = group.spawn(allow_failure=true, () => {
       @async.with_task_group() <| clients => {
-        let accepting=clients.spawn(allow_failure=true,() => {
+        let accepting = clients.spawn(allow_failure=true, () => {
           defer listener.close()
-        while !server.stopped {
-          // Pause while the shared owner is full. Concurrent listeners may
-          // already have an accept pending: recheck atomically before
-          // allocating any protocol/TLS state and close excess sockets.
-          if !@native.connection_available() { @async.sleep(10); continue }
-          let (tcp,_)=listener.accept()
-          if !@native.try_acquire_connection() { tcp.close(); continue }
-          clients.spawn_bg(allow_failure=true,() => {
-            defer @native.release_connection()
-            defer tcp.close()
-            handle_connection(server, tcp)
-          })
-        }
+          while !server.stopped {
+            // Pause while the shared owner is full. Concurrent listeners may
+            // already have an accept pending: recheck atomically before
+            // allocating any protocol/TLS state and close excess sockets.
+            if !@native.connection_available() {
+              @async.sleep(10)
+              continue
+            }
+            let (tcp, _) = listener.accept()
+            if !@native.try_acquire_connection() {
+              tcp.close()
+              continue
+            }
+            clients.spawn_bg(allow_failure=true, () => {
+              defer @native.release_connection()
+              defer tcp.close()
+              handle_connection(server, tcp)
+            })
+          }
         })
-        server.accept_task=Some(accepting)
+        server.accept_task = Some(accepting)
       }
     })
     server.task = Some(server_task)
@@ -188,7 +194,9 @@ pub async fn with_server_at_with_connector(
 pub fn Server::stop(self : Server) -> Unit {
   if !self.stopped {
     self.stopped = true
-    if self.accept_task is Some(task) { task.cancel() }
+    if self.accept_task is Some(task) {
+      task.cancel()
+    }
   }
 }
 
@@ -208,7 +216,10 @@ pub async fn Server::stop_and_drain(
     }
   })
   @async.protect_from_cancel(() => {
-    if self.task is Some(t) { t.cancel(); ignore(t.wait() catch { _ => () }) }
+    if self.task is Some(t) {
+      t.cancel()
+      ignore(t.wait() catch { _ => () })
+    }
     self.engine.close()
   })
 }
@@ -252,7 +263,7 @@ pub fn Transport::plain(tcp : @socket.Tcp) -> Transport {
     raw_fd: Some(tcp.fd()),
     raw_tcp: Some(tcp),
     close_fn: fn() { tcp.close() },
-    shutdown_write_fn:Some(fn() { @native.shutdown_write(tcp.fd()) }),
+    shutdown_write_fn: Some(fn() { @native.shutdown_write(tcp.fd()) }),
   }
 }
 
@@ -267,12 +278,16 @@ pub fn Transport::custom(
   raw_tcp? : @socket.Tcp,
   shutdown_write_fn? : async () -> Bool,
 ) -> Transport {
-  { reader, writer, raw_fd, raw_tcp, close_fn, shutdown_write_fn }
+  { reader, writer, raw_fd, raw_tcp, close_fn, shutdown_write_fn, }
 }
+
 ///|
 /// End this direction while permitting the peer to finish its response.
 pub async fn Transport::shutdown_write(self : Transport) -> Bool {
-  match self.shutdown_write_fn { Some(shutdown) => shutdown(); None => false }
+  match self.shutdown_write_fn {
+    Some(shutdown) => shutdown()
+    None => false
+  }
 }
 
 ///|
@@ -328,7 +343,11 @@ pub impl UpstreamConnector for PlainUpstreamConnector with fn connect(
   _self,
   target,
 ) {
-  if target.scheme() != "http" { raise @core.ConfigError::InvalidTls("HTTPS upstream requires the Full connector") }
+  if target.scheme() != "http" {
+    raise @core.ConfigError::InvalidTls(
+      "HTTPS upstream requires the Full connector",
+    )
+  }
   let tcp = @socket.Tcp::connect_to_host(target.host(), port=target.port())
   Transport::plain(tcp)
 }
@@ -384,24 +403,27 @@ async fn dispatch_engine_request(
   target : String,
   http11 : Bool,
 ) -> Bool {
-  let request : @core.Request={meth,target,headers}
-  match @core.evaluate_security_policies(server.config,request) {
+  let request : @core.Request = { meth, target, headers, }
+  match @core.evaluate_security_policies(server.config, request) {
     Proceed => ()
     _ => {
       match server.engine.handle(request) {
-        @root.HandleResult::Handled(response) => ignore(send_response(transport,response,http11))
-        _ => ignore(send_fallback_status(transport,403,"Forbidden"))
+        @root.HandleResult::Handled(response) =>
+          ignore(send_response(transport, response, http11))
+        _ => ignore(send_fallback_status(transport, 403, "Forbidden"))
       }
       return false
     }
   }
   // Proxy routes bypass the local mount prefix, never URL traversal checks.
-  match @core.resolve_path(server.config.root,"/",target) {
+  match @core.resolve_path(server.config.root, "/", target) {
     Err(@core.PathError::MalformedUri(_)) => {
-      ignore(send_fallback_status(transport,400,"Bad Request"));return false
+      ignore(send_fallback_status(transport, 400, "Bad Request"))
+      return false
     }
     Err(_) => {
-      ignore(send_fallback_status(transport,403,"Forbidden"));return false
+      ignore(send_fallback_status(transport, 403, "Forbidden"))
+      return false
     }
     Ok(_) => ()
   }
@@ -422,7 +444,17 @@ async fn dispatch_engine_request(
   // 3. Local static file engine
   let result = server.engine.handle({ meth, target, headers, })
   let ok = match result {
-    @root.HandleResult::Handled(response) => send_response(transport, response, http11)
+    @root.HandleResult::Handled(response) =>
+      send_response(
+        transport,
+        response,
+        http11,
+        keep_alive=@framing.has_token(
+            headers.get("connection").unwrap_or(""),
+            "keep-alive",
+          ) &&
+          !@framing.has_token(headers.get("connection").unwrap_or(""), "close"),
+      )
     @root.HandleResult::Next => {
       // 4. Fallback proxy for unhandled requests
       if server.config.proxy is Some(upstream) {
@@ -438,10 +470,12 @@ async fn dispatch_engine_request(
       return false
     }
     @root.HandleResult::Error(@root.ServerError::Forbidden(_)) => {
-      ignore(send_fallback_status(transport,403,"Forbidden")); return false
+      ignore(send_fallback_status(transport, 403, "Forbidden"))
+      return false
     }
     @root.HandleResult::Error(@root.ServerError::Overloaded) => {
-      ignore(send_fallback_status(transport,503,"Service Unavailable")); return false
+      ignore(send_fallback_status(transport, 503, "Service Unavailable"))
+      return false
     }
     @root.HandleResult::Error(_) => {
       let _ = send_fallback_status(transport, 500, "Internal Server Error")
@@ -453,8 +487,11 @@ async fn dispatch_engine_request(
 
 ///|
 async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
-  let charge=32768+(if server.acceptor.is_tls() { 131072 } else { 0 })
-  if !@native.try_acquire_body(charge) { tcp_conn.close(); return }
+  let charge = 32768 + (if server.acceptor.is_tls() { 131072 } else { 0 })
+  if !@native.try_acquire_body(charge) {
+    tcp_conn.close()
+    return
+  }
   defer @native.release_body(charge)
   let transport = server.acceptor.accept(tcp_conn) catch {
     _ => {
@@ -468,29 +505,55 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
 
 ///|
 async fn handle_client(server : Server, transport : Transport) -> Unit {
-  let reader=@framing.Connection::new(transport.reader)
+  let reader = @framing.Connection::new(transport.reader)
   while !server.stopped {
-    let head=if server.config.idle_timeout_ms>0 {
-      @async.with_timeout_opt(server.config.idle_timeout_ms, () => reader.read_request())
-    } else { Some(reader.read_request()) }
+    let head = if server.config.idle_timeout_ms > 0 {
+      @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
+        reader.read_request()
+      })
+    } else {
+      Some(reader.read_request())
+    }
     guard head is Some(head) else { break }
-    let req=head.request
+    let req = head.request
     server.active_requests.val += 1
-    let keep={
-      defer { server.active_requests.val -= 1 }
-      if server.has_upgrade_capability() && @framing.has_token(req.headers.get("upgrade").unwrap_or(""),"websocket") {
-        if head.http11 { proxy_websocket(server,transport,reader,req) }
-        else { ignore(send_fallback_status(transport,400,"Bad Request")) }
+    let keep = {
+      defer {
+        server.active_requests.val -= 1
+      }
+      if server.has_upgrade_capability() &&
+        @framing.has_token(
+          req.headers.get("upgrade").unwrap_or(""),
+          "websocket",
+        ) {
+        if head.http11 {
+          proxy_websocket(server, transport, reader, req)
+        } else {
+          ignore(send_fallback_status(transport, 400, "Bad Request"))
+        }
         false
       } else {
-        let keep=dispatch_engine_request(server,transport,reader,req.meth,req.headers,req.target,head.http11)
-        if keep && head.keep_alive { reader.drain() }
+        let keep = dispatch_engine_request(
+          server,
+          transport,
+          reader,
+          req.meth,
+          req.headers,
+          req.target,
+          head.http11,
+        )
+        if keep && head.keep_alive {
+          reader.drain()
+        }
         keep
       }
     }
-    if !keep || !head.keep_alive { break }
+    if !keep || !head.keep_alive {
+      break
+    }
   }
 }
+
 ///|
 fn status_reason(status : Int) -> String {
   match status {
@@ -515,13 +578,21 @@ async fn send_response(
   transport : Transport,
   response : @root.Response,
   http11 : Bool,
+  keep_alive? : Bool = false,
 ) -> Bool {
   defer response.close()
   response.check()
-  let streaming=response.content_length() is None
-  let chunked=streaming && http11
-  if streaming && !http11 { response.headers["Connection"]="close" }
-  if chunked { response.headers["Transfer-Encoding"]="chunked" }
+  let streaming = response.content_length() is None
+  let chunked = streaming && http11
+  if !http11 && keep_alive && !streaming {
+    response.headers["Connection"] = "keep-alive"
+  }
+  if streaming && !http11 {
+    response.headers["Connection"] = "close"
+  }
+  if chunked {
+    response.headers["Transfer-Encoding"] = "chunked"
+  }
   let header_buf = StringBuilder(size_hint=256)
   header_buf.write_string(
     "HTTP/1.1 \{response.status} \{status_reason(response.status)}\r\n",
@@ -541,7 +612,9 @@ async fn send_response(
       None => response.write_to(transport.writer)
     }
     !(streaming && !http11)
-  } catch { _ => false }
+  } catch {
+    _ => false
+  }
 }
 
 ///|
@@ -559,7 +632,6 @@ async fn send_fallback_status(
   buf.write_string(body)
   transport.send(buf.to_string())
 }
-
 
 ///|
 pub extend PlainUpstreamConnector with UpstreamConnector::{close, connect}

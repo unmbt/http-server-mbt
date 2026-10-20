@@ -33,6 +33,14 @@ typedef CONDITION_VARIABLE hs_cond;
 #include <sys/syscall.h>
 #include <linux/openat2.h>
 #include <sys/sendfile.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <poll.h>
+#include <netinet/in.h>
+#if !defined(HS_DISABLE_IO_URING)
+#define HS_HAS_URING 1
+#include <liburing.h>
+#endif
 #endif
 typedef int hs_fd;
 typedef pthread_mutex_t hs_mutex;
@@ -50,10 +58,15 @@ typedef struct hs_file {
 } hs_file;
 typedef struct hs_job hs_job;
 typedef struct hs_budget hs_budget;
+typedef struct hs_socket hs_socket;
+#ifdef HS_HAS_URING
+typedef struct hs_ring hs_ring;
+#endif
 typedef struct hs_pool {
   hs_mutex mutex;
   hs_cond cond;
   int stopping, count, capacity, worker_limit, active, notified, connection_limit;
+  int backend;
   hs_fd notify;
   hs_budget *budget;
   struct hs_pool *budget_next;
@@ -73,6 +86,15 @@ struct hs_budget {
   uint64_t next_id, next_generation;
   hs_pool *pools;
   hs_job *head, *tail;
+#ifdef HS_HAS_URING
+  hs_ring *ring;
+  int ring_jobs;
+#endif
+#ifdef __linux__
+  int wait_started, wait_epoll, wait_wake, waiting;
+  pthread_t wait_thread;
+  hs_job *wait_head;
+#endif
 #ifdef _WIN32
   HANDLE threads[64];
 #else
@@ -96,6 +118,16 @@ struct hs_job {
   uintptr_t socket;
   int directory_charge;
   uint64_t id, generation;
+#ifdef HS_HAS_URING
+  hs_job *ring_next;
+  int read_done, ring_completed, ring_result, cancel_sent;
+  hs_socket *net, *accepted;
+  struct __kernel_timespec timeout;
+#endif
+#ifdef __linux__
+  hs_job *wait_next;
+  int wait_error;
+#endif
 #ifdef HS_IO_TESTING
   int test_delay_ms, test_error, test_short;
 #endif
@@ -318,8 +350,21 @@ static int hs_read(hs_job *j) {
   int code = hs_stat(j->file, 0);
   if (code) return code;
   if (j->offset < 0 || j->length < 0 || j->offset > j->file->size || j->length > j->file->size - j->offset) return -3;
-  j->data = malloc((size_t)j->length + 1);
+  if(!j->data)j->data = malloc((size_t)j->length + 1);
   if (!j->data) return -7;
+#ifdef HS_HAS_URING
+  if(j->pool->backend) {
+    if(j->ring_completed) {
+      j->ring_completed=0;
+      if(j->ring_result<0)return j->ring_result==-ECANCELED?-9:-4;
+      if(!j->ring_result && j->read_done<j->length)return -3;
+      j->read_done+=j->ring_result;
+    }
+    if(j->read_done<j->length)return -11;
+    j->value=j->read_done;
+    return hs_stat(j->file,0);
+  }
+#endif
   int n = 0;
   while (n < j->length) {
     LOCK(&j->pool->mutex);int cancelled=j->cancelled;UNLOCK(&j->pool->mutex);
@@ -447,8 +492,15 @@ static int hs_send(hs_job *j) {
   j->value=sent ? sent : j->length;
 #elif defined(__linux__)
   off_t off=(off_t)j->offset;
-  ssize_t n=sendfile((int)j->socket,j->file->fd,&off,(size_t)j->length);
-  if (n<0) {if (errno==EAGAIN || errno==EINTR) {j->value=0; return 0;} return errno==EINVAL || errno==ENOSYS || errno==EOPNOTSUPP ? -8 : -4;}
+  ssize_t n;
+  for (;;) {
+    n=sendfile((int)j->socket,j->file->fd,&off,(size_t)j->length);
+    if(n>=0 || errno!=EINTR)break;
+    LOCK(&j->pool->mutex);int cancelled=j->cancelled;UNLOCK(&j->pool->mutex);
+    if(cancelled)return -9;
+  }
+  if (n<0) {if (errno==EAGAIN) return -10; return errno==EINVAL || errno==ENOSYS || errno==EOPNOTSUPP ? -8 : -4;}
+  if (!n) return -3; /* Nonempty region reached EOF: never spin on truncation. */
   j->value=n;
 #elif defined(__APPLE__)
   off_t count=j->length;
@@ -498,6 +550,8 @@ static int hs_worker_limit(hs_budget *b) {
     if(p->worker_limit<limit)limit=p->worker_limit;
   return limit;
 }
+#include "native_wait_linux.h"
+#include "native_uring_linux.h"
 #ifdef _WIN32
 static DWORD WINAPI hs_worker(void *arg) {
 #else
@@ -525,6 +579,9 @@ static void *hs_worker(void *arg) {
     LOCK(&p->mutex);int cancelled=j->cancelled;UNLOCK(&p->mutex);
     int code=-9;
     if(!cancelled) {
+#ifdef __linux__
+      if(j->wait_error)code=j->wait_error;else
+#endif
 #ifdef HS_IO_TESTING
       if(j->test_error)code=j->test_error;else
 #endif
@@ -536,6 +593,18 @@ static void *hs_worker(void *arg) {
         case 4:code=hs_send(j);break;
       }
     }
+#ifdef __linux__
+    if(code==-10) {
+      if(hs_defer_writable(j)==0)continue;
+      code=-4;
+    }
+#endif
+#ifdef HS_HAS_URING
+    if(code==-11) {
+      if(hs_ring_defer(j)==0)continue;
+      code=-4;
+    }
+#endif
     LOCK(&p->mutex);
     if(j->result)j->result->generation=j->id;
     j->code=j->cancelled?-9:code;j->done=1;
@@ -609,8 +678,23 @@ MOONBIT_FFI_EXPORT void hs_io_pool_free(hs_pool *p) {
   if(*entry)*entry=p->budget_next;
   int last=--b->refs==0;
   if(last)b->stopping=1;
+#ifdef HS_HAS_URING
+  if(last && b->ring)hs_ring_wakeup(b->ring);
+#endif
+#ifdef __linux__
+  if(last && b->wait_started)hs_wait_wakeup(b);
+#endif
   hs_wake_all(&b->cond);UNLOCK(&b->mutex);
   if(last) {
+#ifdef HS_HAS_URING
+    if(b->ring)hs_ring_destroy(b->ring);
+#endif
+#ifdef __linux__
+    if(b->wait_started) {
+      pthread_join(b->wait_thread,NULL);
+      close(b->wait_epoll);close(b->wait_wake);
+    }
+#endif
     for(int i=0;i<b->thread_count;i++) {
 #ifdef _WIN32
       WaitForSingleObject(b->threads[i],INFINITE);CloseHandle(b->threads[i]);
@@ -695,7 +779,14 @@ MOONBIT_FFI_EXPORT hs_job *hs_io_submit(hs_pool *p,int operation,hs_file *file,c
   LOCK(&b->mutex);
   int limit=INT_MAX;
   for(hs_pool *q=b->pools;q;q=q->budget_next)if(q->capacity<limit)limit=q->capacity;
-  if(p->stopping || b->queued>=limit){UNLOCK(&b->mutex);free(j->path);free(j);return NULL;}
+  int pending=b->queued;
+#ifdef HS_HAS_URING
+  pending+=b->ring_jobs;
+#endif
+#ifdef __linux__
+  pending+=b->waiting;
+#endif
+  if(p->stopping || pending>=limit){UNLOCK(&b->mutex);free(j->path);free(j);return NULL;}
   j->id=++b->next_id;j->generation=file?file->generation:0;
 #ifdef HS_IO_TESTING
   j->test_delay_ms=hs_test_delay_ms;j->test_error=hs_test_error;j->test_short=hs_test_short;
@@ -714,7 +805,17 @@ MOONBIT_FFI_EXPORT void hs_io_ack(hs_pool *p){
   p->notified=0;UNLOCK(&p->mutex);
 }
 MOONBIT_FFI_EXPORT int hs_io_done(hs_job *j){LOCK(&j->pool->mutex);int d=j->done;UNLOCK(&j->pool->mutex);return d;}
-MOONBIT_FFI_EXPORT void hs_io_cancel(hs_job *j){LOCK(&j->pool->mutex);j->cancelled=1;UNLOCK(&j->pool->mutex);}
+MOONBIT_FFI_EXPORT void hs_io_cancel(hs_job *j){
+  hs_pool *p=j->pool;
+  LOCK(&p->mutex);j->cancelled=1;UNLOCK(&p->mutex);
+#ifdef __linux__
+  hs_budget *b=p->budget;
+  LOCK(&b->mutex);if(b->wait_started)hs_wait_wakeup(b);UNLOCK(&b->mutex);
+#endif
+#ifdef HS_HAS_URING
+  LOCK(&p->budget->mutex);if(p->budget->ring)hs_ring_wakeup(p->budget->ring);UNLOCK(&p->budget->mutex);
+#endif
+}
 MOONBIT_FFI_EXPORT int hs_io_code(hs_job *j){return j->code;}
 MOONBIT_FFI_EXPORT int64_t hs_io_value(hs_job *j){return j->value;}
 MOONBIT_FFI_EXPORT hs_file *hs_io_take_file(hs_job *j){hs_file*f=j->result;j->result=NULL;return f;}
@@ -722,7 +823,12 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t hs_io_bytes(hs_job*j){int n=(int)j->value;moo
 MOONBIT_FFI_EXPORT int hs_io_names_count(hs_job*j){return j->names_count;}
 MOONBIT_FFI_EXPORT int hs_io_take_directory_charge(hs_job*j){int n=j->directory_charge;j->directory_charge=0;return n;}
 MOONBIT_FFI_EXPORT moonbit_bytes_t hs_io_name(hs_job*j,int i){int n=(int)strlen(j->names[i]);moonbit_bytes_t b=moonbit_make_bytes(n,0);memcpy(b,j->names[i],(size_t)n);return b;}
-MOONBIT_FFI_EXPORT void hs_io_job_free(hs_job*j){if(!j)return;hs_io_release(j->pool,1,j->directory_charge);hs_file_free(j->result);for(int i=0;i<j->names_count;i++)free(j->names[i]);free(j->names);free(j->path);free(j->data);free(j);}
+MOONBIT_FFI_EXPORT void hs_io_job_free(hs_job*j){if(!j)return;
+#ifdef HS_HAS_URING
+  if(j->net)hs_socket_release(j->net,0);
+  if(j->accepted)hs_socket_release(j->accepted,1);
+#endif
+  hs_io_release(j->pool,1,j->directory_charge);hs_file_free(j->result);for(int i=0;i<j->names_count;i++)free(j->names[i]);free(j->names);free(j->path);free(j->data);free(j);}
 MOONBIT_FFI_EXPORT void hs_io_file_free(hs_file*f){hs_file_free(f);}
 MOONBIT_FFI_EXPORT int hs_io_file_kind(hs_file*f){return f->kind;}
 MOONBIT_FFI_EXPORT int64_t hs_io_file_size(hs_file*f){return f->size;}
@@ -745,3 +851,5 @@ MOONBIT_FFI_EXPORT uint32_t hs_io_process_handles(void) {
   closedir(dir);return count;
 #endif
 }
+
+#include "native_backend.h"

@@ -112,7 +112,10 @@ async test "tls client verifies hostname and rejects mismatch" {
       @tls.TlsError::TlsError(..) => ()
       _ => ()
     } noraise {
-      conn => { conn.close(); fail("wrong hostname was accepted") }
+      conn => {
+        conn.close()
+        fail("wrong hostname was accepted")
+      }
     }
   }
   listener.close()

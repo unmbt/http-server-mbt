@@ -21,6 +21,11 @@ import {
 } for "test"
 
 options(
-  link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "stub-cc-flags": "${build.HS_C_FLAGS}" } },
+  link: {
+    "native": {
+      "cc-flags": "${build.HS_C_FLAGS}",
+      "stub-cc-flags": "${build.HS_C_FLAGS}",
+    },
+  },
   targets: { "*.mbt": [ "native" ] },
 )

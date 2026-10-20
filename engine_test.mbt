@@ -930,8 +930,11 @@ async test "CORS preflight 204 intercepted before static routing" {
 
 ///|
 async test "D-17 in-flight mutation lease tracking" {
-  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(engine) {
-    match engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]) }) {
+  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(
+    engine,
+  ) {
+    match
+      engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]), }) {
       Handled(response) => {
         assert_eq(response.body_length(), 14L)
         assert_eq(response.to_bytes(max_bytes=14), b"hello moonbit\n")

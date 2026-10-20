@@ -1,0 +1,43 @@
+// R-N18 / D-09 / T-036 / N-24. Deterministic, bounded-memory fixtures.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
+}
+
+fn fixture(size : Int, offset? : Int = 0) -> Bytes {
+  Bytes::makei(size, i => (((offset + i) * 31 + 17) % 251).to_byte())
+}
+
+async fn main {
+  let root = "target/benchmark/fixtures"
+  if !@fs.exists(root) { @fs.mkdir(root, recursive=true) }
+  let records : Array[Json] = []
+  for size in [1024, 65536, 1048576, 67108864] {
+    let name = "file-\{size}.bin"
+    // One block at a time, not a 64 MiB Array[Byte].
+    let file = @fs.open(root + "/" + name, mode=WriteOnly, create_mode=CreateOrTruncate)
+    defer file.close()
+    let mut written = 0
+    while written < size {
+      let count = if size - written < 65536 { size - written } else { 65536 }
+      let data = fixture(count, offset=written)
+      file.write_at(data, position=written.to_int64())
+      written += count
+    }
+    let digest = @shell.Cmd("sha256sum", [root + "/" + name]).output()
+    digest.check()
+    records.push({ "name": name, "bytes": size, "sha256": digest.stdout().split(" ").next().unwrap().to_owned() })
+  }
+  @fs.write_file(root + "/manifest.json", Json::object(Map([
+    ("schema", 1), ("pattern", "byte[i] = (i * 31 + 17) % 251"), ("files", Json::array(records)),
+  ])).stringify(indent=2))
+  println(root)
+}
+
+test "N-24 deterministic fixtures are independent of chunk boundaries" {
+  let all = fixture(131072)
+  assert_eq(all[0], (17).to_byte())
+  assert_eq(all[65536], ((65536 * 31 + 17) % 251).to_byte())
+  assert_eq(all, fixture(131072))
+}

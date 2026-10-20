@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "sizes": [1024, 65536, 1048576, 67108864],
+  "concurrency": [1, 32, 256],
+  "rounds": 3,
+  "seconds": 10,
+  "cache": "warm",
+  "arrival": "closed-loop",
+  "protocol": "http plaintext keep-alive"
+}

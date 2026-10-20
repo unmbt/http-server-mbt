@@ -61,7 +61,10 @@ test "adversarial: path traversal and boundary defenses" {
 test "adversarial: resolve_path and root prefix collision" {
   // Root prefix collision defense:
   // Accessing a child directory named "public-secret" stays inside root "public"
-  assert_eq(@core.resolve_path("public", "/", "/index.html"), Ok("public/index.html"))
+  assert_eq(
+    @core.resolve_path("public", "/", "/index.html"),
+    Ok("public/index.html"),
+  )
   assert_eq(
     @core.resolve_path("public", "/", "/public-secret/passwords.txt"),
     Ok("public/public-secret/passwords.txt"),
@@ -148,11 +151,17 @@ test "adversarial: Basic Auth validation and timing safety" {
   let expected = ("admin", "secret123")
 
   // Correct credentials: admin:secret123 in base64: YWRtaW46c2VjcmV0MTIz
-  assert_true(@core.verify_basic_auth(Some("Basic YWRtaW46c2VjcmV0MTIz"), expected))
+  assert_true(
+    @core.verify_basic_auth(Some("Basic YWRtaW46c2VjcmV0MTIz"), expected),
+  )
 
   // Case insensitivity of scheme
-  assert_true(@core.verify_basic_auth(Some("basic YWRtaW46c2VjcmV0MTIz"), expected))
-  assert_true(@core.verify_basic_auth(Some("BASIC YWRtaW46c2VjcmV0MTIz"), expected))
+  assert_true(
+    @core.verify_basic_auth(Some("basic YWRtaW46c2VjcmV0MTIz"), expected),
+  )
+  assert_true(
+    @core.verify_basic_auth(Some("BASIC YWRtaW46c2VjcmV0MTIz"), expected),
+  )
 
   // Whitespace trimming
   assert_true(
@@ -165,15 +174,23 @@ test "adversarial: Basic Auth validation and timing safety" {
   assert_false(@core.verify_basic_auth(Some("   "), expected))
   assert_false(@core.verify_basic_auth(Some("Basic"), expected))
   assert_false(@core.verify_basic_auth(Some("Basic "), expected))
-  assert_false(@core.verify_basic_auth(Some("Bearer YWRtaW46c2VjcmV0MTIz"), expected))
-  assert_false(@core.verify_basic_auth(Some("Digest YWRtaW46c2VjcmV0MTIz"), expected))
+  assert_false(
+    @core.verify_basic_auth(Some("Bearer YWRtaW46c2VjcmV0MTIz"), expected),
+  )
+  assert_false(
+    @core.verify_basic_auth(Some("Digest YWRtaW46c2VjcmV0MTIz"), expected),
+  )
 
   // Missing colon in decoded base64 (e.g. "adminsecret" -> YWRtaW5zZWNyZXQ=)
-  assert_false(@core.verify_basic_auth(Some("Basic YWRtaW5zZWNyZXQ="), expected))
+  assert_false(
+    @core.verify_basic_auth(Some("Basic YWRtaW5zZWNyZXQ="), expected),
+  )
 
   // Invalid base64 characters
   assert_false(@core.verify_basic_auth(Some("Basic ???!!!"), expected))
-  assert_false(@core.verify_basic_auth(Some("Basic YWRtaW4*c2VjcmV0"), expected))
+  assert_false(
+    @core.verify_basic_auth(Some("Basic YWRtaW4*c2VjcmV0"), expected),
+  )
 
   // Wrong username or password
   assert_false(
@@ -199,11 +216,16 @@ test "adversarial: Basic Auth validation and timing safety" {
   // base64("user:pass:word:123") = dXNlcjpwYXNzOndvcmQ6MTIz
   let colon_expected = ("user", "pass:word:123")
   assert_true(
-    @core.verify_basic_auth(Some("Basic dXNlcjpwYXNzOndvcmQ6MTIz"), colon_expected),
+    @core.verify_basic_auth(
+      Some("Basic dXNlcjpwYXNzOndvcmQ6MTIz"),
+      colon_expected,
+    ),
   )
 
   // Empty username: ("", "secret") -> base64(":secret") = OnNlY3JldA==
-  assert_true(@core.verify_basic_auth(Some("Basic OnNlY3JldA=="), ("", "secret")))
+  assert_true(
+    @core.verify_basic_auth(Some("Basic OnNlY3JldA=="), ("", "secret")),
+  )
 
   // Empty password: ("admin", "") -> base64("admin:") = YWRtaW46
   assert_true(@core.verify_basic_auth(Some("Basic YWRtaW46"), ("admin", "")))
@@ -346,5 +368,3 @@ test "adversarial: UTF-8 decoding and overlong bypass prevention" {
   // Trailing space in device name is not stripped before matching
   assert_true(@core.validate_relative_path("CON "))
 }
-
-

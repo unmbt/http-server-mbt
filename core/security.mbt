@@ -561,7 +561,6 @@ pub fn find_header_case_insensitive(
   None
 }
 
-
 ///|
 pub extend PathError with Eq::{not_equal, equal}
 

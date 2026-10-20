@@ -34,9 +34,15 @@ test "adversarial: base_url component boundary matching" {
   // 4. Root BaseURL "/"
   assert_eq(@core.match_and_strip_base_url("/", "/"), Some(""))
   assert_eq(@core.match_and_strip_base_url("/", ""), Some(""))
-  assert_eq(@core.match_and_strip_base_url("/", "/index.html"), Some("index.html"))
+  assert_eq(
+    @core.match_and_strip_base_url("/", "/index.html"),
+    Some("index.html"),
+  )
   assert_eq(@core.match_and_strip_base_url("/", "/app"), Some("app"))
-  assert_eq(@core.match_and_strip_base_url("/", "/application"), Some("application"))
+  assert_eq(
+    @core.match_and_strip_base_url("/", "/application"),
+    Some("application"),
+  )
   assert_eq(@core.match_and_strip_base_url("/", "not_rooted"), None)
 
   // 5. Empty base url normalization and direct handling
@@ -47,9 +53,24 @@ test "adversarial: base_url component boundary matching" {
   // 6. Trailing slash base url normalization
   assert_eq(@core.normalize_base_url("/app/") catch { _ => "err" }, "/app")
   assert_eq(@core.normalize_base_url("app/") catch { _ => "err" }, "/app")
-  assert_eq(@core.normalize_base_url("/api/v1/") catch { _ => "err" }, "/api/v1")
-  assert_eq(@core.resolve_base_url(Some("/app/"), None) catch { _ => "err" }, "/app")
-  assert_eq(@core.resolve_base_url(None, Some("app/")) catch { _ => "err" }, "/app")
+  assert_eq(
+    @core.normalize_base_url("/api/v1/") catch {
+      _ => "err"
+    },
+    "/api/v1",
+  )
+  assert_eq(
+    @core.resolve_base_url(Some("/app/"), None) catch {
+      _ => "err"
+    },
+    "/app",
+  )
+  assert_eq(
+    @core.resolve_base_url(None, Some("app/")) catch {
+      _ => "err"
+    },
+    "/app",
+  )
   assert_eq(
     @core.resolve_base_url(Some("/app"), Some("app/")) catch {
       _ => "err"
@@ -60,7 +81,10 @@ test "adversarial: base_url component boundary matching" {
   // 7. Nested base URL matching
   assert_eq(@core.match_and_strip_base_url("/api/v1", "/api/v1"), Some(""))
   assert_eq(@core.match_and_strip_base_url("/api/v1", "/api/v1/"), Some(""))
-  assert_eq(@core.match_and_strip_base_url("/api/v1", "/api/v1/users"), Some("users"))
+  assert_eq(
+    @core.match_and_strip_base_url("/api/v1", "/api/v1/users"),
+    Some("users"),
+  )
   assert_eq(
     @core.match_and_strip_base_url("/api/v1", "/api/v1/users/123/profile.json"),
     Some("users/123/profile.json"),
@@ -240,7 +264,11 @@ test "adversarial: pre-listen config mutual exclusions and port boundaries" {
   )
   assert_true(
     try {
-      @core.validate_config({ ..base_cfg, spa: false, try_files: Some("app.html"), })
+      @core.validate_config({
+        ..base_cfg,
+        spa: false,
+        try_files: Some("app.html"),
+      })
       true
     } catch {
       _ => false
@@ -519,7 +547,10 @@ test "adversarial: pre-listen config mutual exclusions and port boundaries" {
   )
   assert_false(
     try {
-      @core.validate_config({ ..base_cfg, basic_auth: Some(("user:name", "pass")), })
+      @core.validate_config({
+        ..base_cfg,
+        basic_auth: Some(("user:name", "pass")),
+      })
       true
     } catch {
       _ => false
@@ -527,7 +558,10 @@ test "adversarial: pre-listen config mutual exclusions and port boundaries" {
   )
   assert_false(
     try {
-      @core.validate_config({ ..base_cfg, basic_auth: Some(("user\u0000", "pass")), })
+      @core.validate_config({
+        ..base_cfg,
+        basic_auth: Some(("user\u0000", "pass")),
+      })
       true
     } catch {
       _ => false
@@ -535,7 +569,10 @@ test "adversarial: pre-listen config mutual exclusions and port boundaries" {
   )
   assert_false(
     try {
-      @core.validate_config({ ..base_cfg, basic_auth: Some(("user", "pass\u0000")), })
+      @core.validate_config({
+        ..base_cfg,
+        basic_auth: Some(("user", "pass\u0000")),
+      })
       true
     } catch {
       _ => false

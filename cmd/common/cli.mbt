@@ -29,10 +29,18 @@ pub impl Show for CliAction with fn output(self, logger) {
 
 ///|
 /// Build the declarative command specification using `@argparse`.
-pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
+pub fn build_command(thin? : Bool = false) -> @argparse.Command {
   @argparse.Command(
-    if thin { "http-server-mbt-thin" } else { "http-server-mbt" },
-    about=if thin { "Native static HTTP server (TLS/proxy require Full)" } else { "Native static HTTP server" },
+    if thin {
+      "http-server-mbt-thin"
+    } else {
+      "http-server-mbt"
+    },
+    about=if thin {
+      "Native static HTTP server (TLS/proxy require Full)"
+    } else {
+      "Native static HTTP server"
+    },
     version="\{server_version}",
     disable_help_flag=true,
     disable_version_flag=true,
@@ -60,8 +68,16 @@ pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
         about="Show directory listings [default: true]",
       ),
       @argparse.FlagArg("cors", long="cors", about="Enable CORS headers"),
-      @argparse.FlagArg("insecure", long="insecure", about="Explicitly disable upstream TLS certificate verification (Full)"),
-      @argparse.FlagArg("websocket", long="websocket", about="Enable WebSocket proxy upgrades (Full)"),
+      @argparse.FlagArg(
+        "insecure",
+        long="insecure",
+        about="Explicitly disable upstream TLS certificate verification (Full)",
+      ),
+      @argparse.FlagArg(
+        "websocket",
+        long="websocket",
+        about="Enable WebSocket proxy upgrades (Full)",
+      ),
       @argparse.FlagArg(
         "gzip",
         short='g',
@@ -93,6 +109,11 @@ pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
       ),
     ],
     options=[
+      @argparse.OptionArg(
+        "io-backend",
+        long="io-backend",
+        about="I/O: platform (default), auto, epoll/kqueue/iocp, io_uring or io_uring-file (Linux experiments)",
+      ),
       @argparse.OptionArg(
         "port",
         short='p',
@@ -134,7 +155,11 @@ pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
         about="TLS certificate chain file (PEM) — enables HTTPS",
       ),
       @argparse.OptionArg("key", long="key", about="TLS private key file (PEM)"),
-      @argparse.OptionArg("ca-file", long="ca-file", about="Replace embedded upstream trust roots with this PEM file (Full)"),
+      @argparse.OptionArg(
+        "ca-file",
+        long="ca-file",
+        about="Replace embedded upstream trust roots with this PEM file (Full)",
+      ),
       @argparse.OptionArg(
         "key-passphrase",
         long="key-passphrase",
@@ -165,7 +190,10 @@ pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
 
 ///|
 /// Parse CLI arguments and validate configuration before server startup.
-pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAction, String] {
+pub fn parse_cli(
+  args : ArrayView[String],
+  thin? : Bool = false,
+) -> Result[CliAction, String] {
   let cmd = build_command(thin~)
   let matches = cmd.parse(argv=args) catch {
     err => return Err(err.to_string())
@@ -178,11 +206,22 @@ pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAc
   }
 
   if thin {
-    if first_value(matches, "cert") is Some(_) || first_value(matches, "key") is Some(_) || first_value(matches, "key-passphrase") is Some(_) || first_value(matches,"ca-file") is Some(_) || matches.flags.get("insecure")==Some(true) {
-      return Err("TLS is not supported in thin build; use http-server-mbt (full build)")
+    if first_value(matches, "cert") is Some(_) ||
+      first_value(matches, "key") is Some(_) ||
+      first_value(matches, "key-passphrase") is Some(_) ||
+      first_value(matches, "ca-file") is Some(_) ||
+      matches.flags.get("insecure") == Some(true) {
+      return Err(
+        "TLS is not supported in thin build; use http-server-mbt (full build)",
+      )
     }
-    if first_value(matches, "proxy") is Some(_) || matches.flags.get("proxy-all") == Some(true) || first_value(matches, "proxy-config") is Some(_) || matches.flags.get("websocket")==Some(true) {
-      return Err("Proxy is not supported in thin build; use http-server-mbt (full build)")
+    if first_value(matches, "proxy") is Some(_) ||
+      matches.flags.get("proxy-all") == Some(true) ||
+      first_value(matches, "proxy-config") is Some(_) ||
+      matches.flags.get("websocket") == Some(true) {
+      return Err(
+        "Proxy is not supported in thin build; use http-server-mbt (full build)",
+      )
     }
   }
   // 1. Port
@@ -267,8 +306,14 @@ pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAc
 
   // 12. Construct Config
   let mut config = @core.Config::default(root)
+  let io_backend = @core.IoBackend::parse(
+    first_value(matches, "io-backend").unwrap_or("platform"),
+  ) catch {
+    error => return Err(error.to_string())
+  }
   config = {
     ..config,
+    io_backend,
     port,
     base_url,
     spa,
@@ -286,9 +331,9 @@ pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAc
     cert_file,
     key_file,
     key_passphrase,
-    ca_file:first_value(matches,"ca-file"),
-    secure:!matches.flags.get("insecure").unwrap_or(false),
-    websocket:matches.flags.get("websocket").unwrap_or(false),
+    ca_file: first_value(matches, "ca-file"),
+    secure: !matches.flags.get("insecure").unwrap_or(false),
+    websocket: matches.flags.get("websocket").unwrap_or(false),
     proxy,
     proxy_all,
     proxy_config,

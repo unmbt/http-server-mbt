@@ -292,7 +292,10 @@ async test "challenger2: BaseURL routing stress (subpaths, query params, directo
   match r6 {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 403 for traversal in base_url")
   }
@@ -318,7 +321,11 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
   match res_a {
     Handled(r) => {
       assert_eq(r.status, 404)
-      assert_true(ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains("Custom 404"))
+      assert_true(
+        ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains(
+          "Custom 404",
+        ),
+      )
     }
     _ => fail("expected custom 404 precedence when dir_overrides_404 is false")
   }
@@ -367,7 +374,9 @@ async test "challenger2: Directory detection and listing vs custom 404 precedenc
     Handled(r) => {
       assert_eq(r.status, 200)
       assert_true(
-        ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains("Index of /empty_dir/"),
+        ch2_bytes_to_string(r.to_bytes(max_bytes=16777216)).contains(
+          "Index of /empty_dir/",
+        ),
       )
     }
     _ => fail("expected directory listing when dir_overrides_404 is true")
@@ -615,9 +624,13 @@ async test "challenger2: Regression check across Core features (MIME, Range, ETa
 
 ///|
 async test "challenger2: In-flight mutation D-17 lease tracking" {
-  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(engine) {
-    match engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]) }) {
-      Handled(response) => assert_eq(response.to_bytes(max_bytes=14), b"hello moonbit\n")
+  @http-server-mbt.with_engine(@core.Config::default("testdata/public"), async fn(
+    engine,
+  ) {
+    match
+      engine.handle({ meth: Get, target: "/hello.txt", headers: Map([]), }) {
+      Handled(response) =>
+        assert_eq(response.to_bytes(max_bytes=14), b"hello moonbit\n")
       _ => fail("expected opened response")
     }
   })
@@ -663,7 +676,10 @@ async test "challenger2: Malformed URI, traversal, and auth permutation stress" 
   match r_trav {
     Handled(res) => {
       assert_eq(res.status, 403)
-      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Access denied")
+      assert_eq(
+        ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Access denied",
+      )
     }
     _ => fail("expected 403 on traversal after valid auth")
   }
@@ -677,7 +693,10 @@ async test "challenger2: Malformed URI, traversal, and auth permutation stress" 
   match r_mal {
     Handled(res) => {
       assert_eq(res.status, 400)
-      assert_eq(ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)), "Bad Request")
+      assert_eq(
+        ch2_bytes_to_string(res.to_bytes(max_bytes=16777216)),
+        "Bad Request",
+      )
     }
     _ => fail("expected 400 on malformed URI after valid auth")
   }

@@ -40,6 +40,5 @@ fn strerror(code : Int) -> String {
   @utf8.decode_lossy(tls_strerror_c(code))
 }
 
-
 ///|
 pub extend TlsError with Debug::{to_repr}

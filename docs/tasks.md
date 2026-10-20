@@ -129,9 +129,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：精简/完整 CLI、Linux 静态 ELF、Distroless/scratch × thin/full 的 Docker 构建声明、固定基础层 digest/功能标签/镜像清单；将三平台打包与 Linux 镜像验证接入 Actions。汇总库/Node target、CRT、PIC、系统库、TLS/资源许可，更新实际发布/安装说明。
   - 验收：N-10/N-17；三平台 CLI 干净环境独立启动，四种容器组合真实执行、非 root/只读挂载/无 shell 就绪探测及 SIGTERM 排空通过。full 保留全部兼容能力，thin 拒绝裁去功能；同档位 CLI 哈希一致，镜像及基础层体积另报。候选包不等于已推送，静态 archive、DLL import library 和 .node 清楚区分。
 
-- [ ] **T-023 可运行 io_uring 实验后端** — 状态：未开始。需求：R-N04；设计：D-05；依赖：T-016、T-017。
+- [ ] **T-023 可运行 io_uring 实验后端** — 状态：进行中（2026-10-17 用户确认按调研顺序实施；分项验证不代表完整后端）。需求：R-N04；设计：D-05；依赖：T-016、T-017。
   - 交付：Linux 可选后端、opcode 探测、platform/auto/强制选择、实验标识与能力输出。
   - 验收：N-07 及共同 H/S 案例；支持环境真实处理文件请求与取消，受限环境 auto 退回 epoll，强制选择失败前无监听，非 Linux 无伪实现。
+  - 调研记录（2026-10-17，源码 `8b95fe2`）：[io_uring 可行性与性能证据](io-uring-research.md) 核对当前 epoll + 有界 C 工作队列/sendfile 路径，提出先建轻量 benchmark、校准基线，再分阶段接入的建议；外部实验不等于本项目收益。未运行 ring/opcode 探针或 A/B 压测，未创建 benchmark 代码、改变默认后端或恢复 T-024，任务保持未开始。
 
 - [ ] **T-024 原性能基准交付（已撤出当前范围）** — 状态：未开始。需求：R-N03 的历史量化计划已撤出；设计：D-09；依赖：无。
   - 交付：当前无实施交付，仅保留历史编号，不重用、不计入当前任务分母。
@@ -326,3 +327,10 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：落实六项问题的架构记录；Thin 只依赖 `server/plain`，Full 统一入站/上游/WebSocket TLS 连接器；HTTP framing 共用并验证冲突长度、chunk trailer、keep-alive、HEAD 和关闭；抽取无 Full 依赖的公共 CLI；建立 Full/Thin 依赖、符号、PE/ELF/Mach-O、bytes、哈希审计。
   - 验收：`moon check/test/info/fmt --target native`；Full/Thin release 构建；N-12 HTTPS upstream（HTTP 明文、HTTPS 握手、CA/主机名、secure=false、失败清理、502）；Windows 本机证据与 Actions 三平台证据分别记录，不能用本机结果勾选整体任务。
   - 当前证据：Thin `1,602,560` bytes（SHA-256 `F21871E7432B5E0F678305663BBF89FCD790E1B8C3029A20E4654BABA0E7F9D0`）、Full `3,884,544` bytes（SHA-256 `79721784E4D9D012B04A908CB4C168353E89802A8F78081CE8495ACB0C3BD1D7`；Windows x86_64 release）；`moon test --target native` 为 240/240。真实 HTTPS upstream E2E、完整测试矩阵和三平台依赖审计待回填。详见 [architecture-review](architecture-review.md)。
+
+## 7. 可选性能测量工具（2026-10-17 用户确认）
+
+- [ ] **T-036 可复现 benchmark 与后端对照证据** — 状态：进行中。需求：R-N18、R-N03、R-SDD；设计：D-09；依赖：T-016/T-017 已可用 Linux 分项。
+  - 交付：`benchmark/` 的 `.mbtx` fixtures/驱动/报告及测试、真实生产 release CLI 的 Linux 静态 GET/HEAD/Range 基线、每轮原始输出/环境/哈希；CI 验证解析和冒烟，不设吞吐门槛。
+  - 验收：N-24；失败/能力缺失/无法比较明确失败或不可测，不产生虚假提升；生成数据不进入包。T-023 未实现时不得输出 io_uring A/B 结果。冷缓存、固定到达率、TLS、远端负载机器明确不属于首批实测。
+  - T-024/P 计划仍撤出，不重新编号或恢复历史量化门槛。

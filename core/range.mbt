@@ -120,7 +120,6 @@ pub fn parse_range(value : String, size : Int64) -> ByteRange? {
   }
 }
 
-
 ///|
 pub extend ByteRange with Eq::{not_equal, equal}
 

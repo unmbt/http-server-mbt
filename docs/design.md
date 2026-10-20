@@ -158,6 +158,8 @@ base_url 是 URL 路径前缀；输入 `app`、`/app`、`/app/` 归一化为 `/a
 
 ### 后端契约
 
+2026-10-17 基线回归（N-24，D-03/D-05）：HTTP/1.0 显式请求 keep-alive 且正文有界定长度时，Thin/Full 明确响应 `Connection: keep-alive`；请求 close 或无长度的 HTTP/1.0 流不声明持久连接。该变更修正旧实现已保持连接却未通知旧客户端的行为，不能把修复前后的不同连接模式计为后端收益。
+
 以显式操作记录表示 Accept、Read、Write、FileTransfer、FileRead、Stat/Open、Timer、Cancel，完成结果区分完成字节数、WouldBlock、EOF、取消和系统错误。连接 ID 与操作 ID 均带 generation，防止 fd/slab 槽复用后迟到事件写入新连接。上层不依赖 readiness 或 completion 模型差异。
 
 | 平台 | 默认后端 | 文件内核传输 | 异步与降级要求 |
@@ -170,6 +172,10 @@ base_url 是 URL 路径前缀；输入 `app`、`/app`、`/app/` 归一化为 `/a
 `platform` 选择当前平台稳定默认。Linux `auto` 在已编入实验功能且探测成功时可选 io_uring，否则 epoll；其他平台 auto 等价 platform。显式指定不属于本平台的后端、未编入的 io_uring 或被内核/沙箱禁止的 io_uring，监听前失败。auto 降级只发生在启动探测阶段；在途操作失败不能无声切换后端而重发数据。
 
 实验后端至少完成监听/接收、收发、文件读取、计时/取消，执行共同协议测试；能力表记录内核版本、探测到的 opcode 和实际传输路径。multishot、registered buffers、SEND_ZC 等分别探测，只在缓冲生命周期和取消测试通过后开启，不作为所有内核的共同能力。默认稳定后端不因实验功能加入而改变。
+
+2026-10-17 调研补充：[io_uring 可行性与性能证据](io-uring-research.md) 对照当前源码、外部实验和建议的可选 benchmark 工具。该文不是后端实现或性能验收，不改变本节默认值、T-023 交付范围及 D-09/T-024 的历史撤出状态。
+
+2026-10-17 实施补充（T-023/N-07）：配置增加 `IoBackend` 与 `--io-backend`，保留 platform 默认；增加显式 `io_uring-file` 混合实验名（epoll 网络、sendfile 明文正文、io_uring 缓冲文件读），不把它作为完整后端。完整 `io_uring` 首版采用 accept/recv/send/read/timeout/cancel，正文明确为有界 read+send，不声称零拷贝或性能提升。静态解析/open/stat/readdir 仍复用有界 C worker，完成通过库内部 pipe 回到合法 MoonBit owner；不得在 ring 线程调用 MoonBit。固定 liburing 2.9，源码归档 SHA-256 `897b1153b55543e8b92a5a3eb9b906537a5fedcf8afaf241f8b8787940c79f8d`，所选 src 子集按 SPDX MIT（io_uring UAPI 选择 MIT 分支）随包源码编译，Linux 使用 libc 模式；构建头文件需提供 time_types/openat2，非 Linux 不编译 Linux 源。`HTTP_SERVER_IO_URING=0` 可编译裁去实验功能。只在启动时探测/降级，运行时失败不可改用其他后端续传。
 
 ### 连接状态与调度
 
@@ -302,6 +308,10 @@ MoonBit 版本、C 编译器、目标 triple、TLS 与资源哈希、链接选�
 
 ## D-09 高性能原则与历史编号
 
+2026-10-17 范围补充（R-N18 / T-036，用户确认）：允许 `benchmark/` 提供可选测量工具，先交付 Linux 明文静态 GET/HEAD/Range 与热缓存闭环负载；测试驱动、fixtures、解析和报告仅用 `.mbtx`，测量真实 Thin/Full CLI，不另建演示服务器。生成数据/二进制/原始结果写入 `target/benchmark/`，不得进入发布资源；脚本解析/失败处理测试进入三平台 CI，Linux 实际运行作可运行性冒烟，不设置百分比门槛。结果保留工具版本、Git/dirty、release 产物 SHA-256、实际网络/文件路径、参数、每轮分布、错误数与测量限制；未测指标明确为空而非零。固定到达率、冷缓存、TLS 和独立负载机器是后续扩展，不用闭环本机数据冒充这些场景。
+
+实施顺序为基线 → epoll 发送等待回归修正 → io_uring 能力/生命周期探针 → 显式标识的混合文件路径 → 完整 T-023 → 逐项优化。每个阶段先通过相关正确性测试。EAGAIN 等待真实可写，EINTR 重试；取消必须唤醒并排空等待，不引入每连接线程或占满文件 worker 的无限等待。io_uring setup/opcode/操作失败保留 errno，无法运行的环境不得伪造性能对照。T-024 与 P 编号不复用。
+
 保证高性能，以单进程高效 I/O、按需分配、有界队列、背压和高效集合/渲染算法落实。多核仅作可选实验，默认公共 API 保持托管生命周期。本轮不设量化性能目标，不要求专项基准、性能报告工作流或新增指标端点。
 
 下列编号及 T-024 自版本 4 起撤出当前范围，仅保留追踪，不再构成功能完成或发布门槛。原有依赖清单、资源正确释放、实际内核传输和公平性验证仍分别由 D-08、N-05/N-06/N-08/N-19 承担。
@@ -346,6 +356,7 @@ MoonBit 版本、C 编译器、目标 triple、TLS 与资源哈希、链接选�
 | N-19 | 两种托管模式均不手动推进循环；启动就绪/预检失败、请求异步完成/背压、跨线程命令、停止与提交竞态、关闭自动排空、多实例隔离、无关闭后回调；MoonBit/C/Node/Python 与 wasm-gc 适配的各自上下文合法 | R-N14 / T-002、T-015、T-016、T-020、T-021、T-028～T-030 |
 | N-20 | 下载期间原地同长度改写/增长/截断、路径替换/删除、Range/预压缩/TLS、检测迟到与在途取消；FILE_CHANGED 不作 EOF、写入不等待下载、自动重试丢弃旧内容并从头请求、If-Range 不跨版本拼接、元数据缓存失效 | R-N15 / T-033 |
 | N-21 | HTTP 随机分片/非法报文、模型事件调度、短写/故障/取消与完成乱序、generation 复用、文件变更及关闭回调竞态；固定种子可复现、语料最小化、ASan/平台检查及三平台回归 | R-N16、R-SAFE / T-034、T-025 |
+| N-24 | benchmark 确定性 fixtures、压测输出解析、缺失/错误/非成功响应拒绝、同场景重复汇总、生产 CLI 的 GET/HEAD/Range 字节验证、子进程退出清理与可复查 manifest；Linux 冒烟不作性能门槛 | R-N18 / T-036 |
 
 实现任务完成证据包含：R/D/T/C/N/P 编号、提交、目标平台/构建形态、完整命令、成功/失败/跳过数及原因、相关日志/报告位置。MoonBit 修改运行 `moon check --target native`、相关 `moon test --target native`，最后 `moon info --target native` 与 `moon fmt` 并审查接口变化；FFI/传输增加 ASan/UBSan 或对应平台可用的内存/句柄检查，缺少工具须记录覆盖缺口。
 

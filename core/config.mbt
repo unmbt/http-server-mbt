@@ -14,6 +14,7 @@ pub(all) suberror ConfigError {
   InvalidTimeout(String)
   InvalidTls(String)
   InvalidLimits(String)
+  InvalidIoBackend(String)
 } derive(Eq, Debug)
 
 ///|
@@ -31,6 +32,7 @@ pub fn ConfigError::to_string(self : ConfigError) -> String {
     InvalidTimeout(s) => "InvalidTimeout: " + s
     InvalidTls(s) => "InvalidTls: " + s
     InvalidLimits(s) => "InvalidLimits: " + s
+    InvalidIoBackend(s) => "InvalidIoBackend: " + s
   }
 }
 
@@ -45,6 +47,10 @@ pub impl Show for ConfigError with fn output(self, logger) {
 /// routing mounts, SPA fallback, security policies, and upstream proxies.
 pub(all) struct Config {
   limits : RuntimeLimits
+  // --- Native I/O backend ---
+  // platform is the stable OS backend; auto may select the experimental Linux
+  // io_uring path after a startup capability probe.
+  io_backend : String
   // --- Filesystem & Network ---
   root : String // Filesystem root directory (default "." or "public")
   port : Int // TCP listen port (0..65535, 0 = ephemeral)
@@ -117,6 +123,7 @@ pub fn Config::default(root : String) -> Config {
   {
     root,
     limits: RuntimeLimits::default(),
+    io_backend: "platform",
     port: 8080,
     address: "0.0.0.0",
     base_url: "/",
@@ -381,6 +388,16 @@ pub fn validate_config(config : Config) -> Unit raise ConfigError {
 
   if config.idle_timeout_ms < 0 {
     raise ConfigError::InvalidTimeout("idle_timeout_ms cannot be negative")
+  }
+
+  match config.io_backend {
+    "platform" | "auto" | "epoll" | "kqueue" | "iocp" | "io_uring" => ()
+    other =>
+      raise ConfigError::InvalidIoBackend(
+        "unsupported backend '" +
+        other +
+        "'; expected platform, auto, epoll, kqueue, iocp, or io_uring",
+      )
   }
 
   match config.try_files {

@@ -2,6 +2,7 @@
 test "config defaults and dual defaults" {
   let def = @core.Config::default("public")
   assert_eq(def.port, 8080)
+  assert_eq(def.io_backend, "platform")
   assert_eq(def.base_url, "/")
   assert_eq(def.gzip, false)
   assert_eq(def.brotli, false)
@@ -45,6 +46,17 @@ test "config validation and mutual exclusions" {
       @core.validate_config(invalid_timeout)
       true
     } catch {
+      _ => false
+    },
+  )
+
+  let invalid_backend = { ..valid, io_backend: "liburing", }
+  assert_true(
+    try {
+      @core.validate_config(invalid_backend)
+      true
+    } catch {
+      @core.ConfigError::InvalidIoBackend(_) => true
       _ => false
     },
   )

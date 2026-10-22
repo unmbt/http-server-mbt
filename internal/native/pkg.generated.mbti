@@ -11,15 +11,19 @@ import {
 // Values
 pub fn connection_available() -> Bool
 
-pub fn process_handles() -> UInt
+pub fn io_uring_available() -> Bool
 
-pub fn release_body(Int) -> Unit
+pub fn io_uring_capabilities() -> UInt32
+
+pub fn process_handles() -> UInt32
+
+pub fn release_body(Int32) -> Unit
 
 pub fn release_connection() -> Unit
 
 pub fn shutdown_write(@types.Fd) -> Bool
 
-pub fn try_acquire_body(Int) -> Bool
+pub fn try_acquire_body(Int32) -> Bool
 
 pub fn try_acquire_connection() -> Bool
 
@@ -39,22 +43,22 @@ pub suberror NativeError {
 pub struct File {
   runtime : Runtime
   handle : Handle
-  kind : Int
+  kind : Int32
   size : Int64
   mtime : Int64
   mut closed : Bool
   mut closing : Bool
-  mut active : Int
+  mut active : Int32
   idle : @cond_var.Cond
-  mut next_id : Int
+  mut next_id : Int32
   // private fields
 }
 pub async fn File::check(Self) -> Unit
 pub async fn File::close(Self) -> Unit
-pub async fn File::names(Self, Int64) -> (Array[String], Int)
+pub async fn File::names(Self, Int64) -> (Array[String], Int32)
 pub async fn File::open(Self, String) -> Self
-pub async fn File::read(Self, Int64, Int) -> Bytes
-pub async fn File::send(Self, @types.Fd, Int64, Int) -> Int64?
+pub async fn File::read(Self, Int64, Int32) -> Bytes
+pub async fn File::send(Self, @types.Fd, Int64, Int32) -> Int64?
 
 type Handle
 
@@ -66,17 +70,17 @@ pub struct Runtime {
   writer : @pipe.PipeWrite
   gate : @async.Mutex
   idle : @cond_var.Cond
-  mut active : Int
+  mut active : Int32
   mut closing : Bool
   mut closed : Bool
-  mut next_id : Int
+  mut next_id : Int32
   // private fields
 }
 pub async fn Runtime::close(Self) -> Unit
-pub fn Runtime::new(workers~ : Int, capacity~ : Int, body_bytes? : Int, directory_bytes? : Int, connections? : Int) -> Self raise
+pub fn Runtime::new(workers~ : Int32, capacity~ : Int32, body_bytes? : Int32, directory_bytes? : Int32, connections? : Int32, backend? : String) -> Self raise
 pub async fn Runtime::open_root(Self, String) -> File
-pub fn Runtime::release(Self, directory~ : Bool, Int) -> Unit
-pub fn Runtime::reserve(Self, directory~ : Bool, Int) -> Unit raise
+pub fn Runtime::release(Self, directory~ : Bool, Int32) -> Unit
+pub fn Runtime::reserve(Self, directory~ : Bool, Int32) -> Unit raise
 pub fn Runtime::stop(Self) -> Unit
 
 // Type aliases

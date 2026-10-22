@@ -1,6 +1,6 @@
 # http-server-mbt 实施任务与测试迁移清单
 
-2026-09-24 状态校正：现有编号为 T-001～T-035，共 35 项，T-024 已撤出，当前范围 34 项。早期平台记录保留历史证据，不代表当前提交或跨平台总验收。本轮实施记录见 [implementation-20260924](archive/implementation-20260924.md)。C/Node 异步嵌入、io_uring、wasm-gc 引擎未纳入本轮，继续约束最终交付。
+2026-10-22 增量：现有编号扩展至 T-037；T-024 仍是已撤出的历史量化基准，新增 T-036 为不设门槛的观测型 benchmark，T-023 进入 io_uring 实验实现。Linux 能力、取消和三平台 Actions 证据仍未完成，不能把本机 Windows 结果冒充总验收。活动工具链已更新为 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`；旧验证记录中的版本仅表示当时环境。
 
 历史修订：版本 5（2026-09-13）将 TLS 后端改为源码 vendor 的 MbedTLS 4.2.0（D-08），T-002 补充 TLS 探针分项、T-012 进入进行中（Windows 分项）；任务数量与当前状态以上方 2026-09-24 校正为准。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
 
@@ -146,13 +146,23 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
   - 交付：精简/完整 CLI、Linux 静态 ELF、Distroless/scratch × thin/full 的 Docker 构建声明、固定基础层 digest/功能标签/镜像清单；将三平台打包与 Linux 镜像验证接入 Actions。汇总库/Node target、CRT、PIC、系统库、TLS/资源许可，更新实际发布/安装说明。
   - 验收：N-10/N-17；三平台 CLI 干净环境独立启动，四种容器组合真实执行、非 root/只读挂载/无 shell 就绪探测及 SIGTERM 排空通过。full 保留全部兼容能力，thin 拒绝裁去功能；同档位 CLI 哈希一致，镜像及基础层体积另报。候选包不等于已推送，静态 archive、DLL import library 和 .node 清楚区分。
 
-- [ ] **T-023 可运行 io_uring 实验后端** — 状态：未开始。需求：R-N04；设计：D-05；依赖：T-016、T-017。
-  - 交付：Linux 可选后端、opcode 探测、platform/auto/强制选择、实验标识与能力输出。
-  - 验收：N-07 及共同 H/S 案例；支持环境真实处理文件请求与取消，受限环境 auto 退回 epoll，强制选择失败前无监听，非 Linux 无伪实现。
+- [ ] **T-023 可运行 io_uring 实验后端** — 状态：进行中（2026-10-22，Windows 编译分项；Linux 运行验收待 Actions）。需求：R-N04；设计：D-05、D-21；依赖：T-016、T-017。
+  - 交付：Linux 可选后端、opcode 探测、platform/auto/强制选择、实验标识与能力输出；当前直接使用 io_uring syscall ABI，liburing 2.15 不作为必需依赖。
+  - 当前实现：Config/CLI 接受 platform|auto|epoll|kqueue|iocp|io_uring；auto 只在启动探测成功时启用 io_uring；实验路径用 IORING_OP_READ，文件发送回退到有界读取；非 Linux 显式选择在监听前失败。
+  - 验收：N-07 及共同 H/S 案例；支持环境真实处理文件请求与取消，受限环境 auto 退回 epoll，强制选择失败前无监听，非 Linux 无伪实现。Linux kernel/opcode、取消和三平台 Actions 证据待补。
 
 - [ ] **T-024 原性能基准交付（已撤出当前范围）** — 状态：未开始。需求：R-N03 的历史量化计划已撤出；设计：D-09；依赖：无。
   - 交付：当前无实施交付，仅保留历史编号，不重用、不计入当前任务分母。
   - 验收：不作为当前完成或发布门槛，不勾选为已实现；现有资源安全和内核传输验证由 N 测试承担。未来如恢复专项基准，先更新需求及任务范围。
+
+- [ ] **T-036 可重复 Native 观测型 benchmark** — 状态：进行中（2026-10-22，Windows 本机分项）。需求：R-N18；设计：D-09、D-21；依赖：T-016。
+  - 交付：benchmarks/ Native-only 可执行包，支持 root/path/iterations/warmup/io-backend 参数，使用单调时钟输出请求数、字节数、耗时和吞吐。
+  - 验收：moon run benchmarks --target native --release 在稳定 backend 与 auto 下可运行；结果仅作诊断证据，不设提升倍率、跨机器门槛或发布阻塞。Linux io_uring benchmark 结果随 T-023 补回。
+
+- [ ] **T-037 io_uring 依赖与能力矩阵审计** — 状态：进行中（2026-10-22）。需求：R-N04、R-SDD；设计：D-05、D-21；依赖：T-023。
+  - 交付：记录 syscall ABI 与 liburing 2.15 的取舍、setup/opcode/EPERM/ENOSYS 探测位、静态/动态链接影响及受限环境策略。
+  - 当前证据：Windows Native 构建未引入 liburing 链接；WSL FedoraLinux-43 的 `gcc -fsyntax-only -std=c11 -pthread` 通过 `internal/native/native.c`，`pkg-config --modversion liburing` 报未安装。Linux 真实运行与三平台 Actions 证据仍待补。
+  - 验收：默认三平台构建不出现 liburing 链接；Linux 可用环境真实执行 READ，受限环境 auto 降级、显式选择失败；若未来切换 liburing，先更新设计、依赖清单和 Actions 证据。
 
 - [ ] **T-025 GitHub Actions 完整验证与发布门槛** — 状态：进行中（2026-09-24 校正；Windows 历史验证不代表总交付）。需求：R-SDD、R-COMPAT、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-08、D-10～D-18；依赖：T-001、T-021、T-022、T-023、T-027、T-028、T-029、T-030、T-032、T-033、T-034。
   - [x] 2026-09-28 版本升级回归修复分项（关联 T-030、D-08/D-14/D-16、N-18）：状态：已完成（Windows 本机版本一致性分项）。修复 v0.4.0 候选构建仍断言 0.3.4；统一版本读取、同步及只读漂移检查，候选/发行核对版本。脚本升级回归 2/2、Native 266/266、Full/Thin release、干净 MoonBit 消费通过；证据、产物哈希与未运行范围见[版本修复记录](release-version-fix-20260928.md)。远程三平台和实际发行未运行，完整发行门槛及总任务状态不变。
@@ -322,7 +332,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 ## 5. 本次文档验收与后续追踪维护
 
-本次检查四文件、相对链接和稳定 ID、42 文件映射及 CC/CE 数量、R-N01～R-N16 的任务/测试归属。保留的 34 项任务均未勾选，其中 33 项属当前范围；依赖无环且不依赖撤出的 T-024。另核对两种托管模式、文件变更/重试和故障注入契约，移除量化性能目标及专项基准门槛，保持镜像和 Windows→Actions 路线。参考仓库链接在干净克隆缺失的已知条件见 proposal。
+本次检查四文件、相对链接和稳定 ID、42 文件映射及 CC/CE 数量、R-N01～R-N18 的任务/测试归属。T-024 仍为撤出项；T-023/T-036/T-037 的实验实现和证据保持进行中，依赖无环。另核对两种托管模式、文件变更/重试和故障注入契约，benchmark 不恢复量化门槛，保持镜像和 Windows→Actions 路线。参考仓库链接在干净克隆缺失的已知条件见 proposal。
 
 后续 T-001 固定每个源 test 名称、参数键和断言；实现时补充目标测试位置，保留本表 ID。N-01～N-21 新测试组见 D-10；D-09 的 P-01～P-06 仅保留已撤出标记。最终 T-026 按完整包、库/宿主/镜像形态、目标平台、适用性及 AD 差异分别报告当前验收结果。
 

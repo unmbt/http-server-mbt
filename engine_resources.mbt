@@ -114,6 +114,7 @@ pub async fn StaticEngine::open(config : @core.Config) -> StaticEngine {
     body_bytes=config.limits.body_buffer_bytes,
     directory_bytes=config.limits.directory_metadata_bytes,
     connections=config.limits.connections,
+    backend=config.io_backend,
   )
   errdefer runtime.close()
   let root = runtime.open_root(config.root)

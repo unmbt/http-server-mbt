@@ -21,20 +21,20 @@ pub fn ProtocolError::to_repr(Self) -> @debug.Repr
 pub struct Connection {
   // private fields
 }
-pub async fn Connection::_direct_read(Self, FixedArray[Byte], offset~ : Int, max_len~ : Int) -> Int
+pub async fn Connection::_direct_read(Self, FixedArray[Byte], offset~ : Int32, max_len~ : Int32) -> Int32
 pub fn Connection::_get_internal_buffer(Self) -> @io.ReaderBuffer
 pub async fn Connection::drain(Self) -> Unit
-pub async fn Connection::drop(Self, Int) -> Int
+pub async fn Connection::drop(Self, Int32) -> Int32
 pub fn Connection::has_body(Self) -> Bool
 pub async fn Connection::headers(Self) -> Map[String, String]
-pub async fn Connection::line(Self, limit~ : Int) -> String
+pub async fn Connection::line(Self, limit~ : Int32) -> String
 pub fn Connection::new(&@io.Reader) -> Self
-pub async fn Connection::read(Self, FixedArray[Byte], offset? : Int, max_len? : Int) -> Int
+pub async fn Connection::read(Self, FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32
 pub async fn Connection::read_all(Self) -> &@io.Data
-pub async fn Connection::read_body(Self, FixedArray[Byte]) -> Int
-pub async fn Connection::read_exactly(Self, Int) -> Bytes
+pub async fn Connection::read_body(Self, FixedArray[Byte]) -> Int32
+pub async fn Connection::read_exactly(Self, Int32) -> Bytes
 pub async fn Connection::read_request(Self) -> Head
-pub async fn Connection::read_some(Self, max_len? : Int) -> Bytes?
+pub async fn Connection::read_some(Self, max_len? : Int32) -> Bytes?
 pub async fn Connection::read_until(Self, StringView) -> String?
 pub impl @io.Reader for Connection
 

@@ -10,8 +10,6 @@ priv type Job
 #external
 type Handle
 ///|
-extern "C" fn pool_new(workers : Int, capacity : Int, notify : @types.Fd, body : Int, directory : Int) -> Pool = "hs_io_pool_new"
-///|
 extern "C" fn reserve(pool : Pool, directory : Bool, bytes : Int) -> Bool = "hs_io_reserve"
 ///|
 extern "C" fn release(pool : Pool, directory : Bool, bytes : Int) = "hs_io_release"
@@ -74,6 +72,15 @@ extern "C" fn file_size(file : Handle) -> Int64 = "hs_io_file_size"
 extern "C" fn file_time(file : Handle) -> Int64 = "hs_io_file_time"
 ///|
 extern "C" fn no_file() -> Handle = "hs_io_no_file"
+
+///|
+extern "C" fn pool_new_with_backend(workers : Int, capacity : Int, notify : @types.Fd, body : Int, directory : Int, backend : Int) -> Pool = "hs_io_pool_new"
+///|
+extern "C" fn backend_supported(backend : Int) -> Bool = "hs_io_backend_supported"
+///|
+pub extern "C" fn io_uring_available() -> Bool = "hs_io_uring_available"
+///|
+pub extern "C" fn io_uring_capabilities() -> UInt = "hs_io_uring_capabilities"
 ///|
 #cfg(platform="windows")
 extern "C" fn no_socket() -> @types.Fd = "hs_io_no_file"
@@ -108,9 +115,23 @@ pub struct Runtime {
 }
 
 ///|
-pub fn Runtime::new(workers~ : Int, capacity~ : Int, body_bytes? : Int = 67108864, directory_bytes? : Int = 67108864, connections? : Int = 1024) -> Runtime raise {
+pub fn Runtime::new(workers~ : Int, capacity~ : Int, body_bytes? : Int = 67108864, directory_bytes? : Int = 67108864, connections? : Int = 1024, backend? : String = "platform") -> Runtime raise {
   let (reader, writer) = @pipe.pipe()
-  let pool = pool_new(workers, capacity, writer.fd(), body_bytes, directory_bytes)
+  let backend_code = match backend {
+    "platform" => 0
+    "auto" => if io_uring_available() { 1 } else { 0 }
+    "epoll" => 2
+    "kqueue" => 3
+    "iocp" => 4
+    "io_uring" => 1
+    _ => 5
+  }
+  if backend_code == 5 || !backend_supported(backend_code) {
+    reader.close()
+    writer.close()
+    raise Unsupported
+  }
+  let pool = pool_new_with_backend(workers, capacity, writer.fd(), body_bytes, directory_bytes, backend_code)
   if pool_null(pool) {
     reader.close()
     writer.close()

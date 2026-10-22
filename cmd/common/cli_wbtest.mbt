@@ -6,6 +6,7 @@ test "cli: default arguments" {
       assert_eq(port, 8080)
       assert_eq(config.port, 8080)
       assert_eq(config.root, ".")
+      assert_eq(config.io_backend, "platform")
       assert_eq(config.base_url, "/")
       assert_eq(config.auto_index, true)
       assert_eq(config.show_dir, true)
@@ -22,6 +23,15 @@ test "cli: default arguments" {
     }
     _ => fail("expected Ok(Run)")
   }
+}
+
+///|
+test "cli: io backend selection is preserved for engine preflight" {
+  match parse_cli(["--io-backend", "auto", "public"]) {
+    Ok(Run(config, _)) => assert_eq(config.io_backend, "auto")
+    _ => fail("expected auto backend")
+  }
+  assert_true(parse_cli(["--io-backend", "liburing"]) is Err(_))
 }
 
 ///|

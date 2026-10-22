@@ -8,7 +8,7 @@ import {
 // Values
 pub fn register(FuncRef[() -> Unit]) -> Unit
 
-pub fn run(Bool, async (@core.Config, async (Int) -> Unit) -> Unit) -> Unit
+pub fn run(Bool, async (@core.Config, async (Int32) -> Unit) -> Unit) -> Unit
 
 // Errors
 

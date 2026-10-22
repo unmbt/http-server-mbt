@@ -14,15 +14,15 @@ pub fn first_value(@argparse.Matches, String) -> String?
 
 pub fn parse_auth(String) -> Result[(String, String), String]
 
-pub fn parse_cache(String) -> Result[(Int, String?), String]
+pub fn parse_cache(String) -> Result[(Int32, String?), String]
 
 pub fn parse_cli(ArrayView[String], thin? : Bool) -> Result[CliAction, String]
 
-pub fn parse_integer(String) -> Int?
+pub fn parse_integer(String) -> Int32?
 
-pub fn parse_port(String) -> Int?
+pub fn parse_port(String) -> Int32?
 
-pub async fn run(thin~ : Bool, async (@core.Config, Int, async () -> Unit) -> Unit) -> Unit
+pub async fn run(thin~ : Bool, async (@core.Config, Int32, async () -> Unit) -> Unit) -> Unit
 
 // Errors
 
@@ -30,7 +30,7 @@ pub async fn run(thin~ : Bool, async (@core.Config, Int, async () -> Unit) -> Un
 pub enum CliAction {
   Help(String)
   Version(String)
-  Run(@core.Config, Int)
+  Run(@core.Config, Int32)
 } derive(@debug.Debug)
 pub fn CliAction::output(Self, &Logger) -> Unit
 pub fn CliAction::to_repr(Self) -> @debug.Repr

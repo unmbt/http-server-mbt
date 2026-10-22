@@ -1,6 +1,6 @@
 # 脚本入口
 
-所有命令从仓库根目录运行；自动化使用 `.mbtx`，依赖固定 `moonbitlang/async@0.21.3`。先执行 `moon update`。当前候选验证要求 Moon `0.1.20260920`；平台工具链配置见 [Actions](../.github/workflows/cli.yml)。
+所有命令从仓库根目录运行；自动化使用 `.mbtx`，依赖固定 `moonbitlang/async@0.21.3`。先执行 `moon update`。当前候选验证要求 Moon `0.1.20261020`、moonc `0.10.16+b1a0e846e`；平台工具链配置见 [Actions](../.github/workflows/cli.yml)。
 
 | 目录 | 入口及用途 |
 |---|---|

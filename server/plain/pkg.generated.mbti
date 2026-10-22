@@ -12,7 +12,7 @@ import {
 // Values
 pub async fn with_server(@core.Config, async (Server) -> Unit) -> Unit
 
-pub async fn with_server_at(@core.Config, Int, async (Server) -> Unit) -> Unit
+pub async fn with_server_at(@core.Config, Int32, async (Server) -> Unit) -> Unit
 
 // Errors
 
@@ -24,14 +24,14 @@ pub struct Server {
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
-  active_requests : @ref.Ref[Int]
+  active_requests : @ref.Ref[Int32]
 }
-pub fn Server::active_request_count(Self) -> Int
+pub fn Server::active_request_count(Self) -> Int32
 pub fn Server::config(Self) -> @core.Config
 pub fn Server::engine(Self) -> @http-server-mbt.StaticEngine
-pub fn Server::port(Self) -> Int
+pub fn Server::port(Self) -> Int32
 pub fn Server::stop(Self) -> Unit
-pub async fn Server::stop_and_drain(Self, timeout_ms? : Int) -> Unit
+pub async fn Server::stop_and_drain(Self, timeout_ms? : Int32) -> Unit
 
 // Type aliases
 

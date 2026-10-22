@@ -108,6 +108,7 @@ pub(all) suberror ConfigError {
   InvalidTimeout(String)
   InvalidTls(String)
   InvalidLimits(String)
+  InvalidIoBackend(String)
 } derive(Eq, @debug.Debug)
 pub fn ConfigError::equal(Self, Self) -> Bool
 pub fn ConfigError::not_equal(Self, Self) -> Bool
@@ -136,7 +137,7 @@ pub fn ByteRange::not_equal(Self, Self) -> Bool
 pub fn ByteRange::to_repr(Self) -> @debug.Repr
 
 pub(all) enum CachePolicy {
-  MaxAge(Int)
+  MaxAge(Int32)
   NoCache
   Exact(String)
 } derive(Eq, @debug.Debug)
@@ -146,8 +147,9 @@ pub fn CachePolicy::to_repr(Self) -> @debug.Repr
 
 pub(all) struct Config {
   limits : RuntimeLimits
+  io_backend : String
   root : String
-  port : Int
+  port : Int32
   address : String
   base_url : String
   default_ext : String?
@@ -160,7 +162,7 @@ pub(all) struct Config {
   show_dir : Bool
   show_dotfiles : Bool
   dir_overrides_404 : Bool
-  cache_seconds : Int
+  cache_seconds : Int32
   cache_control : String?
   weak_etags : Bool
   weak_compare : Bool
@@ -184,7 +186,7 @@ pub(all) struct Config {
   ca_file : String?
   secure : Bool
   handle_error : Bool
-  idle_timeout_ms : Int
+  idle_timeout_ms : Int32
   mime_types : Map[String, String]
   log_ip : Bool
   silent : Bool
@@ -271,17 +273,17 @@ pub(all) enum ResponseBody {
   FileRegion(String, Int64, Int64)
 } derive(Eq, @debug.Debug)
 pub fn ResponseBody::equal(Self, Self) -> Bool
-pub fn ResponseBody::length(Self) -> Int
+pub fn ResponseBody::length(Self) -> Int32
 pub fn ResponseBody::not_equal(Self, Self) -> Bool
 pub fn ResponseBody::to_repr(Self) -> @debug.Repr
 
 pub(all) struct RuntimeLimits {
-  file_workers : Int
-  queued_operations : Int
-  connections : Int
-  body_block_bytes : Int
-  body_buffer_bytes : Int
-  directory_metadata_bytes : Int
+  file_workers : Int32
+  queued_operations : Int32
+  connections : Int32
+  body_block_bytes : Int32
+  body_buffer_bytes : Int32
+  directory_metadata_bytes : Int32
 } derive(Eq, @debug.Debug)
 pub fn RuntimeLimits::default() -> Self
 pub fn RuntimeLimits::equal(Self, Self) -> Bool

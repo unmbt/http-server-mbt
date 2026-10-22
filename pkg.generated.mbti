@@ -10,7 +10,11 @@ import {
 // Values
 pub fn escape_html(String) -> String
 
-pub fn get_handle_count() -> UInt
+pub fn get_handle_count() -> UInt32
+
+pub fn io_uring_available() -> Bool
+
+pub fn io_uring_capabilities() -> UInt32
 
 pub fn render_directory_listing_html(String, Array[(String, Bool)], raw_query? : String?, host? : String) -> String
 
@@ -38,7 +42,7 @@ pub(all) enum HandleResult {
 }
 
 pub struct Response {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   // private fields
 }
@@ -46,9 +50,9 @@ pub fn Response::body_length(Self) -> Int64
 pub async fn Response::check(Self) -> Unit
 pub async fn Response::close(Self) -> Unit
 pub fn Response::content_length(Self) -> Int64?
-pub async fn Response::read(Self, max_len? : Int) -> Bytes
+pub async fn Response::read(Self, max_len? : Int32) -> Bytes
 pub async fn Response::send_to(Self, @socket.Tcp) -> Unit
-pub async fn Response::to_bytes(Self, max_bytes~ : Int) -> Bytes
+pub async fn Response::to_bytes(Self, max_bytes~ : Int32) -> Bytes
 pub async fn Response::write_to(Self, &@io.Writer, chunked? : Bool) -> Unit
 
 pub struct StaticEngine {

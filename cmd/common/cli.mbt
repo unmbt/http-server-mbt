@@ -101,6 +101,11 @@ pub fn build_command(thin~ : Bool = false) -> @argparse.Command {
         about="Listen TCP port [default: 8080]",
       ),
       @argparse.OptionArg(
+        "io-backend",
+        long="io-backend",
+        about="I/O backend: platform, auto, epoll, kqueue, iocp, or io_uring [default: platform]",
+      ),
+      @argparse.OptionArg(
         "base-url",
         long="base-url",
         about="Mount URL prefix [default: /]",
@@ -201,6 +206,10 @@ pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAc
   // 2. Root positional
   let root = first_value(matches, "root").unwrap_or(".")
 
+  // Native I/O backend. Capability and platform checks happen when the
+  // engine opens, before the listener is created.
+  let io_backend = first_value(matches, "io-backend").unwrap_or("platform")
+
   // 3. Base URL / Base Dir
   let raw_base_url = first_value(matches, "base-url")
   let raw_base_dir = first_value(matches, "base-dir")
@@ -269,6 +278,7 @@ pub fn parse_cli(args : ArrayView[String], thin~ : Bool = false) -> Result[CliAc
   let mut config = @core.Config::default(root)
   config = {
     ..config,
+    io_backend,
     port,
     base_url,
     spa,

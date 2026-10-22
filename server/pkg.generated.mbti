@@ -13,7 +13,7 @@ import {
 }
 
 // Values
-pub fn get_handle_count() -> UInt
+pub fn get_handle_count() -> UInt32
 
 pub async fn load_proxy_rules(String?) -> Array[@core.ProxyRule]
 
@@ -23,9 +23,9 @@ pub fn parse_target_url(String) -> TargetUrl?
 
 pub async fn with_server(@core.Config, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
 
-pub async fn with_server_at(@core.Config, Int, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
+pub async fn with_server_at(@core.Config, Int32, acceptor? : &Acceptor, async (Server) -> Unit) -> Unit
 
-pub async fn with_server_at_with_connector(@core.Config, Int, acceptor? : &Acceptor, upstream_connector? : &UpstreamConnector, async (Server) -> Unit) -> Unit
+pub async fn with_server_at_with_connector(@core.Config, Int32, acceptor? : &Acceptor, upstream_connector? : &UpstreamConnector, async (Server) -> Unit) -> Unit
 
 // Errors
 
@@ -56,29 +56,29 @@ pub struct Server {
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
-  active_requests : @ref.Ref[Int]
+  active_requests : @ref.Ref[Int32]
 }
 pub fn Server::acceptor(Self) -> &Acceptor
-pub fn Server::active_request_count(Self) -> Int
+pub fn Server::active_request_count(Self) -> Int32
 pub fn Server::config(Self) -> @core.Config
 pub fn Server::engine(Self) -> @http-server-mbt.StaticEngine
 pub fn Server::has_upgrade_capability(Self) -> Bool
 pub fn Server::match_proxy_rule(Self, String) -> (String, String)?
-pub fn Server::port(Self) -> Int
+pub fn Server::port(Self) -> Int32
 pub fn Server::stop(Self) -> Unit
-pub async fn Server::stop_and_drain(Self, timeout_ms? : Int) -> Unit
+pub async fn Server::stop_and_drain(Self, timeout_ms? : Int32) -> Unit
 pub fn Server::upstream_connector(Self) -> &UpstreamConnector
 
 pub struct TargetUrl {
   scheme : String
   host : String
-  port : Int
+  port : Int32
   base_path : String
 } derive(Eq, @debug.Debug)
 pub fn TargetUrl::equal(Self, Self) -> Bool
 pub fn TargetUrl::host(Self) -> String
 pub fn TargetUrl::not_equal(Self, Self) -> Bool
-pub fn TargetUrl::port(Self) -> Int
+pub fn TargetUrl::port(Self) -> Int32
 pub fn TargetUrl::scheme(Self) -> String
 pub fn TargetUrl::to_repr(Self) -> @debug.Repr
 

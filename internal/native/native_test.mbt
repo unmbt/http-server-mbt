@@ -13,3 +13,15 @@ async test "native rooted lease and bounded worker completion" {
   defer runtime.release(directory=true,charge)
   assert_true(names.contains("hello.txt"))
 }
+
+///|
+test "io_uring capability probe is conservative" {
+  let available = @native.io_uring_available()
+  let capabilities = @native.io_uring_capabilities()
+  if !available {
+    assert_eq(capabilities, 0U)
+  } else {
+    assert_true((capabilities & 1U) != 0U)
+    assert_true((capabilities & (1U << 1)) != 0U)
+  }
+}

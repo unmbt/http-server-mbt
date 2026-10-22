@@ -17,7 +17,7 @@ pub async fn new_tls_acceptor(@core.Config) -> &@server.Acceptor raise @core.Con
 
 pub async fn with_server(@core.Config, async (@server.Server) -> Unit) -> Unit
 
-pub async fn with_server_at(@core.Config, Int, async (@server.Server) -> Unit) -> Unit
+pub async fn with_server_at(@core.Config, Int32, async (@server.Server) -> Unit) -> Unit
 
 // Errors
 

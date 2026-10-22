@@ -6,7 +6,7 @@
 
 ## 从源码构建并启动
 
-在仓库根目录执行。构建使用 MoonBit `0.10.14+7d59c7ec9` 发行工具链及配套 core（`moon version --all` 中 Moon 为 `0.1.20260920`）。
+在仓库根目录执行。构建使用 MoonBit `0.10.16+b1a0e846e` 发行工具链及配套 core（`moon version --all` 中 Moon 为 `0.1.20261020`）。
 
 ```powershell
 moon update

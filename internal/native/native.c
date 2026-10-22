@@ -32,6 +32,8 @@ typedef CONDITION_VARIABLE hs_cond;
 #ifdef __linux__
 #include <sys/syscall.h>
 #include <linux/openat2.h>
+#include <linux/io_uring.h>
+#include <sys/mman.h>
 #include <sys/sendfile.h>
 #endif
 typedef int hs_fd;
@@ -58,6 +60,7 @@ typedef struct hs_pool {
   hs_budget *budget;
   struct hs_pool *budget_next;
   int64_t body_limit, directory_limit, body_owned, directory_owned;
+  int backend;
 #ifdef _WIN32
   OVERLAPPED notification;
   HANDLE notification_event;
@@ -117,6 +120,182 @@ static void hs_file_free(hs_file *f) {
   close(f->fd);
 #endif
   free(f);
+}
+
+/* The experimental Linux backend deliberately uses the stable io_uring
+ * syscall ABI directly.  This keeps the default epoll/sendfile build free of
+ * a liburing link dependency and lets capability probing fail cleanly under
+ * older kernels or seccomp sandboxes. */
+#ifdef __linux__
+typedef struct hs_uring {
+  int fd;
+  void *sq_ring;
+  void *cq_ring;
+  struct io_uring_sqe *sqes;
+  unsigned *sq_head, *sq_tail, *sq_mask, *sq_array;
+  unsigned *cq_head, *cq_tail, *cq_mask;
+  struct io_uring_cqe *cqes;
+  size_t sq_ring_size, cq_ring_size, sqes_size;
+} hs_uring;
+
+static int hs_uring_open(hs_uring *u, unsigned entries) {
+  memset(u, 0, sizeof(*u));
+  u->fd = -1;
+  struct io_uring_params p;
+  memset(&p, 0, sizeof(p));
+  int fd = (int)syscall(SYS_io_uring_setup, entries, &p);
+  if (fd < 0) return -errno;
+  /* The simple bridge uses the normal 64-byte SQE layout. */
+  if (p.flags & IORING_SETUP_SQE128) { close(fd); return -ENOTSUP; }
+  size_t sq_size = p.sq_off.array + p.sq_entries * sizeof(unsigned);
+  size_t cq_size = p.cq_off.cqes + p.cq_entries * sizeof(struct io_uring_cqe);
+  if (p.features & IORING_FEAT_SINGLE_MMAP && cq_size > sq_size) sq_size = cq_size;
+  void *sq = mmap(NULL, sq_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
+                  fd, IORING_OFF_SQ_RING);
+  if (sq == MAP_FAILED) { int e = errno; close(fd); return -e; }
+  void *cq = (p.features & IORING_FEAT_SINGLE_MMAP)
+    ? sq
+    : mmap(NULL, cq_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
+           fd, IORING_OFF_CQ_RING);
+  if (cq == MAP_FAILED) { int e = errno; munmap(sq, sq_size); close(fd); return -e; }
+  size_t sqes_size = p.sq_entries * sizeof(struct io_uring_sqe);
+  struct io_uring_sqe *sqes = mmap(NULL, sqes_size, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED | MAP_POPULATE, fd, IORING_OFF_SQES);
+  if (sqes == MAP_FAILED) {
+    int e = errno;
+    if (cq != sq) munmap(cq, cq_size);
+    munmap(sq, sq_size);
+    close(fd);
+    return -e;
+  }
+  u->fd = fd; u->sq_ring = sq; u->cq_ring = cq; u->sqes = sqes;
+  u->sq_ring_size = sq_size; u->cq_ring_size = cq_size; u->sqes_size = sqes_size;
+  u->sq_head = (unsigned *)((char *)sq + p.sq_off.head);
+  u->sq_tail = (unsigned *)((char *)sq + p.sq_off.tail);
+  u->sq_mask = (unsigned *)((char *)sq + p.sq_off.ring_mask);
+  u->sq_array = (unsigned *)((char *)sq + p.sq_off.array);
+  u->cq_head = (unsigned *)((char *)cq + p.cq_off.head);
+  u->cq_tail = (unsigned *)((char *)cq + p.cq_off.tail);
+  u->cq_mask = (unsigned *)((char *)cq + p.cq_off.ring_mask);
+  u->cqes = (struct io_uring_cqe *)((char *)cq + p.cq_off.cqes);
+  return 0;
+}
+
+static void hs_uring_close(hs_uring *u) {
+  if (u->fd < 0) return;
+  munmap(u->sqes, u->sqes_size);
+  if (u->cq_ring != u->sq_ring) munmap(u->cq_ring, u->cq_ring_size);
+  munmap(u->sq_ring, u->sq_ring_size);
+  close(u->fd);
+  u->fd = -1;
+}
+
+static int hs_uring_io(hs_uring *u, uint8_t opcode, int fd, void *buffer,
+                       unsigned length, uint64_t offset) {
+  unsigned head = *u->sq_head;
+  unsigned tail = *u->sq_tail;
+  if (tail - head >= *u->sq_mask + 1) return -EBUSY;
+  unsigned index = tail & *u->sq_mask;
+  struct io_uring_sqe *sqe = &u->sqes[index];
+  memset(sqe, 0, sizeof(*sqe));
+  sqe->opcode = opcode;
+  sqe->fd = fd;
+  sqe->off = offset;
+  sqe->addr = (uintptr_t)buffer;
+  sqe->len = length;
+  sqe->user_data = 1;
+  u->sq_array[index] = index;
+  __sync_synchronize();
+  *u->sq_tail = tail + 1;
+  int submitted;
+  do {
+    submitted = (int)syscall(SYS_io_uring_enter, u->fd, 1, 1, 0, NULL);
+  } while (submitted < 0 && errno == EINTR);
+  if (submitted < 0) return -errno;
+  unsigned cq_head = *u->cq_head;
+  unsigned cq_tail = *u->cq_tail;
+  while (cq_head == cq_tail) {
+    int ret = (int)syscall(SYS_io_uring_enter, u->fd, 0, 1, 0, NULL);
+    if (ret < 0 && errno != EINTR) return -errno;
+    cq_tail = *u->cq_tail;
+  }
+  __sync_synchronize();
+  struct io_uring_cqe cqe = u->cqes[cq_head & *u->cq_mask];
+  *u->cq_head = cq_head + 1;
+  return cqe.res;
+}
+
+static int hs_uring_read(int fd, void *buffer, unsigned length, uint64_t offset) {
+  hs_uring u;
+  int code = hs_uring_open(&u, 2);
+  if (code) return code;
+  int result = hs_uring_io(&u, IORING_OP_READ, fd, buffer, length, offset);
+  hs_uring_close(&u);
+  return result;
+}
+
+static int hs_uring_probe_opcode(int ring, unsigned opcode) {
+  const unsigned count = 256;
+  size_t size = sizeof(struct io_uring_probe) + count * sizeof(struct io_uring_probe_op);
+  struct io_uring_probe *probe = calloc(1, size);
+  if (!probe) return 0;
+  probe->ops_len = count;
+  int result = (int)syscall(SYS_io_uring_register, ring, IORING_REGISTER_PROBE,
+                            probe, count);
+  int supported = 0;
+  if (result >= 0 && opcode < probe->ops_len)
+    supported = (probe->ops[opcode].flags & IO_URING_OP_SUPPORTED) != 0;
+  free(probe);
+  return supported;
+}
+#endif
+
+MOONBIT_FFI_EXPORT uint32_t hs_io_uring_capabilities(void);
+
+MOONBIT_FFI_EXPORT int hs_io_uring_available(void) {
+#ifdef __linux__
+  return (hs_io_uring_capabilities() & 3u) == 3u;
+#else
+  return 0;
+#endif
+}
+
+MOONBIT_FFI_EXPORT uint32_t hs_io_uring_capabilities(void) {
+#ifdef __linux__
+  hs_uring u;
+  if (hs_uring_open(&u, 2)) return 0;
+  uint32_t caps = 1u; /* setup */
+  if (hs_uring_probe_opcode(u.fd, IORING_OP_READ)) caps |= 1u << 1;
+  if (hs_uring_probe_opcode(u.fd, IORING_OP_SEND)) caps |= 1u << 2;
+  if (hs_uring_probe_opcode(u.fd, IORING_OP_ASYNC_CANCEL)) caps |= 1u << 3;
+  hs_uring_close(&u);
+  return caps;
+#else
+  return 0;
+#endif
+}
+
+MOONBIT_FFI_EXPORT int hs_io_backend_supported(int backend) {
+  switch (backend) {
+    case 0: return 1; /* platform */
+    case 1: return hs_io_uring_available();
+#ifdef __linux__
+    case 2: return 1; /* epoll is the stable Linux selection */
+#else
+    case 2: return 0;
+#endif
+#ifdef __APPLE__
+    case 3: return 1;
+#else
+    case 3: return 0;
+#endif
+#ifdef _WIN32
+    case 4: return 1;
+#else
+    case 4: return 0;
+#endif
+    default: return 0;
+  }
 }
 
 #ifdef _WIN32
@@ -347,6 +526,20 @@ static int hs_read(hs_job *j) {
     if (!ok) return -4;
     int count = (int)got;
 #else
+#ifdef __linux__
+    if (j->pool->backend == 1) {
+      int count = hs_uring_read(j->file->fd, j->data + n, (unsigned)request,
+                                (uint64_t)(j->offset + n));
+      if (count < 0) {
+        if (count == -EINTR) continue;
+        if (count == -ECANCELED) return -9;
+        return -4;
+      }
+      if (!count) return -3;
+      n += count;
+      continue;
+    }
+#endif
     ssize_t count = pread(j->file->fd, j->data+n, (size_t)request, (off_t)(j->offset+n));
     if (count < 0 && errno == EINTR) continue;
     if (count < 0) return -4;
@@ -446,6 +639,10 @@ static int hs_send(hs_job *j) {
   if (!ok) return -4;
   j->value=sent ? sent : j->length;
 #elif defined(__linux__)
+  /* io_uring currently uses the bounded read path.  Returning unsupported
+     here makes the MoonBit owner switch to File::read without ever labelling a
+     normal send as zero-copy; the file reads themselves use IORING_OP_READ. */
+  if (j->pool->backend == 1) return -8;
   off_t off=(off_t)j->offset;
   ssize_t n=sendfile((int)j->socket,j->file->fd,&off,(size_t)j->length);
   if (n<0) {if (errno==EAGAIN || errno==EINTR) {j->value=0; return 0;} return errno==EINVAL || errno==ENOSYS || errno==EOPNOTSUPP ? -8 : -4;}
@@ -547,8 +744,9 @@ static void *hs_worker(void *arg) {
   }
   return 0;
 }
-MOONBIT_FFI_EXPORT hs_pool *hs_io_pool_new(int count,int capacity,hs_fd notify,int body_limit,int directory_limit) {
+MOONBIT_FFI_EXPORT hs_pool *hs_io_pool_new(int count,int capacity,hs_fd notify,int body_limit,int directory_limit,int backend) {
   if(count<1 || count>64 || capacity<1)return NULL;
+  if(!hs_io_backend_supported(backend))return NULL;
   hs_pool *p=calloc(1,sizeof(*p));if(!p)return NULL;
 #ifdef _WIN32
   InitializeSRWLock(&p->mutex);
@@ -578,7 +776,7 @@ MOONBIT_FFI_EXPORT hs_pool *hs_io_pool_new(int count,int capacity,hs_fd notify,i
     hs_owner_budget=b;
   }
   p->budget=b;p->capacity=capacity;p->worker_limit=count;p->notify=notify;
-  p->body_limit=body_limit;p->directory_limit=directory_limit;p->connection_limit=1024;
+  p->body_limit=body_limit;p->directory_limit=directory_limit;p->connection_limit=1024;p->backend=backend;
   LOCK(&b->mutex);
   p->budget_next=b->pools;b->pools=p;b->refs++;
   /* One executor per owner; capacity never scales with instance count.

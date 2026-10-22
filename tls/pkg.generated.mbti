@@ -8,15 +8,15 @@ import {
 }
 
 // Values
-pub fn tls_acceptor_count() -> Int
+pub fn tls_acceptor_count() -> Int32
 
-pub fn tls_conn_count() -> Int
+pub fn tls_conn_count() -> Int32
 
 pub fn tls_global_init() -> Unit raise TlsError
 
 // Errors
 pub suberror TlsError {
-  TlsError(code~ : Int, message~ : String)
+  TlsError(code~ : Int32, message~ : String)
   TlsUnexpectedEof
 } derive(@debug.Debug)
 pub fn TlsError::to_repr(Self) -> @debug.Repr
@@ -49,20 +49,20 @@ pub struct TlsConn {
   output_gate : @async.Mutex
   mut closed : Bool
 }
-pub async fn TlsConn::_direct_read(Self, FixedArray[Byte], offset~ : Int, max_len~ : Int) -> Int
+pub async fn TlsConn::_direct_read(Self, FixedArray[Byte], offset~ : Int32, max_len~ : Int32) -> Int32
 pub fn TlsConn::_get_internal_buffer(Self) -> @io.ReaderBuffer
 pub fn TlsConn::close(Self) -> Unit
-pub async fn TlsConn::drop(Self, Int) -> Int
+pub async fn TlsConn::drop(Self, Int32) -> Int32
 pub fn TlsConn::is_closed(Self) -> Bool
-pub async fn TlsConn::read(Self, FixedArray[Byte], offset? : Int, max_len? : Int) -> Int
+pub async fn TlsConn::read(Self, FixedArray[Byte], offset? : Int32, max_len? : Int32) -> Int32
 pub async fn TlsConn::read_all(Self) -> &@io.Data
-pub async fn TlsConn::read_exactly(Self, Int) -> Bytes
-pub async fn TlsConn::read_some(Self, max_len? : Int) -> Bytes?
+pub async fn TlsConn::read_exactly(Self, Int32) -> Bytes
+pub async fn TlsConn::read_some(Self, max_len? : Int32) -> Bytes?
 pub async fn TlsConn::read_until(Self, StringView) -> String?
 pub async fn TlsConn::shutdown(Self) -> Bool
 pub async fn TlsConn::shutdown_write(Self) -> Bool
 pub async fn TlsConn::write(Self, &@io.Data) -> Unit
-pub async fn TlsConn::write_once(Self, Bytes, offset~ : Int, len~ : Int) -> Int
+pub async fn TlsConn::write_once(Self, Bytes, offset~ : Int32, len~ : Int32) -> Int32
 pub async fn TlsConn::write_reader(Self, &@io.Reader) -> Unit
 pub impl @io.Reader for TlsConn
 pub impl @io.Writer for TlsConn

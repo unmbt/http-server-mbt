@@ -1,5 +1,26 @@
 # http-server-mbt 重构设计
 
+## 2026-10-22 增量设计（D-21：可选 io_uring 与观测型 benchmark）
+
+本增量实现 R-N04/R-N18。Config.io_backend 和 CLI --io-backend 的默认值为
+platform；auto 仅在 Linux 启动探测成功时选择实验后端，其他情况回到稳定平台
+后端。显式 io_uring、epoll、kqueue 或 iocp 在当前平台/内核不具备能力时，
+在 StaticEngine::open、监听器创建前失败，不创建监听 socket。进行中的操作不会因为
+错误无声切换后端或重发数据。
+
+实验实现通过 Linux io_uring_setup/io_uring_enter/io_uring_register 直接调用
+内核 ABI，当前把 IORING_OP_READ 用于文件读取；文件发送在实验路径回退到有界
+File::read，不把普通 send 宣称为零拷贝。探测能力位为 setup、READ、SEND、
+ASYNC_CANCEL；能力不足、ENOSYS、EPERM、opcode 缺失都视为不可用。默认
+platform 不加载这段路径。因为没有使用 liburing API 或链接符号，liburing 2.15
+不是必需依赖；若以后采用 liburing 的 ring 管理或新 opcode，必须另建可选 Linux
+依赖清单和静态/动态链接验证，不能把它隐式加入三平台基础构建。
+
+benchmarks/ 是 Native-only 的进程内测量工具，重复 StaticEngine 的规划和有界
+文件读取，输出 backend、iterations、bytes、elapsed_ns、requests_per_second 和
+mib_per_second。输出是本机诊断证据，不是性能承诺、跨机器比较或发布门槛；默认稳定
+后端和生产 CLI 行为不因 benchmark 存在而改变。
+
 ## 2026-09-29 第三方许可分发修订（D-08、D-14～D-16）
 
 关联 R-SDD/R-COMPAT/R-N02/R-N11/R-N13、T-001/T-025/T-026/T-030、N-18。项目原创代码保持 MIT；第三方代码与资源保留原许可，MbedTLS/TF-PSA 选择 Apache-2.0。源码候选包含第三方声明及原版迁移资产的 MIT 版权；二进制候选、npm、CLI/SDK 归档及四种容器包含许可目录。Mozilla MPL 资源同时提供固定 PEM、生成的 MoonBit 源码及再生脚本，不以根 MIT 覆盖它们。
@@ -472,6 +493,8 @@ T-030 用干净临时消费模块验证候选包内容，避免工作区缓存�
 ## D-16 Windows 本机起步与 GitHub Actions
 
 2026-10-13 CI 工具链漂移修复（T-025/T-029）：所有 Actions 安装入口同时固定 toolchain 和 core 为 `0.10.14+7d59c7ec9`（对应 Moon `0.1.20260920`）。安装器的发行版本与 `moon version` 的日期版本不同，不能直接将日期版本用作下载目录；候选脚本的版本门槛保持。工具链升级仍需单独验证，不随安装器的 `latest` 漂移。
+
+2026-10-22 工具链升级记录（T-023/T-036/T-037）：当前本机与活动 Actions 配置统一使用 toolchain/core `0.10.16+b1a0e846e`，对应 Moon `0.1.20261020`、moonrun `0.1.20261020`。`validate_candidate.mbtx` 的门槛、Wasm 示例和维护文档同步更新；此前验证记录保留原工具链版本，不改写历史证据。
 
 2026-09-28 版本一致性修订（R-N02/R-N11/R-N13，T-025/T-030，N-18）：`moon.mod` 是项目发行版本的唯一输入。`gen_version.mbtx --sync` 同步 CLI 生成源码、npm 主包/三平台包及其精确可选依赖、MoonBit 消费示例；`--check` 只读校验并在漂移时失败。CLI 构建和干净消费从同一解析器取得当前版本，不能固定旧版本断言。三平台候选检查在构建前执行此校验及版本升级回归；候选清单携带版本，汇总和发行同时核对版本、提交，发行 tag 必须为 `v<moon.mod version>`。既有完整发行任务和能力门槛保持有效。
 

@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+  "unmbt/http-server-mbt" @root,
+  "unmbt/http-server-mbt/core",
+}
+
+pkgtype(kind: "executable")
+
+options(
+  "native-stub": [ "clock.c" ],
+  targets: { "*.mbt": [ "native" ] },
+)

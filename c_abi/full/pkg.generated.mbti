@@ -2,7 +2,7 @@
 package "unmbt/http-server-mbt/c_abi/full"
 
 // Values
-pub fn hs_abi_version() -> UInt
+pub fn hs_abi_version() -> UInt32
 
 // Errors
 

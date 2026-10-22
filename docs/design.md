@@ -496,7 +496,7 @@ T-030 用干净临时消费模块验证候选包内容，避免工作区缓存�
 
 2026-10-22 工具链升级记录（T-023/T-036/T-037）：当前本机与活动 Actions 配置统一使用 toolchain/core `0.10.16+b1a0e846e`，对应 Moon `0.1.20261020`、moonrun `0.1.20261020`。`validate_candidate.mbtx` 的门槛、Wasm 示例和维护文档同步更新；此前验证记录保留原工具链版本，不改写历史证据。
 
-同日回归修复：`Json(value)` 替代新工具链弃用的 `.to_json()`；`resolve_path` 继续返回可匹配的 `Result`，以局部 `#warnings("-result_error_return")` 记录其有意的普通数据错误契约；候选 Native 测试顺序执行以隔离共享 owner 预算，编译仍可并行；Native sanitizer 探针补齐后端选择参数。首个失败候选 run 39778473013 的三平台错误均指向 `build_docker.mbtx` 的弃用调用，修复后的 Actions 结果另行记录。
+同日回归修复：`Json(value)` 替代新工具链弃用的 `.to_json()`；`resolve_path` 继续返回可匹配的 `Result`，以局部 `#warnings("-result_error_return")` 记录其有意的普通数据错误契约；候选 Native 测试顺序执行以隔离共享 owner 预算，编译仍可并行；Native sanitizer 探针补齐后端选择参数；C ABI 链接清单补充 `pathcch.lib`，并在 Linux/macOS staging 中只嵌入一次 thread pool。首个失败候选 run 39778473013 的三平台错误均指向 `build_docker.mbtx` 的弃用调用，修复后的 Actions 结果另行记录。
 
 2026-09-28 版本一致性修订（R-N02/R-N11/R-N13，T-025/T-030，N-18）：`moon.mod` 是项目发行版本的唯一输入。`gen_version.mbtx --sync` 同步 CLI 生成源码、npm 主包/三平台包及其精确可选依赖、MoonBit 消费示例；`--check` 只读校验并在漂移时失败。CLI 构建和干净消费从同一解析器取得当前版本，不能固定旧版本断言。三平台候选检查在构建前执行此校验及版本升级回归；候选清单携带版本，汇总和发行同时核对版本、提交，发行 tag 必须为 `v<moon.mod version>`。既有完整发行任务和能力门槛保持有效。
 

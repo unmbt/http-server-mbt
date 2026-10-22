@@ -15,34 +15,34 @@ type AcceptorObj
 type ConnObj
 
 ///|
-extern "c" fn tls_global_init_c() -> Int = "http_server_tls_global_init"
+extern "c" fn tls_global_init_c() -> Int32 = "http_server_tls_global_init"
 
 ///|
-extern "c" fn tls_strerror_c(code : Int) -> Bytes = "http_server_tls_strerror"
+extern "c" fn tls_strerror_c(code : Int32) -> Bytes = "http_server_tls_strerror"
 
 ///|
-extern "c" fn tls_conn_count_c() -> Int = "http_server_tls_conn_count"
+extern "c" fn tls_conn_count_c() -> Int32 = "http_server_tls_conn_count"
 
 ///|
-extern "c" fn tls_acceptor_count_c() -> Int = "http_server_tls_acceptor_count"
+extern "c" fn tls_acceptor_count_c() -> Int32 = "http_server_tls_acceptor_count"
 
 ///|
 #borrow(cert, key, pass)
 extern "c" fn tls_acceptor_new_server_c(
   cert : Bytes,
-  cert_len : Int,
+  cert_len : Int32,
   key : Bytes,
-  key_len : Int,
+  key_len : Int32,
   pass : Bytes,
-  pass_len : Int,
+  pass_len : Int32,
 ) -> Int64 = "http_server_tls_acceptor_new_server"
 
 ///|
 #borrow(ca)
 extern "c" fn tls_acceptor_new_client_c(
   ca : Bytes,
-  ca_len : Int,
-  insecure : Int,
+  ca_len : Int32,
+  insecure : Int32,
 ) -> Int64 = "http_server_tls_acceptor_new_client"
 
 ///|
@@ -57,7 +57,7 @@ extern "c" fn tls_acceptor_wrap_c(handle : Int64) -> AcceptorObj = "http_server_
 extern "c" fn tls_conn_new_c(
   acceptor : Int64,
   hostname : Bytes,
-  hostname_len : Int,
+  hostname_len : Int32,
 ) -> Int64 = "http_server_tls_conn_new"
 
 ///|
@@ -72,43 +72,43 @@ extern "c" fn tls_conn_wrap_c(handle : Int64) -> ConnObj = "http_server_tls_conn
 extern "c" fn tls_feed_array_c(
   handle : Int64,
   buf : FixedArray[Byte],
-  len : Int,
-) -> Int = "http_server_tls_feed"
+  len : Int32,
+) -> Int32 = "http_server_tls_feed"
 
 ///|
-extern "c" fn tls_in_space_c(handle : Int64) -> Int = "http_server_tls_in_space"
+extern "c" fn tls_in_space_c(handle : Int64) -> Int32 = "http_server_tls_in_space"
 
 ///|
 #borrow(buf)
 extern "c" fn tls_take_output_c(
   handle : Int64,
   buf : FixedArray[Byte],
-  cap : Int,
-) -> Int = "http_server_tls_take_output"
+  cap : Int32,
+) -> Int32 = "http_server_tls_take_output"
 
 ///|
-extern "c" fn tls_output_pending_c(handle : Int64) -> Int = "http_server_tls_output_pending"
+extern "c" fn tls_output_pending_c(handle : Int64) -> Int32 = "http_server_tls_output_pending"
 
 ///|
-extern "c" fn tls_handshake_c(handle : Int64) -> Int = "http_server_tls_handshake"
+extern "c" fn tls_handshake_c(handle : Int64) -> Int32 = "http_server_tls_handshake"
 
 ///|
 #borrow(buf)
 extern "c" fn tls_read_c(
   handle : Int64,
   buf : FixedArray[Byte],
-  offset : Int,
-  cap : Int,
-) -> Int = "http_server_tls_read"
+  offset : Int32,
+  cap : Int32,
+) -> Int32 = "http_server_tls_read"
 
 ///|
 #borrow(buf)
 extern "c" fn tls_write_c(
   handle : Int64,
   buf : Bytes,
-  offset : Int,
-  len : Int,
-) -> Int = "http_server_tls_write"
+  offset : Int32,
+  len : Int32,
+) -> Int32 = "http_server_tls_write"
 
 ///|
-extern "c" fn tls_shutdown_c(handle : Int64) -> Int = "http_server_tls_shutdown"
+extern "c" fn tls_shutdown_c(handle : Int64) -> Int32 = "http_server_tls_shutdown"

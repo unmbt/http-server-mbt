@@ -17,28 +17,28 @@
 
 ///|
 async fn proto_get(
-  port : Int,
+  port : Int32,
   path : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   proto_request_full(port, path, [], "GET")
 }
 
 ///|
 async fn proto_request(
-  port : Int,
+  port : Int32,
   path : String,
   headers : Array[(String, String)],
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   proto_request_full(port, path, headers, "GET")
 }
 
 ///|
 async fn proto_request_full(
-  port : Int,
+  port : Int32,
   path : String,
   headers : Array[(String, String)],
   meth : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()

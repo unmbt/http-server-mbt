@@ -27,7 +27,7 @@ pub fn render_directory_listing_html(
   title_path : String,
   entry_names : Array[(String, Bool)],
   raw_query? : String?,
-  host? : String = "localhost",
+  host~ : String = "localhost",
 ) -> String {
   @plan.render_directory_listing_html(
     title_path,
@@ -43,7 +43,7 @@ async fn StaticEngine::plan_request(
   self : StaticEngine,
   request : @core.Request,
 ) -> PlanResult {
-  let files : Map[Int, @native.File] = Map([])
+  let files : Map[Int32, @native.File] = Map([])
   let mut next_token = 0
   let mut retained = -1
   let mut charge = 0

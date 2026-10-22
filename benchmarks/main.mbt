@@ -15,7 +15,7 @@ fn option(args : ArrayView[String], name : String, fallback : String) -> String 
 }
 
 ///|
-fn positive_int(value : String, fallback : Int) -> Int {
+fn positive_int(value : String, fallback : Int32) -> Int32 {
   if value.length() == 0 {
     return fallback
   }

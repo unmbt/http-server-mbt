@@ -53,7 +53,7 @@ pub(all) struct Config {
   io_backend : String
   // --- Filesystem & Network ---
   root : String // Filesystem root directory (default "." or "public")
-  port : Int // TCP listen port (0..65535, 0 = ephemeral)
+  port : Int32 // TCP listen port (0..65535, 0 = ephemeral)
   address : String // Bind address ("0.0.0.0", "::", etc.)
 
   // --- Routing & Mounts ---
@@ -74,7 +74,7 @@ pub(all) struct Config {
   dir_overrides_404 : Bool // Directory listing takes precedence over custom 404.html
 
   // --- Caching & ETag ---
-  cache_seconds : Int // Cache duration in seconds (-1 = no-cache, no-store)
+  cache_seconds : Int32 // Cache duration in seconds (-1 = no-cache, no-store)
   cache_control : String? // Explicit Cache-Control header override
   weak_etags : Bool // Generate weak ETags (W/"...")
   weak_compare : Bool // Compare ETags using weak comparison
@@ -109,7 +109,7 @@ pub(all) struct Config {
 
   // --- Lifecycle & Error Handling ---
   handle_error : Bool // If false, delegates 404/errors to host (middleware Next)
-  idle_timeout_ms : Int // Socket idle timeout in ms (0 = disabled, default 120000)
+  idle_timeout_ms : Int32 // Socket idle timeout in ms (0 = disabled, default 120000)
   mime_types : Map[String, String] // Custom extension -> MIME type overrides
 
   // --- Logging & Output ---
@@ -222,10 +222,12 @@ pub fn Config::has_tls(self : Config) -> Bool {
 /// Inline/file proxy rules are conservatively treated as HTTPS when their
 /// configuration contains an `https://` target.
 pub fn Config::proxy_targets_include_https(self : Config) -> Bool {
-  if self.proxy is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
+  if self.proxy is Some(url) &&
+    (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
-  if self.proxy_all is Some(url) && (url.has_prefix("https://") || url.has_prefix("wss://")) {
+  if self.proxy_all is Some(url) &&
+    (url.has_prefix("https://") || url.has_prefix("wss://")) {
     return true
   }
   match self.proxy_config {
@@ -329,8 +331,13 @@ pub fn validate_try_files_path(path : String) -> String raise ConfigError {
 ///|
 /// Validate upstream proxy URL format (http:// or https:// with valid host/port).
 pub fn validate_proxy_url(url : String) -> Unit raise ConfigError {
-  let url=if url.has_prefix("wss://") { "https://"+url[6:].to_owned() }
-    else if url.has_prefix("ws://") { "http://"+url[5:].to_owned() } else { url }
+  let url = if url.has_prefix("wss://") {
+    "https://" + url[6:].to_owned()
+  } else if url.has_prefix("ws://") {
+    "http://" + url[5:].to_owned()
+  } else {
+    url
+  }
   if !url.has_prefix("http://") && !url.has_prefix("https://") {
     raise ConfigError::InvalidProxy(
       "proxy URL must start with http:// or https://",
@@ -481,7 +488,6 @@ pub fn parse_auth_credential(str : String) -> (String, String)? {
     None => None
   }
 }
-
 
 ///|
 pub extend ConfigError with Eq::{not_equal, equal}

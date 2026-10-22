@@ -53,7 +53,7 @@ pub fn TlsAcceptor::new_server(
 /// meant for the explicit `secure=false` configuration escape (AD-09).
 pub fn TlsAcceptor::new_client(
   ca? : Bytes,
-  insecure? : Bool = false,
+  insecure~ : Bool = false,
 ) -> TlsAcceptor raise TlsError {
   tls_global_init()
   let ca = match ca {
@@ -90,6 +90,6 @@ pub fn TlsAcceptor::close(self : TlsAcceptor) -> Unit {
 
 ///|
 /// Number of live acceptor objects (leak probe for resource tests).
-pub fn tls_acceptor_count() -> Int {
+pub fn tls_acceptor_count() -> Int32 {
   tls_acceptor_count_c()
 }

@@ -12,7 +12,7 @@
 
 ///|
 struct HttpResponse {
-  status : Int
+  status : Int32
   reason : String
   headers : Map[String, String]
   body : Bytes
@@ -24,7 +24,7 @@ struct TcpClient {
 }
 
 ///|
-fn parse_status_line(line : String) -> (Int, String) {
+fn parse_status_line(line : String) -> (Int32, String) {
   let parts = line.split(" ").to_array()
   let status = if parts.length() >= 2 {
     let mut n = 0
@@ -53,7 +53,7 @@ fn parse_status_line(line : String) -> (Int, String) {
 }
 
 ///|
-fn parse_content_length(headers : Map[String, String]) -> Int {
+fn parse_content_length(headers : Map[String, String]) -> Int32 {
   match headers.get("content-length") {
     Some(len_str) => {
       let mut n = 0
@@ -69,7 +69,7 @@ fn parse_content_length(headers : Map[String, String]) -> Int {
 }
 
 ///|
-async fn TcpClient::connect(port : Int) -> TcpClient {
+async fn TcpClient::connect(port : Int32) -> TcpClient {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   { conn, }
@@ -88,7 +88,7 @@ async fn TcpClient::send_raw(self : TcpClient, raw : String) -> Unit {
 ///|
 async fn TcpClient::read_response(
   self : TcpClient,
-  is_head? : Bool = false,
+  is_head~ : Bool = false,
 ) -> HttpResponse {
   let status_line = match self.conn.read_until("\r\n") {
     Some(s) => s
@@ -133,9 +133,9 @@ async fn TcpClient::is_eof(self : TcpClient) -> Bool {
 
 ///|
 async fn e2e_one_shot(
-  port : Int,
+  port : Int32,
   raw_req : String,
-  is_head? : Bool = false,
+  is_head~ : Bool = false,
 ) -> HttpResponse {
   let client = TcpClient::connect(port)
   defer client.close()

@@ -2,7 +2,7 @@
 // Content-Length client; chunked/protocol-fault clients retain their own semantics.
 
 ///|
-fn parse_status_code(status_line : String) -> Int {
+fn parse_status_code(status_line : String) -> Int32 {
   let parts = status_line.split(" ").to_array()
   if parts.length() >= 2 {
     parse_int(parts[1]).unwrap_or(0)
@@ -12,7 +12,7 @@ fn parse_status_code(status_line : String) -> Int {
 }
 
 ///|
-fn parse_int(s : StringView) -> Int? {
+fn parse_int(s : StringView) -> Int32? {
   let mut n = 0
   if s.length() == 0 {
     return None
@@ -28,9 +28,9 @@ fn parse_int(s : StringView) -> Int? {
 
 ///|
 async fn test_request(
-  port : Int,
+  port : Int32,
   raw_req : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()

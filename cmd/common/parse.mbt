@@ -9,7 +9,7 @@ pub fn first_value(matches : @argparse.Matches, name : String) -> String? {
 
 ///|
 /// Parse an integer string with an optional leading minus sign.
-pub fn parse_integer(s : String) -> Int? {
+pub fn parse_integer(s : String) -> Int32? {
   if s.length() == 0 {
     return None
   }
@@ -40,7 +40,7 @@ pub fn parse_integer(s : String) -> Int? {
 
 ///|
 /// Parse a CLI port, preserving the original decimal truncation behavior.
-pub fn parse_port(value : String) -> Int? {
+pub fn parse_port(value : String) -> Int32? {
   let s = match value.find(".") {
     Some(idx) => value[:idx].to_owned()
     None => value
@@ -67,7 +67,7 @@ pub fn parse_port(value : String) -> Int? {
 
 ///|
 /// Parse a cache duration or an explicit max-age directive.
-pub fn parse_cache(val : String) -> Result[(Int, String?), String] {
+pub fn parse_cache(val : String) -> Result[(Int32, String?), String] {
   if val.has_prefix("max-age=") {
     let sec_str = val["max-age=".length():].to_owned()
     match parse_integer(sec_str) {

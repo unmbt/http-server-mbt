@@ -163,12 +163,12 @@ pub fn format_http_date(epoch_sec : Int64) -> String {
 }
 
 ///|
-fn is_leap_year(y : Int) -> Bool {
+fn is_leap_year(y : Int32) -> Bool {
   (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
 }
 
 ///|
-fn pad2(n : Int) -> String {
+fn pad2(n : Int32) -> String {
   if n < 10 {
     "0" + n.to_string()
   } else {
@@ -256,7 +256,7 @@ fn split_date_tokens(s : StringView) -> Array[String] {
 }
 
 ///|
-fn month_name_to_int(m : String) -> Int? {
+fn month_name_to_int(m : String) -> Int32? {
   match m.to_lower() {
     "jan" => Some(1)
     "feb" => Some(2)
@@ -277,11 +277,11 @@ fn month_name_to_int(m : String) -> Int? {
 ///|
 fn extract_date_fields(
   tokens : Array[String],
-) -> (Int, Int, Int, Int, Int, Int)? {
-  let mut year : Int? = None
-  let mut month : Int? = None
-  let mut day : Int? = None
-  let time_tokens : Array[Int] = []
+) -> (Int32, Int32, Int32, Int32, Int32, Int32)? {
+  let mut year : Int32? = None
+  let mut month : Int32? = None
+  let mut day : Int32? = None
+  let time_tokens : Array[Int32] = []
 
   for t in tokens {
     if month_name_to_int(t) is Some(m) {
@@ -320,7 +320,7 @@ fn extract_date_fields(
 }
 
 ///|
-fn parse_int(s : String) -> Int? {
+fn parse_int(s : String) -> Int32? {
   let mut n = 0
   if s.length() == 0 {
     return None
@@ -369,7 +369,7 @@ pub fn should_return_304(
 ///|
 /// Cache-Control header strategy.
 pub(all) enum CachePolicy {
-  MaxAge(Int)
+  MaxAge(Int32)
   NoCache
   Exact(String)
 } derive(Eq, Debug)
@@ -388,7 +388,6 @@ pub fn format_cache_control(policy : CachePolicy) -> String {
     Exact(val) => val
   }
 }
-
 
 ///|
 pub extend EntityTag with Eq::{not_equal, equal}

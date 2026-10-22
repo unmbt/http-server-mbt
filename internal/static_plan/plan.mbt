@@ -2,8 +2,8 @@
 /// R-N10 / D-13 / T-029. A platform-neutral, suspension-explicit planner.
 /// Tokens are adapter-owned leases, never file descriptors or GC addresses.
 pub(all) struct File {
-  token : Int
-  kind : Int
+  token : Int32
+  kind : Int32
   size : Int64
   mtime : Int64
 }
@@ -18,7 +18,7 @@ pub(all) enum Body {
 
 ///|
 pub(all) struct Response {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   body : Body
 }
@@ -26,7 +26,7 @@ pub(all) struct Response {
 ///|
 pub(all) enum Step {
   Open(String, (File?) -> Step raise)
-  Prefix(File, Int, (Bytes) -> Step raise)
+  Prefix(File, Int32, (Bytes) -> Step raise)
   List(String, (Array[ListingEntry]) -> Step raise)
   Done(Response)
   Next
@@ -41,14 +41,14 @@ pub(all) struct ListingStream {
   title : String
   query : String?
   host : String
-  mut stage : Int
-  mut index : Int
+  mut stage : Int32
+  mut index : Int32
   mut pending : Bytes
-  mut position : Int
+  mut position : Int32
 }
 
 ///|
-pub fn ListingStream::read(self : ListingStream, limit : Int) -> Bytes {
+pub fn ListingStream::read(self : ListingStream, limit : Int32) -> Bytes {
   if limit <= 0 {
     return b""
   }
@@ -72,7 +72,7 @@ pub fn ListingStream::read(self : ListingStream, limit : Int) -> Bytes {
     self.pending = @utf8.encode(text)
     self.position = 0
   }
-  let count = Int::min(limit, self.pending.length() - self.position)
+  let count = Int32::min(limit, self.pending.length() - self.position)
   let result = self.pending[self.position:self.position + count].to_owned()
   self.position += count
   result
@@ -116,7 +116,7 @@ fn join(root : String, path : String) -> String {
 ///|
 fn Planner::response(
   self : Planner,
-  status : Int,
+  status : Int32,
   headers : Map[String, String],
   body : Body,
 ) -> Step {
@@ -133,7 +133,7 @@ fn Planner::response(
 }
 
 ///|
-fn Planner::text(self : Planner, status : Int, text : String) -> Step {
+fn Planner::text(self : Planner, status : Int32, text : String) -> Step {
   let bytes = @utf8.encode(text)
   self.response(
     status,
@@ -228,7 +228,7 @@ fn Planner::representations(
 fn Planner::choose(
   self : Planner,
   choices : Array[(String, String, String?)],
-  index : Int,
+  index : Int32,
   missing : () -> Step,
 ) -> Step {
   if index >= choices.length() {

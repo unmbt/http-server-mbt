@@ -79,7 +79,7 @@ fn settings_block(config : @core.Config, color : Bool) -> String {
 /// ones, green ports, and no color for the hint line.
 fn startup_banner(
   config : @core.Config,
-  port : Int,
+  port : Int32,
   version : String,
   ips : Array[String],
   color : Bool,
@@ -121,7 +121,7 @@ fn startup_banner(
 ///|
 /// Print the original's startup banner for a listening server; silent mode
 /// suppresses every banner line, as the original's null logger does.
-fn print_startup_banner(config : @core.Config, port : Int) -> Unit {
+fn print_startup_banner(config : @core.Config, port : Int32) -> Unit {
   if !config.silent {
     println(
       startup_banner(

@@ -255,5 +255,5 @@ async fn main {
       })
     }
   }
-  @fs.write_file(out + "/matrix.json", records.to_json().stringify(indent=2))
+  @fs.write_file(out + "/matrix.json", Json(records).stringify(indent=2))
 }

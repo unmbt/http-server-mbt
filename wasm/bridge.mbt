@@ -3,11 +3,11 @@
 /// generated chunks. Int64 metadata is decimal text, not a JS Number.
 priv struct Pending {
   mut step : @plan.Step
-  mut serial : Int
+  mut serial : Int32
 }
 
 ///|
-let requests : Map[Int, Pending] = Map([])
+let requests : Map[Int32, Pending] = Map([])
 
 ///|
 let configurations : Array[@core.Config] = []
@@ -19,7 +19,7 @@ let mimes : Array[@core.MimeRegistry] = []
 priv suberror ProtocolError
 
 ///|
-pub fn abi_version() -> Int {
+pub fn abi_version() -> Int32 {
   1
 }
 
@@ -58,7 +58,7 @@ pub fn configure(text : String) -> String {
           "directory_metadata_bytes": config.limits.directory_metadata_bytes,
         },
         "fallback": match config.fallback_target_file() {
-          Some(s) => s.to_json()
+          Some(s) => Json(s)
           None => Json::null()
         },
       } : Json).stringify()
@@ -76,7 +76,7 @@ fn text_field(value : Json, key : String) -> String raise {
 }
 
 ///|
-fn number_field(value : Json, key : String) -> Int raise {
+fn number_field(value : Json, key : String) -> Int32 raise {
   guard value is Object(obj) &&
     obj.get(key) is Some(Number(n, ..)) &&
     n >= 0 &&
@@ -98,7 +98,7 @@ fn file_of(value : Json) -> @plan.File raise {
 }
 
 ///|
-fn emit(id : Int, p : Pending) -> String {
+fn emit(id : Int32, p : Pending) -> String {
   let value : Json = match p.step {
     Open(path, _) =>
       { "kind": "open", "id": id, "serial": p.serial, "path": path }
@@ -116,7 +116,7 @@ fn emit(id : Int, p : Pending) -> String {
     Done(response) => {
       let headers : Array[Json] = []
       for k, v in response.headers {
-        headers.push([k.to_json(), v.to_json()])
+        headers.push([Json(k), Json(v)])
       }
       let body : Json = match response.body {
         Empty => { "type": "empty", "length": "0" }
@@ -143,7 +143,7 @@ fn emit(id : Int, p : Pending) -> String {
 }
 
 ///|
-pub fn begin_request(id : Int, text : String) -> String {
+pub fn begin_request(id : Int32, text : String) -> String {
   try {
     guard !configurations.is_empty() && !requests.contains(id) && id >= 0 else {
       raise ProtocolError
@@ -189,7 +189,7 @@ pub fn begin_request(id : Int, text : String) -> String {
 }
 
 ///|
-pub fn complete(id : Int, serial : Int, text : String) -> String {
+pub fn complete(id : Int32, serial : Int32, text : String) -> String {
   try {
     guard requests.get(id) is Some(p) && p.serial == serial else {
       raise ProtocolError
@@ -238,7 +238,7 @@ pub fn complete(id : Int, serial : Int, text : String) -> String {
 }
 
 ///|
-pub fn take_chunk(id : Int, offset : Int, count : Int) -> String {
+pub fn take_chunk(id : Int32, offset : Int32, count : Int32) -> String {
   try {
     guard requests.get(id) is Some(p) &&
       p.step is Done(response) &&
@@ -251,22 +251,22 @@ pub fn take_chunk(id : Int, offset : Int, count : Int) -> String {
       Empty => b""
       Bytes(bytes) => {
         guard offset <= bytes.length() else { raise ProtocolError }
-        bytes[offset:offset + Int::min(count, bytes.length() - offset)].to_owned()
+        bytes[offset:offset + Int32::min(count, bytes.length() - offset)].to_owned()
       }
       Listing(stream) => stream.read(count)
       _ => raise ProtocolError
     }
     let values : Array[Json] = []
     for b in bytes {
-      values.push(b.to_int().to_json())
+      values.push(Json(b.to_int()))
     }
-    values.to_json().stringify()
+    Json(values).stringify()
   } catch {
     e => error_json(e)
   }
 }
 
 ///|
-pub fn release(id : Int) -> Unit {
+pub fn release(id : Int32) -> Unit {
   requests.remove(id)
 }

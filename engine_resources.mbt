@@ -1,7 +1,7 @@
 ///|
 priv struct EngineOwner {
   mut closing : Bool
-  mut planning : Int
+  mut planning : Int32
   idle : @async.CondVar
 }
 
@@ -12,8 +12,8 @@ pub struct StaticEngine {
   priv root : @native.File
   priv runtime : @native.Runtime
   priv owner : EngineOwner
-  priv responses : Map[Int, BodyState]
-  priv mut next_id : Int
+  priv responses : Map[Int32, BodyState]
+  priv mut next_id : Int32
 }
 
 ///|
@@ -60,17 +60,17 @@ priv enum PlanBody {
 ///|
 priv struct ListingStream {
   stream : @plan.ListingStream
-  metadata_charge : Int
+  metadata_charge : Int32
 }
 
 ///|
-fn ListingStream::read(self : ListingStream, limit : Int) -> Bytes {
+fn ListingStream::read(self : ListingStream, limit : Int32) -> Bytes {
   self.stream.read(limit)
 }
 
 ///|
 priv struct ResponsePlan {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   body : PlanBody
 }
@@ -89,19 +89,19 @@ priv struct BodyState {
   mut reading : Bool
   idle : @async.CondVar
   runtime : @native.Runtime
-  mut body_charge : Int
+  mut body_charge : Int32
   mut released : Bool
 }
 
 ///|
 pub struct Response {
-  status : Int
+  status : Int32
   headers : Map[String, String]
   priv state : BodyState
   priv owner : EngineOwner
-  priv registry : Map[Int, BodyState]
-  priv id : Int
-  priv block_size : Int
+  priv registry : Map[Int32, BodyState]
+  priv id : Int32
+  priv block_size : Int32
 }
 
 ///|
@@ -320,7 +320,7 @@ pub async fn Response::check(self : Response) -> Unit {
 
 ///|
 /// Read the next bounded chunk. Only successful EOF returns empty bytes.
-pub async fn Response::read(self : Response, max_len? : Int = 65536) -> Bytes {
+pub async fn Response::read(self : Response, max_len~ : Int32 = 65536) -> Bytes {
   if self.state.closed || self.owner.closing {
     raise Closed
   }
@@ -374,7 +374,7 @@ pub async fn Response::read(self : Response, max_len? : Int = 65536) -> Bytes {
 
 ///|
 /// Explicitly bounded convenience collection; normal server paths stream instead.
-pub async fn Response::to_bytes(self : Response, max_bytes~ : Int) -> Bytes {
+pub async fn Response::to_bytes(self : Response, max_bytes~ : Int32) -> Bytes {
   errdefer self.close()
   if max_bytes < 0 ||
     self.body_length() - self.state.cursor > max_bytes.to_int64() {
@@ -419,7 +419,7 @@ pub async fn Response::close(self : Response) -> Unit {
 pub async fn Response::write_to(
   self : Response,
   writer : &@io.Writer,
-  chunked? : Bool = false,
+  chunked~ : Bool = false,
 ) -> Unit {
   for ;; {
     let chunk = self.read()

@@ -1,7 +1,12 @@
 ///|
 // Own test executable: intentionally lowering a shared-owner budget also
 // constrains other engines, so this must not race unrelated static tests.
+let budget_lock : @async.Mutex = @async.Mutex()
+
+///|
 async test "N-23 directory admission is shared and HEAD does not enumerate" {
+  budget_lock.acquire()
+  defer budget_lock.release()
   let base = {
     ..@core.Config::default("testdata/public"),
     auto_index: false,
@@ -32,6 +37,8 @@ async test "N-23 directory admission is shared and HEAD does not enumerate" {
 
 ///|
 async test "N-23 shared admission and collection credits survive instance close" {
+  budget_lock.acquire()
+  defer budget_lock.release()
   let a = @native.Runtime::new(
     workers=1,
     capacity=1,

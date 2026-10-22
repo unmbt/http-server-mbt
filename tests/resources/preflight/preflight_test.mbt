@@ -5,14 +5,14 @@
 let probe_lock : @async.Mutex = @async.Mutex()
 
 ///|
-fn handle_count() -> UInt raise {
+fn handle_count() -> UInt32 raise {
   let count = @server.get_handle_count()
   assert_true(count > 0U)
   count
 }
 
 ///|
-fn assert_no_handle_growth(before : UInt, after : UInt) -> Unit raise {
+fn assert_no_handle_growth(before : UInt32, after : UInt32) -> Unit raise {
   // Unrelated runtime cleanup may lower the count. No positive tolerance:
   // even one additional retained handle must fail this isolated probe.
   if after > before {

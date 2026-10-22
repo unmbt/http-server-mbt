@@ -58,21 +58,21 @@ fn colors_enabled_for(is_tty : Bool, get_env : (String) -> String?) -> Bool {
 
 ///|
 #cfg(any(target="native", target="llvm"))
-extern "c" fn is_stdout_tty_ffi() -> Int = "http_server_cli_is_stdout_tty"
+extern "c" fn is_stdout_tty_ffi() -> Int32 = "http_server_cli_is_stdout_tty"
 
 ///|
 #cfg(not(any(target="native", target="llvm")))
-fn is_stdout_tty_ffi() -> Int {
+fn is_stdout_tty_ffi() -> Int32 {
   1
 }
 
 ///|
 #cfg(any(target="native", target="llvm"))
-extern "c" fn flush_stdout_ffi() -> Int = "http_server_cli_flush_stdout"
+extern "c" fn flush_stdout_ffi() -> Int32 = "http_server_cli_flush_stdout"
 
 ///|
 #cfg(not(any(target="native", target="llvm")))
-fn flush_stdout_ffi() -> Int {
+fn flush_stdout_ffi() -> Int32 {
   0
 }
 

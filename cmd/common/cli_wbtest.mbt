@@ -553,16 +553,19 @@ test "cli: banner displays https protocol and through https when TLS is enabled"
     ),
   )
 }
+
 ///|
 test "N-12 Full trust flags are explicit and rejected by Thin" {
-  let args=["--proxy","https://localhost","--ca-file","roots.pem","--insecure","--websocket"]
+  let args = [
+    "--proxy", "https://localhost", "--ca-file", "roots.pem", "--insecure", "--websocket",
+  ]
   match parse_cli(args[:]) {
-    Ok(Run(config,_)) => {
-      assert_eq(config.ca_file,Some("roots.pem"))
+    Ok(Run(config, _)) => {
+      assert_eq(config.ca_file, Some("roots.pem"))
       assert_false(config.secure)
       assert_true(config.websocket)
     }
     _ => fail("Full trust flags rejected")
   }
-  assert_true(parse_cli(args[:],thin=true) is Err(_))
+  assert_true(parse_cli(args[:], thin=true) is Err(_))
 }

@@ -8,7 +8,7 @@
 /// 4. Multi-round cyclic stress test asserting Win32 GetProcessHandleCount 0 handle leaks across cycles.
 
 ///|
-fn m6_edge_parse_status(status_line : String) -> Int {
+fn m6_edge_parse_status(status_line : String) -> Int32 {
   let parts = status_line.split(" ").to_array()
   if parts.length() >= 2 {
     let mut n = 0
@@ -24,7 +24,7 @@ fn m6_edge_parse_status(status_line : String) -> Int {
 }
 
 ///|
-fn m6_edge_parse_int(s : StringView) -> Int? {
+fn m6_edge_parse_int(s : StringView) -> Int32? {
   let mut n = 0
   if s.length() == 0 {
     return None
@@ -63,9 +63,9 @@ async fn m6_edge_read_headers(conn : @socket.Tcp) -> Map[String, String] {
 
 ///|
 async fn m6_edge_request(
-  port : Int,
+  port : Int32,
   raw_req : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()
@@ -107,7 +107,7 @@ async test "cancellation and range: in-flight request cancellation and drain und
   @server.with_server_at(config, 0, async fn(server) {
     let port = server.port()
     let num_readers = 3
-    let finished_count : Ref[Int] = Ref(0)
+    let finished_count : Ref[Int32] = Ref(0)
     let readers_success : Ref[Bool] = Ref(true)
 
     // Part A: Concurrent in-flight streaming readers drain cleanly on stop_and_drain

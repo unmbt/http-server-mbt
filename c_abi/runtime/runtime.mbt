@@ -10,16 +10,16 @@ priv struct ServerScope {
 
 ///|
 priv struct Context {
-  engines : Map[Int, @engine.StaticEngine]
-  responses : Map[Int, (Int, @engine.Response)]
-  servers : Map[Int, ServerScope]
-  tasks : Map[Int, (Operation, @async.Task[Unit])]
+  engines : Map[Int32, @engine.StaticEngine]
+  responses : Map[Int32, (Int32, @engine.Response)]
+  servers : Map[Int32, ServerScope]
+  tasks : Map[Int32, (Operation, @async.Task[Unit])]
   changed : @async.CondVar
-  mut response_serial : Int
+  mut response_serial : Int32
 }
 
 ///|
-fn error_code(e : Error, creating : Bool) -> Int {
+fn error_code(e : Error, creating : Bool) -> Int32 {
   if @async.is_cancellation_error(e) {
     return 8
   }
@@ -40,7 +40,7 @@ async fn Context::execute(
   self : Context,
   op : Operation,
   thin : Bool,
-  serve : async (@core.Config, async (Int) -> Unit) -> Unit,
+  serve : async (@core.Config, async (Int32) -> Unit) -> Unit,
 ) -> Unit {
   let key = id(op)
   let owner = instance(op)
@@ -200,7 +200,7 @@ async fn Context::execute(
 ///|
 pub fn run(
   thin : Bool,
-  serve : async (@core.Config, async (Int) -> Unit) -> Unit,
+  serve : async (@core.Config, async (Int32) -> Unit) -> Unit,
 ) -> Unit {
   @async.run_async_main(async fn() {
     try {

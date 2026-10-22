@@ -112,7 +112,10 @@ async test "tls client verifies hostname and rejects mismatch" {
       @tls.TlsError::TlsError(..) => ()
       _ => ()
     } noraise {
-      conn => { conn.close(); fail("wrong hostname was accepted") }
+      conn => {
+        conn.close()
+        fail("wrong hostname was accepted")
+      }
     }
   }
   listener.close()
@@ -178,7 +181,7 @@ async test "tls insecure client skips verification" {
 /// sibling tests may hold TLS objects during our snapshot; mirroring
 /// handle_leak_assert_test, the baseline is min-of-3 and the assertion waits
 /// for quiescence (a real leak keeps the count elevated forever).
-async fn tls_object_baseline() -> (Int, Int) {
+async fn tls_object_baseline() -> (Int32, Int32) {
   let mut conn_base = @tls.tls_conn_count()
   let mut acc_base = @tls.tls_acceptor_count()
   for _ in 0..<3 {
@@ -198,7 +201,7 @@ async fn tls_object_baseline() -> (Int, Int) {
 //|
 
 ///|
-async fn assert_no_tls_object_leak(baseline : (Int, Int)) -> Unit {
+async fn assert_no_tls_object_leak(baseline : (Int32, Int32)) -> Unit {
   let (conn_base, acc_base) = baseline
   let step = 40
   let mut waited = 0

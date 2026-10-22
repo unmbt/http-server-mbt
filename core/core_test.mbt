@@ -203,7 +203,12 @@ test "normalize base url" {
   assert_eq(@core.normalize_base_url("/") catch { _ => "error" }, "/")
   assert_eq(@core.normalize_base_url("") catch { _ => "error" }, "/")
   assert_eq(@core.normalize_base_url("docs/") catch { _ => "error" }, "/docs")
-  assert_eq(@core.normalize_base_url("/api/v1") catch { _ => "error" }, "/api/v1")
+  assert_eq(
+    @core.normalize_base_url("/api/v1") catch {
+      _ => "error"
+    },
+    "/api/v1",
+  )
   assert_eq(@core.normalize_base_url("app") catch { _ => "error" }, "/app")
 
   assert_false(
@@ -251,8 +256,18 @@ test "normalize base url" {
 ///|
 test "resolve base url aliases" {
   assert_eq(@core.resolve_base_url(None, None) catch { _ => "err" }, "/")
-  assert_eq(@core.resolve_base_url(Some("app"), None) catch { _ => "err" }, "/app")
-  assert_eq(@core.resolve_base_url(None, Some("app/")) catch { _ => "err" }, "/app")
+  assert_eq(
+    @core.resolve_base_url(Some("app"), None) catch {
+      _ => "err"
+    },
+    "/app",
+  )
+  assert_eq(
+    @core.resolve_base_url(None, Some("app/")) catch {
+      _ => "err"
+    },
+    "/app",
+  )
   assert_eq(
     @core.resolve_base_url(Some("app"), Some("/app/")) catch {
       _ => "err"
@@ -273,12 +288,21 @@ test "resolve base url aliases" {
 test "match and strip base url" {
   assert_eq(@core.match_and_strip_base_url("/", "/"), Some(""))
   assert_eq(@core.match_and_strip_base_url("/", ""), Some(""))
-  assert_eq(@core.match_and_strip_base_url("/", "/hello.txt"), Some("hello.txt"))
-  assert_eq(@core.match_and_strip_base_url("/", "/a/b/c.html"), Some("a/b/c.html"))
+  assert_eq(
+    @core.match_and_strip_base_url("/", "/hello.txt"),
+    Some("hello.txt"),
+  )
+  assert_eq(
+    @core.match_and_strip_base_url("/", "/a/b/c.html"),
+    Some("a/b/c.html"),
+  )
 
   assert_eq(@core.match_and_strip_base_url("/app", "/app"), Some(""))
   assert_eq(@core.match_and_strip_base_url("/app", "/app/page"), Some("page"))
-  assert_eq(@core.match_and_strip_base_url("/app", "/app/a/b.js"), Some("a/b.js"))
+  assert_eq(
+    @core.match_and_strip_base_url("/app", "/app/a/b.js"),
+    Some("a/b.js"),
+  )
   // Strict component boundary: /application must NOT match /app
   assert_eq(@core.match_and_strip_base_url("/app", "/application"), None)
   assert_eq(@core.match_and_strip_base_url("/app", "/app-test"), None)
@@ -324,9 +348,19 @@ test "validate uri encoding and decode percent" {
   assert_false(@core.validate_uri_encoding("/foo%2g"))
   assert_false(@core.validate_uri_encoding("/?%"))
 
-  assert_eq(@core.decode_percent("hello%20world") catch { _ => "err" }, "hello world")
+  assert_eq(
+    @core.decode_percent("hello%20world") catch {
+      _ => "err"
+    },
+    "hello world",
+  )
   assert_eq(@core.decode_percent("%2e%2e") catch { _ => "err" }, "..")
-  assert_eq(@core.decode_percent("%E4%B8%AD%E6%96%87") catch { _ => "err" }, "中文")
+  assert_eq(
+    @core.decode_percent("%E4%B8%AD%E6%96%87") catch {
+      _ => "err"
+    },
+    "中文",
+  )
   assert_false(
     try {
       ignore(@core.decode_percent("/%"))
@@ -340,7 +374,10 @@ test "validate uri encoding and decode percent" {
 ///|
 test "resolve path root anchoring and defense" {
   assert_eq(@core.resolve_path("public", "/", "/"), Ok("public"))
-  assert_eq(@core.resolve_path("public", "/", "/hello.txt"), Ok("public/hello.txt"))
+  assert_eq(
+    @core.resolve_path("public", "/", "/hello.txt"),
+    Ok("public/hello.txt"),
+  )
   assert_eq(@core.resolve_path("public", "/app", "/app"), Ok("public"))
   assert_eq(
     @core.resolve_path("public", "/app", "/app/sub/file.txt"),
@@ -393,15 +430,21 @@ test "basic auth parsing and verification" {
 
   let expected = ("user", "pass")
   assert_true(@core.verify_basic_auth(Some("Basic dXNlcjpwYXNz"), expected))
-  assert_false(@core.verify_basic_auth(Some("Basic dXNlcjp3cm9uZw=="), expected))
-  assert_false(@core.verify_basic_auth(Some("Basic d3Jvbmc6cGFzcw=="), expected))
+  assert_false(
+    @core.verify_basic_auth(Some("Basic dXNlcjp3cm9uZw=="), expected),
+  )
+  assert_false(
+    @core.verify_basic_auth(Some("Basic d3Jvbmc6cGFzcw=="), expected),
+  )
   assert_false(@core.verify_basic_auth(None, expected))
   assert_false(@core.verify_basic_auth(Some("InvalidHeader"), expected))
 
   // Numeric password verification
   let num_expected = ("admin", "123456")
   // Base64 of admin:123456 is YWRtaW46MTIzNDU2
-  assert_true(@core.verify_basic_auth(Some("Basic YWRtaW46MTIzNDU2"), num_expected))
+  assert_true(
+    @core.verify_basic_auth(Some("Basic YWRtaW46MTIzNDU2"), num_expected),
+  )
 }
 
 ///|
@@ -536,7 +579,9 @@ test "etag and cache negotiation" {
   assert_false(@core.etag_matches("W/\"100-200\"", tag, false))
 
   assert_true(@core.if_none_match_matches("\"other\", \"100-200\"", tag, false))
-  assert_false(@core.if_none_match_matches("\"other\", \"999-999\"", tag, false))
+  assert_false(
+    @core.if_none_match_matches("\"other\", \"999-999\"", tag, false),
+  )
 }
 
 ///|
@@ -555,9 +600,13 @@ test "http date and 304 decision" {
 
   let tag = @core.EntityTag::from_metadata(50L, 1000L, false)
   // Matching ETag returns 304
-  assert_true(@core.should_return_304(Some("\"50-1000\""), None, 1000L, tag, true))
+  assert_true(
+    @core.should_return_304(Some("\"50-1000\""), None, 1000L, tag, true),
+  )
   // Mismatched ETag returns 200 (false)
-  assert_false(@core.should_return_304(Some("\"50-999\""), None, 1000L, tag, true))
+  assert_false(
+    @core.should_return_304(Some("\"50-999\""), None, 1000L, tag, true),
+  )
   // Newer client date returns 304
   assert_true(
     @core.should_return_304(
@@ -588,7 +637,10 @@ test "byte range protocol RFC 7233" {
     Satisfiable({ start: 5L, end: 9L, }),
   )
   // Ecstatic bare range
-  assert_eq(@core.parse_range_spec("3-5", 10L), Satisfiable({ start: 3L, end: 5L, }))
+  assert_eq(
+    @core.parse_range_spec("3-5", 10L),
+    Satisfiable({ start: 3L, end: 5L, }),
+  )
   // Clamp to EOF
   assert_eq(
     @core.parse_range_spec("bytes=3-500", 10L),
@@ -636,4 +688,3 @@ test "validate root path" {
     },
   )
 }
-

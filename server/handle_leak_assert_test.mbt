@@ -12,7 +12,7 @@
 ///|
 /// Sample the handle-count baseline as the minimum of 3 probes 30ms apart,
 /// so a transient sibling-test spike is not frozen into the baseline.
-async fn handle_leak_baseline() -> UInt {
+async fn handle_leak_baseline() -> UInt32 {
   let mut baseline = @server.get_handle_count()
   for _ in 0..<3 {
     @async.sleep(30)
@@ -30,9 +30,9 @@ async fn handle_leak_baseline() -> UInt {
 /// Transient sibling-test handles are absorbed by the wait; a real leak keeps
 /// the count elevated forever and fails with the observed values.
 async fn assert_no_handle_leak(
-  baseline : UInt,
-  tolerance? : UInt = 80U,
-  deadline_ms? : Int = 4000,
+  baseline : UInt32,
+  tolerance~ : UInt32 = 80U,
+  deadline_ms~ : Int32 = 4000,
 ) -> Unit {
   let step = 40
   let mut waited = 0

@@ -3,7 +3,7 @@
 pub struct TargetUrl {
   scheme : String
   host : String
-  port : Int
+  port : Int32
   base_path : String
 } derive(Debug, Eq)
 
@@ -18,15 +18,20 @@ pub fn TargetUrl::host(self : TargetUrl) -> String {
 }
 
 ///|
-pub fn TargetUrl::port(self : TargetUrl) -> Int {
+pub fn TargetUrl::port(self : TargetUrl) -> Int32 {
   self.port
 }
 
 ///|
 /// Parse an upstream target URL (e.g. "http://127.0.0.1:8080" or "http://localhost:8082/api").
 pub fn parse_target_url(url : String) -> TargetUrl? {
-  let url=if url.has_prefix("wss://") { "https://"+url[6:].to_owned() }
-    else if url.has_prefix("ws://") { "http://"+url[5:].to_owned() } else { url }
+  let url = if url.has_prefix("wss://") {
+    "https://" + url[6:].to_owned()
+  } else if url.has_prefix("ws://") {
+    "http://" + url[5:].to_owned()
+  } else {
+    url
+  }
   let scheme = if url.has_prefix("https://") {
     "https"
   } else if url.has_prefix("http://") {
@@ -131,10 +136,11 @@ async fn proxy_http_request(
   target : String,
   upstream_url : String,
 ) -> Bool {
-  let buffer_size=server.config.limits.body_block_bytes
-  let charge=buffer_size*2+163840
+  let buffer_size = server.config.limits.body_block_bytes
+  let charge = buffer_size * 2 + 163840
   if !@native.try_acquire_body(charge) {
-    ignore(send_fallback_status(transport,503,"Service Unavailable"));return false
+    ignore(send_fallback_status(transport, 503, "Service Unavailable"))
+    return false
   }
   defer @native.release_body(charge)
   let parsed = match parse_target_url(upstream_url) {
@@ -183,9 +189,14 @@ async fn proxy_http_request(
   req_buf.write_string("Connection: close\r\n")
   for k, v in headers {
     let lk = k.to_lower()
-    if lk == "host" || lk == "connection" || lk == "expect" || lk == "trailer" ||
-      lk == "keep-alive" || lk == "proxy-connection" || lk == "upgrade" ||
-      @framing.has_token(headers.get("connection").unwrap_or(""),lk) {
+    if lk == "host" ||
+      lk == "connection" ||
+      lk == "expect" ||
+      lk == "trailer" ||
+      lk == "keep-alive" ||
+      lk == "proxy-connection" ||
+      lk == "upgrade" ||
+      @framing.has_token(headers.get("connection").unwrap_or(""), lk) {
       continue
     }
     req_buf.write_string("\{k}: \{v}\r\n")
@@ -201,18 +212,27 @@ async fn proxy_http_request(
   // Forward decoded framing in bounded chunks. Re-encode chunked bodies;
   // validated trailers are consumed locally (the Trailer header was stripped).
   let buf = FixedArray::make(buffer_size, b'\x00')
-  if body.has_body() && @framing.has_token(headers.get("expect").unwrap_or(""),"100-continue") {
+  if body.has_body() &&
+    @framing.has_token(headers.get("expect").unwrap_or(""), "100-continue") {
     transport.writer.write("HTTP/1.1 100 Continue\r\n\r\n")
   }
-  let chunked=headers.contains("transfer-encoding")
+  let chunked = headers.contains("transfer-encoding")
   for ;; {
-    let n=body.read_body(buf)
-    if n==0 { break }
-    if chunked { upstream_conn.writer.write(n.to_string(radix=16)+"\r\n") }
+    let n = body.read_body(buf)
+    if n == 0 {
+      break
+    }
+    if chunked {
+      upstream_conn.writer.write(n.to_string(radix=16) + "\r\n")
+    }
     upstream_conn.writer.write(buf.unsafe_reinterpret_as_bytes()[:n])
-    if chunked { upstream_conn.writer.write("\r\n") }
+    if chunked {
+      upstream_conn.writer.write("\r\n")
+    }
   }
-  if chunked { upstream_conn.writer.write("0\r\n\r\n") }
+  if chunked {
+    upstream_conn.writer.write("0\r\n\r\n")
+  }
 
   // Stream upstream response back to client transport
   let mut read_any = false
@@ -240,7 +260,6 @@ async fn proxy_http_request(
   // Return whether keep-alive should continue on client transport
   false
 }
-
 
 ///|
 pub extend TargetUrl with Debug::{to_repr}

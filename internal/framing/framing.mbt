@@ -8,8 +8,8 @@ pub suberror ProtocolError {
 ///|
 priv enum Body {
   Empty
-  Fixed(Int)
-  Chunked(Int)
+  Fixed(Int32)
+  Chunked(Int32)
 }
 
 ///|
@@ -19,8 +19,8 @@ priv enum Body {
 pub struct Connection {
   priv source : &@io.Reader
   priv pending : FixedArray[Byte]
-  priv mut start : Int
-  priv mut end : Int
+  priv mut start : Int32
+  priv mut end : Int32
   priv buffer : @io.ReaderBuffer
   priv mut body : Body
 }
@@ -58,7 +58,7 @@ pub impl @io.Reader for Connection with fn _direct_read(
   max_len~,
 ) {
   if self.start < self.end {
-    let n = Int::min(max_len, self.end - self.start)
+    let n = Int32::min(max_len, self.end - self.start)
     self.pending.blit_to(dst, src_offset=self.start, dst_offset=offset, len=n)
     self.start += n
     n
@@ -82,7 +82,7 @@ async fn Connection::byte(self : Connection) -> Byte {
 }
 
 ///|
-pub async fn Connection::line(self : Connection, limit~ : Int) -> String {
+pub async fn Connection::line(self : Connection, limit~ : Int32) -> String {
   let bytes : Array[Byte] = []
   while bytes.length() <= limit {
     let b = self.byte()
@@ -193,7 +193,7 @@ pub fn Connection::has_body(self : Connection) -> Bool {
 pub async fn Connection::read_body(
   self : Connection,
   dst : FixedArray[Byte],
-) -> Int {
+) -> Int32 {
   let remaining = match self.body {
     Empty => return 0
     Fixed(n) => n
@@ -231,7 +231,11 @@ pub async fn Connection::read_body(
       n
     }
   }
-  let n = @io.Reader::read(self, dst, max_len=Int::min(dst.length(), remaining))
+  let n = @io.Reader::read(
+    self,
+    dst,
+    max_len=Int32::min(dst.length(), remaining),
+  )
   if n == 0 {
     raise @io.ReaderClosed
   }

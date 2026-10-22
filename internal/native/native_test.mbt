@@ -9,8 +9,8 @@ async test "native rooted lease and bounded worker completion" {
   assert_eq(file.size, 14L)
   assert_eq(file.read(0L, 14), b"hello moonbit\n")
   file.check()
-  let (names,charge) = root.names(1048576L)
-  defer runtime.release(directory=true,charge)
+  let (names, charge) = root.names(1048576L)
+  defer runtime.release(directory=true, charge)
   assert_true(names.contains("hello.txt"))
 }
 

@@ -8,7 +8,7 @@ pub struct Server {
   mut stopped : Bool
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
-  active_requests : Ref[Int]
+  active_requests : Ref[Int32]
 }
 
 ///|
@@ -17,7 +17,7 @@ pub fn Server::config(self : Server) -> @core.Config {
 }
 
 ///|
-pub fn Server::port(self : Server) -> Int {
+pub fn Server::port(self : Server) -> Int32 {
   self.listener.addr.port()
 }
 
@@ -25,14 +25,16 @@ pub fn Server::port(self : Server) -> Int {
 pub fn Server::stop(self : Server) -> Unit {
   if !self.stopped {
     self.stopped = true
-    if self.accept_task is Some(task) { task.cancel() }
+    if self.accept_task is Some(task) {
+      task.cancel()
+    }
   }
 }
 
 ///|
 pub async fn Server::stop_and_drain(
   self : Server,
-  timeout_ms? : Int = 5000,
+  timeout_ms~ : Int32 = 5000,
 ) -> Unit {
   self.stop()
   @async.protect_from_cancel(() => {
@@ -43,13 +45,16 @@ pub async fn Server::stop_and_drain(
     }
   })
   @async.protect_from_cancel(() => {
-    if self.task is Some(t) { t.cancel(); ignore(t.wait() catch { _ => () }) }
+    if self.task is Some(t) {
+      t.cancel()
+      ignore(t.wait() catch { _ => () })
+    }
     self.engine.close()
   })
 }
 
 ///|
-pub fn Server::active_request_count(self : Server) -> Int {
+pub fn Server::active_request_count(self : Server) -> Int32 {
   self.active_requests.val
 }
 
@@ -69,7 +74,7 @@ pub async fn with_server(
 ///|
 pub async fn with_server_at(
   config : @core.Config,
-  port : Int,
+  port : Int32,
   action : async (Server) -> Unit,
 ) -> Unit {
   @core.validate_tls(config)
@@ -100,23 +105,29 @@ pub async fn with_server_at(
   @async.with_task_group() <| group => {
     let server_task = group.spawn(allow_failure=true, () => {
       @async.with_task_group() <| clients => {
-        let accepting=clients.spawn(allow_failure=true,() => {
+        let accepting = clients.spawn(allow_failure=true, () => {
           defer listener.close()
-        while !server.stopped {
-          // Pause while the shared owner is full. Concurrent listeners may
-          // already have an accept pending: recheck atomically before
-          // allocating any protocol/TLS state and close excess sockets.
-          if !@native.connection_available() { @async.sleep(10); continue }
-          let (tcp,_)=listener.accept()
-          if !@native.try_acquire_connection() { tcp.close(); continue }
-          clients.spawn_bg(allow_failure=true,() => {
-            defer @native.release_connection()
-            defer tcp.close()
-            handle_connection(server, tcp)
-          })
-        }
+          while !server.stopped {
+            // Pause while the shared owner is full. Concurrent listeners may
+            // already have an accept pending: recheck atomically before
+            // allocating any protocol/TLS state and close excess sockets.
+            if !@native.connection_available() {
+              @async.sleep(10)
+              continue
+            }
+            let (tcp, _) = listener.accept()
+            if !@native.try_acquire_connection() {
+              tcp.close()
+              continue
+            }
+            clients.spawn_bg(allow_failure=true, () => {
+              defer @native.release_connection()
+              defer tcp.close()
+              handle_connection(server, tcp)
+            })
+          }
         })
-        server.accept_task=Some(accepting)
+        server.accept_task = Some(accepting)
       }
     })
     server.task = Some(server_task)
@@ -135,7 +146,7 @@ pub async fn with_server_at(
 }
 
 ///|
-fn status_reason(status : Int) -> String {
+fn status_reason(status : Int32) -> String {
   match status {
     200 => "OK"
     206 => "Partial Content"
@@ -155,13 +166,21 @@ fn status_reason(status : Int) -> String {
 }
 
 ///|
-async fn send_response(tcp : @socket.Tcp, response : @root.Response, http11 : Bool) -> Bool {
+async fn send_response(
+  tcp : @socket.Tcp,
+  response : @root.Response,
+  http11 : Bool,
+) -> Bool {
   defer response.close()
-  let streaming=response.content_length() is None
-  let chunked=streaming && http11
+  let streaming = response.content_length() is None
+  let chunked = streaming && http11
   response.check()
-  if streaming && !http11 { response.headers["Connection"]="close" }
-  if chunked { response.headers["Transfer-Encoding"]="chunked" }
+  if streaming && !http11 {
+    response.headers["Connection"] = "close"
+  }
+  if chunked {
+    response.headers["Transfer-Encoding"] = "chunked"
+  }
   let headers = StringBuilder(size_hint=256)
   headers.write_string(
     "HTTP/1.1 \{response.status} \{status_reason(response.status)}\r\n",
@@ -178,40 +197,65 @@ async fn send_response(tcp : @socket.Tcp, response : @root.Response, http11 : Bo
   }
   guard header_ok else { return false }
   try {
-    if chunked { response.write_to(tcp, chunked=true) } else { response.send_to(tcp) }
+    if chunked {
+      response.write_to(tcp, chunked=true)
+    } else {
+      response.send_to(tcp)
+    }
     !(streaming && !http11)
-  } catch { _ => false }
+  } catch {
+    _ => false
+  }
 }
 
 ///|
 async fn handle_connection(server : Server, tcp : @socket.Tcp) -> Unit {
-  if !@native.try_acquire_body(32768) { return }
+  if !@native.try_acquire_body(32768) {
+    return
+  }
   defer @native.release_body(32768)
   let reader = @framing.Connection::new(tcp)
   while !server.stopped {
     let head = if server.config.idle_timeout_ms > 0 {
-      @async.with_timeout_opt(server.config.idle_timeout_ms, () => reader.read_request())
-    } else { Some(reader.read_request()) }
+      @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
+        reader.read_request()
+      })
+    } else {
+      Some(reader.read_request())
+    }
     guard head is Some(head) else { break }
-    let req=head.request
+    let req = head.request
     server.active_requests.val += 1
     let keep = {
-      defer { server.active_requests.val -= 1 }
-      let keep=match server.engine.handle(req) {
-        @root.HandleResult::Handled(response) => send_response(tcp,response,head.http11)
-        @root.HandleResult::Next => send_error(tcp,404,"Not Found")
-        @root.HandleResult::Error(@root.ServerError::Forbidden(_)) => send_error(tcp,403,"Forbidden")
-        @root.HandleResult::Error(@root.ServerError::Overloaded) => send_error(tcp,503,"Service Unavailable")
-        @root.HandleResult::Error(_) => send_error(tcp,500,"Internal Server Error")
+      defer {
+        server.active_requests.val -= 1
       }
-      if keep && head.keep_alive { reader.drain() }
+      let keep = match server.engine.handle(req) {
+        @root.HandleResult::Handled(response) =>
+          send_response(tcp, response, head.http11)
+        @root.HandleResult::Next => send_error(tcp, 404, "Not Found")
+        @root.HandleResult::Error(@root.ServerError::Forbidden(_)) =>
+          send_error(tcp, 403, "Forbidden")
+        @root.HandleResult::Error(@root.ServerError::Overloaded) =>
+          send_error(tcp, 503, "Service Unavailable")
+        @root.HandleResult::Error(_) =>
+          send_error(tcp, 500, "Internal Server Error")
+      }
+      if keep && head.keep_alive {
+        reader.drain()
+      }
       keep
     }
-    if !keep || !head.keep_alive { break }
+    if !keep || !head.keep_alive {
+      break
+    }
   }
 }
+
 ///|
-async fn send_error(tcp : @socket.Tcp,status : Int,reason : String) -> Bool {
-  tcp.write("HTTP/1.1 \{status} \{reason}\r\nConnection: close\r\nContent-Length: \{reason.length()}\r\n\r\n\{reason}")
+async fn send_error(tcp : @socket.Tcp, status : Int32, reason : String) -> Bool {
+  tcp.write(
+    "HTTP/1.1 \{status} \{reason}\r\nConnection: close\r\nContent-Length: \{reason.length()}\r\n\r\n\{reason}",
+  )
   false
 }

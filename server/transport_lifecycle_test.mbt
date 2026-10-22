@@ -22,7 +22,7 @@ async test "transport lifecycle: 20 concurrent requests & 50 rapid connection ch
     @async.sleep(50)
 
     // Phase 2: 20 concurrent requests executing simultaneously
-    let results : Array[(Int, Bytes)] = Array::make(20, (0, b""))
+    let results : Array[(Int32, Bytes)] = Array::make(20, (0, b""))
     @async.with_task_group() <| group => {
       for i in 0..<20 {
         let idx = i
@@ -203,7 +203,7 @@ async test "transport lifecycle: Abrupt client disconnect during bounded-buffer 
 ///|
 /// Acceptor that raises an exception during accept to stress error path
 priv struct M1ChFailingAcceptor {
-  fail_count : Ref[Int]
+  fail_count : Ref[Int32]
 }
 
 ///|
@@ -220,7 +220,7 @@ impl @server.Acceptor for M1ChFailingAcceptor with fn close(_self) {
 ///|
 /// Challenge 4: Error handling in handle_connection when Acceptor::accept raises
 async test "transport lifecycle: Failing Acceptor::accept closes socket cleanly without server crash or handle leak" {
-  let fail_count : Ref[Int] = { val: 0, }
+  let fail_count : Ref[Int32] = { val: 0, }
   let failing_acc = M1ChFailingAcceptor::{ fail_count, }
   let config = @core.Config::default("testdata/public")
 
@@ -248,7 +248,7 @@ async test "transport lifecycle: Failing Acceptor::accept closes socket cleanly 
 ///|
 /// Tracking Acceptor to verify Transport::close is invoked exactly once per connection
 priv struct M1ChTrackingAcceptor {
-  close_count : Ref[Int]
+  close_count : Ref[Int32]
 }
 
 ///|
@@ -274,7 +274,7 @@ impl @server.Acceptor for M1ChTrackingAcceptor with fn close(_self) {
 ///|
 /// Challenge 5: Verify Transport::close is reliably executed for every connection lifecycle
 async test "transport lifecycle: Transport::close lifecycle tracking executes exactly once per connection" {
-  let close_count : Ref[Int] = { val: 0, }
+  let close_count : Ref[Int32] = { val: 0, }
   let tracking_acc = M1ChTrackingAcceptor::{ close_count, }
   let config = @core.Config::default("testdata/public")
 

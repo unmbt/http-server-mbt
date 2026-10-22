@@ -10,6 +10,6 @@ pub fn io_uring_available() -> Bool {
 ///
 /// Bits are setup (0), IORING_OP_READ (1), IORING_OP_SEND (2), and
 /// IORING_OP_ASYNC_CANCEL (3). A zero value means the probe was unavailable.
-pub fn io_uring_capabilities() -> UInt {
+pub fn io_uring_capabilities() -> UInt32 {
   @native.io_uring_capabilities()
 }

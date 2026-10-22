@@ -4,7 +4,7 @@
 /// Otherwise runs with default PlainAcceptor.
 pub async fn with_server_at(
   config : @core.Config,
-  port : Int,
+  port : Int32,
   action : async (@server.Server) -> Unit,
 ) -> Unit {
   let acceptor : &@server.Acceptor? = if config.has_tls() {

@@ -3,6 +3,14 @@ import {
   "unmbt/http-server-mbt/server/plain" @server,
   "moonbitlang/async",
 }
+
 pkgtype(kind: "executable")
 
-options(link: { "native": { "cc-flags": "${build.HS_C_FLAGS}", "cc-link-flags": "${build.HS_CLI_LINK}" } })
+options(
+  link: {
+    "native": {
+      "cc-flags": "${build.HS_C_FLAGS}",
+      "cc-link-flags": "${build.HS_CLI_LINK}",
+    },
+  },
+)

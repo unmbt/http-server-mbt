@@ -9,9 +9,9 @@
 
 ///|
 async fn ch2_test_request(
-  port : Int,
+  port : Int32,
   raw_req : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()

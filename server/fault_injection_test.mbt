@@ -11,7 +11,7 @@
 /// 7. Multi-round empirical zero handle leak verification (GetProcessHandleCount H2 - H1 == 0)
 
 ///|
-fn fi_parse_status(status_line : String) -> Int {
+fn fi_parse_status(status_line : String) -> Int32 {
   let parts = status_line.split(" ").to_array()
   if parts.length() >= 2 {
     let mut n = 0
@@ -27,7 +27,7 @@ fn fi_parse_status(status_line : String) -> Int {
 }
 
 ///|
-fn fi_parse_int(s : StringView) -> Int? {
+fn fi_parse_int(s : StringView) -> Int32? {
   let mut n = 0
   if s.length() == 0 {
     return None
@@ -66,9 +66,9 @@ async fn fi_read_headers(conn : @socket.Tcp) -> Map[String, String] {
 
 ///|
 async fn fi_quick_request(
-  port : Int,
+  port : Int32,
   raw_req : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()

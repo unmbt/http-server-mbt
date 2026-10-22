@@ -8,7 +8,7 @@ pub(all) suberror PathError {
 } derive(Eq, Debug)
 
 ///|
-fn find_char_str(s : String, c : Char) -> Int? {
+fn find_char_str(s : String, c : Char) -> Int32? {
   let len = s.length()
   let target = c.to_int()
   for i = 0; i < len; i = i + 1 {
@@ -20,7 +20,7 @@ fn find_char_str(s : String, c : Char) -> Int? {
 }
 
 ///|
-fn find_char_view(s : StringView, c : Char) -> Int? {
+fn find_char_view(s : StringView, c : Char) -> Int32? {
   let len = s.length()
   let target = c.to_int()
   for i = 0; i < len; i = i + 1 {
@@ -70,7 +70,7 @@ fn is_windows_reserved_name(part : StringView) -> Bool {
   for c in base {
     let cp = c.to_int()
     if cp >= 'a'.to_int() && cp <= 'z'.to_int() {
-      upper.write_char(Int::unsafe_to_char(cp - 32))
+      upper.write_char(Int32::unsafe_to_char(cp - 32))
     } else {
       upper.write_char(c)
     }
@@ -128,14 +128,14 @@ pub fn validate_uri_encoding(target : String) -> Bool {
 }
 
 ///|
-fn is_hex_digit(code : Int) -> Bool {
+fn is_hex_digit(code : Int32) -> Bool {
   (code >= '0'.to_int() && code <= '9'.to_int()) ||
   (code >= 'a'.to_int() && code <= 'f'.to_int()) ||
   (code >= 'A'.to_int() && code <= 'F'.to_int())
 }
 
 ///|
-fn hex_val(code : Int) -> Int {
+fn hex_val(code : Int32) -> Int32 {
   if code >= '0'.to_int() && code <= '9'.to_int() {
     code - '0'.to_int()
   } else if code >= 'a'.to_int() && code <= 'f'.to_int() {
@@ -147,14 +147,14 @@ fn hex_val(code : Int) -> Int {
 
 ///|
 /// Decode raw UTF-8 byte stream into a MoonBit String.
-fn decode_utf8_bytes(bytes : Array[Int]) -> String? {
+fn decode_utf8_bytes(bytes : Array[Int32]) -> String? {
   let buf = StringBuilder()
   let len = bytes.length()
   let mut i = 0
   while i < len {
     let b0 = bytes[i]
     if b0 < 0x80 {
-      buf.write_char(Int::unsafe_to_char(b0))
+      buf.write_char(Int32::unsafe_to_char(b0))
       i = i + 1
     } else if b0 >= 0xC2 && b0 <= 0xDF {
       if i + 1 >= len {
@@ -165,7 +165,7 @@ fn decode_utf8_bytes(bytes : Array[Int]) -> String? {
         return None
       }
       let cp = ((b0 & 0x1F) << 6) | (b1 & 0x3F)
-      buf.write_char(Int::unsafe_to_char(cp))
+      buf.write_char(Int32::unsafe_to_char(cp))
       i = i + 2
     } else if b0 >= 0xE0 && b0 <= 0xEF {
       if i + 2 >= len {
@@ -177,7 +177,7 @@ fn decode_utf8_bytes(bytes : Array[Int]) -> String? {
         return None
       }
       let cp = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F)
-      buf.write_char(Int::unsafe_to_char(cp))
+      buf.write_char(Int32::unsafe_to_char(cp))
       i = i + 3
     } else if b0 >= 0xF0 && b0 <= 0xF4 {
       if i + 3 >= len {
@@ -193,7 +193,7 @@ fn decode_utf8_bytes(bytes : Array[Int]) -> String? {
         ((b1 & 0x3F) << 12) |
         ((b2 & 0x3F) << 6) |
         (b3 & 0x3F)
-      buf.write_char(Int::unsafe_to_char(cp))
+      buf.write_char(Int32::unsafe_to_char(cp))
       i = i + 4
     } else {
       return None
@@ -206,7 +206,7 @@ fn decode_utf8_bytes(bytes : Array[Int]) -> String? {
 /// Percent-decode a string or slice exactly once, decoding UTF-8 byte sequences.
 pub fn decode_percent(value : StringView) -> String raise PathError {
   let len = value.length()
-  let bytes : Array[Int] = []
+  let bytes : Array[Int32] = []
   let mut i = 0
   while i < len {
     if value[i].to_int() == '%'.to_int() {
@@ -247,6 +247,7 @@ pub fn decode_percent(value : StringView) -> String raise PathError {
 
 ///|
 /// Pure path resolution with root anchoring and BaseURL prefix matching.
+#warnings("-result_error_return")
 pub fn resolve_path(
   root : String,
   base_url : String,
@@ -325,7 +326,7 @@ pub fn crypto_equals(expected : String, actual : String) -> Bool {
 ///|
 /// Decode Base64 string to a UTF-8 string. Pure, portable implementation.
 pub fn base64_decode_string(input : StringView) -> String? {
-  let bytes : Array[Int] = []
+  let bytes : Array[Int32] = []
   let mut val = 0
   let mut valb = -8
   for c in input {
@@ -348,7 +349,7 @@ pub fn base64_decode_string(input : StringView) -> String? {
 }
 
 ///|
-fn base64_char_value(c : Char) -> Int {
+fn base64_char_value(c : Char) -> Int32 {
   if c >= 'A' && c <= 'Z' {
     c.to_int() - 'A'.to_int()
   } else if c >= 'a' && c <= 'z' {
@@ -560,7 +561,6 @@ pub fn find_header_case_insensitive(
   }
   None
 }
-
 
 ///|
 pub extend PathError with Eq::{not_equal, equal}

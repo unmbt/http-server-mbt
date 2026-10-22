@@ -1,10 +1,10 @@
 ///|
 #cfg(any(target="native", target="llvm"))
-extern "c" fn runtime_native_exit(code : Int) = "exit"
+extern "c" fn runtime_native_exit(code : Int32) = "exit"
 
 ///|
 #cfg(not(any(target="native", target="llvm")))
-fn runtime_native_exit(code : Int) -> Unit {
+fn runtime_native_exit(code : Int32) -> Unit {
   abort("exit(\{code})")
 }
 
@@ -16,10 +16,13 @@ async fn eprint_err(msg : String) -> Unit {
 }
 
 ///|
-pub async fn run(thin~ : Bool, launch : async (@core.Config, Int, async () -> Unit) -> Unit) -> Unit {
+pub async fn run(
+  thin~ : Bool,
+  launch : async (@core.Config, Int32, async () -> Unit) -> Unit,
+) -> Unit {
   let argv = @env.args()
   let args = if argv.length() > 1 { argv[1:] } else { [] }
-  let (config, port) = match parse_cli(args,thin~) {
+  let (config, port) = match parse_cli(args, thin~) {
     Ok(Help(msg)) => {
       println(msg)
       return
@@ -83,4 +86,3 @@ pub async fn run(thin~ : Bool, launch : async (@core.Config, Int, async () -> Un
     }
   }
 }
-

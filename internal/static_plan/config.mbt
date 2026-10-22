@@ -14,7 +14,7 @@ fn boolean(value : Json) -> Bool raise {
 }
 
 ///|
-fn integer(value : Json) -> Int raise {
+fn integer(value : Json) -> Int32 raise {
   guard value is Number(n, ..) &&
     n >= -2147483648.0 &&
     n <= 2147483647.0 &&

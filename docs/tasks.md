@@ -2,6 +2,8 @@
 
 2026-10-22 增量：现有编号扩展至 T-037；T-024 仍是已撤出的历史量化基准，新增 T-036 为不设门槛的观测型 benchmark，T-023 进入 io_uring 实验实现。Linux 能力、取消和三平台 Actions 证据仍未完成，不能把本机 Windows 结果冒充总验收。活动工具链已更新为 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`；旧验证记录中的版本仅表示当时环境。
 
+2026-10-22 工具链回归修复：按新 moonc 弃用门禁将脚本/Wasm 的 `.to_json()` 迁移为 `Json(value)`，并为共享 owner 预算测试增加异步互斥；候选 Native 测试使用 `--no-parallelize`，保留并行编译。首个失败 run `39778473013` 的错误证据已保存，三平台修复后的 Actions 结果待补入 T-025/T-032，不提前勾选总任务。
+
 历史修订：版本 5（2026-09-13）将 TLS 后端改为源码 vendor 的 MbedTLS 4.2.0（D-08），T-002 补充 TLS 探针分项、T-012 进入进行中（Windows 分项）；任务数量与当前状态以上方 2026-09-24 校正为准。需求见 [proposal](proposal.md)，契约见 [design](design.md)，执行规则见 [AGENTS.md](../AGENTS.md)。
 
 **实施前**：加载 `moonbit-agent-guide`；涉及 Native FFI/C ABI 时另须阅读 `moonbit-c-binding`，先验证所有权、C 桥接、导出/链接及内存检查方式。自动化驱动使用 `.mbtx`。

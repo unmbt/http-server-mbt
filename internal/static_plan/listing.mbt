@@ -28,7 +28,7 @@ fn encode_path_segment(s : String) -> String {
       cp == '_'.to_int() ||
       cp == '.'.to_int() ||
       cp == '~'.to_int() {
-      buf.write_char(Int::unsafe_to_char(cp))
+      buf.write_char(Int32::unsafe_to_char(cp))
     } else {
       let hex = "0123456789ABCDEF"
       buf.write_char('%')
@@ -142,7 +142,7 @@ pub(all) struct ListingEntry {
 }
 
 ///|
-pub fn compare_entries(a : ListingEntry, b : ListingEntry) -> Int {
+pub fn compare_entries(a : ListingEntry, b : ListingEntry) -> Int32 {
   let cmp = a.name.to_lower().compare(b.name.to_lower())
   if cmp != 0 {
     cmp
@@ -270,7 +270,7 @@ pub fn render_directory_listing_html(
   title_path : String,
   entry_names : Array[(String, Bool)],
   raw_query? : String?,
-  host? : String = "localhost",
+  host~ : String = "localhost",
 ) -> String {
   let entries : Array[ListingEntry] = []
   for item in entry_names {

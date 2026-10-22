@@ -1,5 +1,5 @@
 ///|
-pub fn hs_abi_version() -> UInt {
+pub fn hs_abi_version() -> UInt32 {
   0x00010001U
 }
 

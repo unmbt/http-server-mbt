@@ -152,7 +152,6 @@ pub fn match_proxy_rule(rule : ProxyRule, path : String) -> (String, String)? {
   Some((rule.target, rewritten))
 }
 
-
 ///|
 pub extend FallbackMode with Eq::{not_equal, equal}
 

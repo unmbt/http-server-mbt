@@ -36,7 +36,7 @@ int main(int argc,char **argv) {
 #else
   int pipefds[2];assert(pipe(pipefds)==0);reader=pipefds[0];writer=pipefds[1];
 #endif
-  hs_pool *pool=hs_io_pool_new(4,8,writer,1048576,1048576);assert(pool);
+  hs_pool *pool=hs_io_pool_new(4,8,writer,1048576,1048576,0);assert(pool);
   hs_job *open=hs_io_submit(pool,0,NULL,argv[1],0,0,0);wait_job(open);assert(open->code==0);
   hs_file *root=hs_io_take_file(open);hs_io_job_free(open);
   open=hs_io_submit(pool,0,root,"hello.txt",0,0,0);wait_job(open);assert(open->code==0);

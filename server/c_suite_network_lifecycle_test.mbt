@@ -12,7 +12,7 @@
 /// - C041 (cli.test.js: CLI configuration parity, custom headers, and port mapping)
 
 ///|
-fn net_parse_port(port_str : String) -> Int? {
+fn net_parse_port(port_str : String) -> Int32? {
   // Truncate floating point port like "9090.86" -> "9090"
   let clean_str = port_str.split(".").to_array()[0].trim().to_owned()
   if clean_str.length() == 0 {
@@ -33,7 +33,7 @@ fn net_parse_port(port_str : String) -> Int? {
 ///|
 enum NetFamily {
   StrFam(String)
-  NumFam(Int)
+  NumFam(Int32)
 }
 
 ///|
@@ -75,9 +75,9 @@ fn filter_ipv6_addresses(entries : Array[NetInterfaceEntry]) -> Array[String] {
 
 ///|
 async fn net_test_get(
-  port : Int,
+  port : Int32,
   host_hdr : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()
@@ -331,8 +331,8 @@ test "C037 & C040: Proxy configuration and protocol scheme preflight checks" {
     }
     assert_true(failed)
   }
-  for target in ["ws://127.0.0.1:8080","wss://localhost:8443"] {
-    @core.validate_config({..base_cfg,proxy:Some(target),websocket:true})
+  for target in ["ws://127.0.0.1:8080", "wss://localhost:8443"] {
+    @core.validate_config({ ..base_cfg, proxy: Some(target), websocket: true, })
   }
 
   // Valid proxy with http and https schemes

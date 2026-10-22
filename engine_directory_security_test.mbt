@@ -9,7 +9,7 @@
 
 ///|
 fn adv_bytes_to_string(bytes : Bytes) -> String {
-  let arr : Array[Int] = []
+  let arr : Array[Int32] = []
   for b in bytes {
     arr.push(b.to_int())
   }
@@ -19,13 +19,13 @@ fn adv_bytes_to_string(bytes : Bytes) -> String {
   while i < len {
     let b0 = arr[i]
     if b0 < 0x80 {
-      buf.write_char(Int::unsafe_to_char(b0))
+      buf.write_char(Int32::unsafe_to_char(b0))
       i = i + 1
     } else if b0 >= 0xC2 && b0 <= 0xDF {
       if i + 1 < len {
         let b1 = arr[i + 1]
         let cp = ((b0 & 0x1F) << 6) | (b1 & 0x3F)
-        buf.write_char(Int::unsafe_to_char(cp))
+        buf.write_char(Int32::unsafe_to_char(cp))
         i = i + 2
       } else {
         i = i + 1
@@ -35,7 +35,7 @@ fn adv_bytes_to_string(bytes : Bytes) -> String {
         let b1 = arr[i + 1]
         let b2 = arr[i + 2]
         let cp = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F)
-        buf.write_char(Int::unsafe_to_char(cp))
+        buf.write_char(Int32::unsafe_to_char(cp))
         i = i + 3
       } else {
         i = i + 1

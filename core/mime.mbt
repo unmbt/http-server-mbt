@@ -132,7 +132,7 @@ pub fn normalize_extension(raw : String) -> String {
 }
 
 ///|
-fn rfind_slash(s : String) -> Int? {
+fn rfind_slash(s : String) -> Int32? {
   let len = s.length()
   for i = len - 1; i >= 0; i = i - 1 {
     if s[i].to_int() == '/'.to_int() || s[i].to_int() == '\\'.to_int() {
@@ -143,7 +143,7 @@ fn rfind_slash(s : String) -> Int? {
 }
 
 ///|
-fn rfind_char(s : String, c : Char) -> Int? {
+fn rfind_char(s : String, c : Char) -> Int32? {
   let len = s.length()
   let target = c.to_int()
   for i = len - 1; i >= 0; i = i - 1 {
@@ -180,7 +180,7 @@ pub fn extract_extension(path_or_filename : String) -> String {
 pub fn MimeRegistry::lookup(
   self : MimeRegistry,
   path_or_ext : String,
-  default_type? : String = "application/octet-stream",
+  default_type~ : String = "application/octet-stream",
 ) -> String {
   let ext = extract_extension(path_or_ext)
   match self.table.get(ext) {
@@ -354,7 +354,7 @@ pub fn sniff_html_charset(bytes : Bytes) -> String? {
               }
               let buf = StringBuilder()
               for b_idx = val_start; b_idx < k; b_idx = b_idx + 1 {
-                buf.write_char(Int::unsafe_to_char(bytes[b_idx].to_int()))
+                buf.write_char(Int32::unsafe_to_char(bytes[b_idx].to_int()))
               }
               let raw_charset = buf.to_string()
               if raw_charset.length() > 0 {

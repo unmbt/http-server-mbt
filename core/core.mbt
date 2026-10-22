@@ -24,14 +24,13 @@ pub(all) enum ResponseBody {
 
 ///|
 /// Return the total byte length of the response body.
-pub fn ResponseBody::length(self : ResponseBody) -> Int {
+pub fn ResponseBody::length(self : ResponseBody) -> Int32 {
   match self {
     Empty => 0
     Bytes(b) => b.length()
     FileRegion(_, _, length) => length.to_int()
   }
 }
-
 
 ///|
 pub extend Method with Eq::{not_equal, equal}

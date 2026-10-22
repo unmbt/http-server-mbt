@@ -43,7 +43,11 @@ async fn main {
   assert_eq(@fs.read_file("testdata/public/hello.txt").binary().length(), 14)
   @shell.Cmd("moon", ["run", "scripts/check/check_automation.mbtx"]).run()
   @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn"]).run()
-  @shell.Cmd("moon", ["test", "--target", "native", "--deny-warn"]).run()
+  // Native resource probes share process/owner budgets; keep test executables
+  // sequential while leaving their compilation parallel.
+  @shell.Cmd("moon", [
+    "test", "--target", "native", "--deny-warn", "--no-parallelize",
+  ]).run()
   @shell.Cmd("moon", ["check", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
   @shell.Cmd("moon", [

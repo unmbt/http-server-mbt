@@ -14,4 +14,6 @@ license = "MIT"
 
 preferred_target = "native"
 
-options("--moonbit-unstable-prebuild": "build.mbtx")
+options(
+  "--moonbit-unstable-prebuild": "build.mbtx",
+)

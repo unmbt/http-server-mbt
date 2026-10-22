@@ -19,11 +19,11 @@
 
 ///|
 async fn dirsec_request(
-  port : Int,
+  port : Int32,
   raw_path : String,
   headers : Array[(String, String)],
-  meth? : String = "GET",
-) -> (Int, Map[String, String], Bytes) {
+  meth~ : String = "GET",
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()
@@ -54,12 +54,10 @@ async fn dirsec_request(
     Some(s) => fi_parse_int(s[:]).unwrap_or(0)
     None => 0
   }
-  let body = if meth != "HEAD" && res_headers.get("transfer-encoding")==Some("chunked") {
+  let body = if meth != "HEAD" &&
+    res_headers.get("transfer-encoding") == Some("chunked") {
     read_test_chunked_body(conn)
-  } else if meth != "HEAD" &&
-    status != 304 &&
-    status != 204 &&
-    content_len > 0 {
+  } else if meth != "HEAD" && status != 304 && status != 204 && content_len > 0 {
     conn.read_exactly(content_len)
   } else {
     b""
@@ -69,9 +67,9 @@ async fn dirsec_request(
 
 ///|
 async fn dirsec_get(
-  port : Int,
+  port : Int32,
   raw_path : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   dirsec_request(port, raw_path, [])
 }
 

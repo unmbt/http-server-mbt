@@ -5,9 +5,11 @@ Use `server/plain` for Thin HTTP and `full` for HTTP/HTTPS and proxy service sco
 See [the migration contract](docs/migration-0.4.md) for the next minor version's API changes.
 
 ```mbt check
+///|
 async fn example(root : String) -> Bytes {
   @http-server-mbt.with_engine(@core.Config::default(root), engine => {
-    match engine.handle({ meth: Get, target: "/index.html", headers: Map([]) }) {
+    match
+      engine.handle({ meth: Get, target: "/index.html", headers: Map([]), }) {
       Handled(response) => {
         defer response.close()
         response.to_bytes(max_bytes=1048576)
@@ -18,6 +20,7 @@ async fn example(root : String) -> Bytes {
   })
 }
 
+///|
 async test "documented owned engine scope" {
   assert_true(example("testdata/public").length() > 0)
 }

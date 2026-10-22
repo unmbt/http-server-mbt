@@ -3,9 +3,9 @@
 fn run(
   config : @core.Config,
   request : @core.Request,
-  files : Map[String, (Bytes, Int)],
+  files : Map[String, (Bytes, Int32)],
 ) -> @static_plan.Response? raise {
-  let opened : Map[Int, Bytes] = Map([])
+  let opened : Map[Int32, Bytes] = Map([])
   let mut token = 1
   let mime = @core.MimeRegistry::new()
   let mut step = @static_plan.start(config, request, mime)
@@ -37,7 +37,7 @@ fn run(
         }
       Prefix(file, count, k) => {
         let bytes = opened[file.token]
-        k(bytes[:Int::min(count, bytes.length())].to_owned())
+        k(bytes[:Int32::min(count, bytes.length())].to_owned())
       }
       List(_, k) =>
         k([
@@ -78,14 +78,14 @@ fn run(
 ///|
 fn req(
   target : String,
-  meth? : @core.Method = Get,
-  headers? : Map[String, String] = Map([]),
+  meth~ : @core.Method = Get,
+  headers~ : Map[String, String] = Map([]),
 ) -> @core.Request {
   { meth, target, headers, }
 }
 
 ///|
-fn files() -> Map[String, (Bytes, Int)] {
+fn files() -> Map[String, (Bytes, Int32)] {
   Map([
     ("/site", (b"", 2)),
     ("/site/hello.txt", (b"hello moonbit\n", 1)),

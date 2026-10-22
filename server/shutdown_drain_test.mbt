@@ -9,7 +9,7 @@
 /// 5. Zero handle leaks across repeated server lifecycles.
 
 ///|
-fn m5_parse_status(status_line : String) -> Int {
+fn m5_parse_status(status_line : String) -> Int32 {
   let parts = status_line.split(" ").to_array()
   if parts.length() >= 2 {
     let mut n = 0
@@ -25,7 +25,7 @@ fn m5_parse_status(status_line : String) -> Int {
 }
 
 ///|
-fn m5_parse_int(s : StringView) -> Int? {
+fn m5_parse_int(s : StringView) -> Int32? {
   let mut n = 0
   if s.length() == 0 {
     return None
@@ -64,9 +64,9 @@ async fn m5_read_headers(conn : @socket.Tcp) -> Map[String, String] {
 
 ///|
 async fn m5_simple_request(
-  port : Int,
+  port : Int32,
   raw_req : String,
-) -> (Int, Map[String, String], Bytes) {
+) -> (Int32, Map[String, String], Bytes) {
   let addr = @socket.Addr::new(0x7F000001, port)
   let conn = @socket.Tcp::connect(addr)
   defer conn.close()
@@ -101,10 +101,10 @@ async test "shutdown drain: in-flight request drains cleanly on stop_and_drain" 
 
   @server.with_server_at(config, 0, async fn(server) {
     let port = server.port()
-    let client_status : Ref[Int] = Ref(0)
-    let client_len : Ref[Int] = Ref(0)
+    let client_status : Ref[Int32] = Ref(0)
+    let client_len : Ref[Int32] = Ref(0)
     let client_finished : Ref[Bool] = Ref(false)
-    let client_bytes_read : Ref[Int] = Ref(0)
+    let client_bytes_read : Ref[Int32] = Ref(0)
     let client_err : Ref[String] = Ref("")
 
     @async.with_task_group() <| group => {
@@ -187,8 +187,8 @@ async test "shutdown drain: multiple concurrent in-flight requests drain cleanly
   @server.with_server_at(config, 0, async fn(server) {
     let port = server.port()
     let num_clients = 4
-    let completed_clients : Ref[Int] = Ref(0)
-    let started_clients : Ref[Int] = Ref(0)
+    let completed_clients : Ref[Int32] = Ref(0)
+    let started_clients : Ref[Int32] = Ref(0)
 
     @async.with_task_group() <| group => {
       for i in 0..<num_clients {

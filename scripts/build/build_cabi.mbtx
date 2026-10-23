@@ -134,8 +134,10 @@ async fn find_msvc_root_dir() -> String {
 
   // 3. Scan candidate MSVC root directories
   let roots = [
-    "E:/Program Files/msvc/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
-    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
+    "D:/devenv/msvc/VC/Tools/MSVC", "E:/Program Files/msvc/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
@@ -592,11 +594,13 @@ async fn collect_and_stage_objects(
     for name in files {
       if name.has_suffix(".obj") || name.has_suffix(".o") {
         let full = normalize_path(dir + "/" + name)
-        let mut excluded = false
-        for kw in excluded_keywords {
-          if full.contains(kw) {
-            excluded = true
-            break
+        let mut excluded = full.contains("__moonbit_link_core__")
+        if !excluded {
+          for kw in excluded_keywords {
+            if full.contains(kw) {
+              excluded = true
+              break
+            }
           }
         }
         if !excluded {
@@ -1204,12 +1208,13 @@ async fn main {
   println("4. Building thin variant (no TLS backend, static HTTP server)...")
   build_variant("thin", tc, [
     "/cmd/", "/build/tls/", "/full/", "/c_abi/full/", "_test.", "_wbtest.", "blackbox_test",
-    "internal_test",
+    "internal_test", "__moonbit_link_core__",
   ])
 
   println("5. Building full variant (integrated TLS & proxy)...")
   build_variant("full", tc, [
     "/cmd/", "/c_abi/thin/", "_test.", "_wbtest.", "blackbox_test", "internal_test",
+    "__moonbit_link_core__",
   ])
 
   let (dyn_thin, stat_thin, dyn_full, stat_full) = match target_os {

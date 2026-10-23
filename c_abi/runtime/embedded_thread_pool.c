@@ -69,8 +69,8 @@ int32_t moonbit_rt_job_get_err(void *job) {
 }
 
 MOONBIT_FFI_EXPORT
-void moonbit_rt_wake_worker(struct worker *worker, struct job *job) {
-  moonbitlang_async_wake_worker(worker, job);
+void moonbit_rt_wake_worker(struct worker *worker, int32_t job_id, void *job) {
+  moonbitlang_async_wake_worker(worker, job_id, job);
 }
 
 MOONBIT_FFI_EXPORT
@@ -98,7 +98,9 @@ void moonbit_rt_destroy_thread_pool(void) {
   moonbitlang_async_destroy_thread_pool();
 }
 
+#ifndef _WIN32
 MOONBIT_FFI_EXPORT
 int32_t moonbit_rt_fetch_completion(int notify_recv, int32_t *output) {
   return moonbitlang_async_fetch_completion(notify_recv, output);
 }
+#endif

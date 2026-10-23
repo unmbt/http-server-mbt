@@ -1,6 +1,6 @@
 # http-server-mbt 实施任务与测试迁移清单
 
-2026-10-23 增量：活动工具链更新为 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。补充 C ABI embedded_thread_pool 对 `moonbit_rt_*` 运行时符号的导出与转发（校正 `moonbit_rt_wake_worker` 参数签名并对 `moonbit_rt_fetch_completion` 增加非 Windows 保护），补充 embedded_signal 对应桩；排除 `__moonbit_link_core__` 避免多重定义符号，支持本地 MSVC 发现；修复 setup-moonbit 的 GITHUB_TOKEN 配置避免 CI 限流。
+2026-10-23 增量：活动工具链更新为 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。补充 C ABI embedded_thread_pool 对 `moonbit_rt_*` 运行时符号的导出与转发（校正 `moonbit_rt_wake_worker` 参数签名并对 `moonbit_rt_fetch_completion` 增加非 Windows 保护），补充 embedded_signal 对应桩；排除 `__moonbit_link_core__` 避免多重定义符号，支持本地 MSVC 发现；修复 setup-moonbit 的 GITHUB_TOKEN 配置避免 CI 限流；修复 `validate_candidate.mbtx` 中 `moon check` 导致的 `pkg.generated.mbti` 接口文件更新（传入 `--no-mbti`），并在 `candidate_manifest.mbtx` 增加漂移回退保证候选树干净，GitHub Actions 候选验收流水线 [Run 39936437640](https://github.com/unmbt/http-server-mbt/actions/runs/39936437640)（`windows-2025`、`macos-15`、`ubuntu-24.04` 与 `candidate-gate`）全绿通过。
 
 2026-10-22 增量：现有编号扩展至 T-037；T-024 仍是已撤出的历史量化基准，新增 T-036 为不设门槛的观测型 benchmark，T-023 进入 io_uring 实验实现。Linux 能力、取消和三平台 Actions 证据仍未完成，不能把本机 Windows 结果冒充总验收。活动工具链已更新为 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`；旧验证记录中的版本仅表示当时环境。
 

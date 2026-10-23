@@ -494,6 +494,8 @@ T-030 用干净临时消费模块验证候选包内容，避免工作区缓存�
 
 2026-10-13 CI 工具链漂移修复（T-025/T-029）：所有 Actions 安装入口同时固定 toolchain 和 core 为 `0.10.14+7d59c7ec9`（对应 Moon `0.1.20260920`）。安装器的发行版本与 `moon version` 的日期版本不同，不能直接将日期版本用作下载目录；候选脚本的版本门槛保持。工具链升级仍需单独验证，不随安装器的 `latest` 漂移。
 
+2026-10-23 工具链升级与 CI 修复（T-020/T-025/T-032）：按用户要求活动工具链升级至 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。修复 Linux/macOS C ABI 构建中 embedded_thread_pool 与 embedded_signal 缺失新运行时符号（`moonbit_rt_make_job`、`moonbit_rt_leave_cancellable_region` 等 5 项符号及配套信号桩）导致的链接错误；为 `hustcer/setup-moonbit` 配置 `GITHUB_TOKEN` 防止 Nushell 下载遇到 GitHub API 未鉴权频率限制；`validate_candidate.mbtx` 与维护文档同步更新。
+
 2026-10-22 工具链升级记录（T-023/T-036/T-037）：当前本机与活动 Actions 配置统一使用 toolchain/core `0.10.16+b1a0e846e`，对应 Moon `0.1.20261020`、moonrun `0.1.20261020`。`validate_candidate.mbtx` 的门槛、Wasm 示例和维护文档同步更新；此前验证记录保留原工具链版本，不改写历史证据。
 
 同日回归修复：`Json(value)` 替代新工具链弃用的 `.to_json()`；`resolve_path` 继续返回可匹配的 `Result`，以局部 `#warnings("-result_error_return")` 记录其有意的普通数据错误契约；候选 Native 测试顺序执行以隔离共享 owner 预算，编译仍可并行；Native sanitizer 探针补齐后端选择参数；C ABI 链接清单补充 `pathcch.lib`，并在 Linux/macOS staging 中只嵌入一次 thread pool。首个失败候选 run 39778473013 的三平台错误均指向 `build_docker.mbtx` 的弃用调用，修复后的 Actions 结果另行记录。

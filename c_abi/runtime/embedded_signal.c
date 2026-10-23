@@ -22,3 +22,24 @@ void moonbitlang_async_terminate_signal_handler(void) {}
 void moonbitlang_async_terminate_process_by_signal(int32_t signal) {
   (void)signal;
 }
+
+int moonbit_rt_get_signal_by_index(int32_t code) {
+  (void)code;
+  return -1;
+}
+void moonbit_rt_set_global_cancellation_signals(int32_t *a, int32_t n,
+                                                int32_t *b, int32_t m) {
+  (void)a;
+  (void)n;
+  (void)b;
+  (void)m;
+}
+int moonbit_rt_set_console_control_handler(int32_t add) {
+  (void)add;
+  return 1;
+}
+void moonbit_rt_start_signal_handler(void) {}
+void moonbit_rt_terminate_signal_handler(void) {}
+void moonbit_rt_terminate_process_by_signal(int32_t signal) {
+  (void)signal;
+}

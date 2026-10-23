@@ -11,8 +11,8 @@ browser execution, cloud platforms, TLS and proxies are outside its scope.
 
 ## Build and run from the repository
 
-Use the validated MoonBit toolchain/core release `0.10.16+b1a0e846e`
-(`moon version --all` reports Moon `0.1.20261020`) and a supported Node version.
+Use the validated MoonBit toolchain/core release `0.10.17+093cb8f9c`
+(`moon version --all` reports Moon `0.1.20261021`) and a supported Node version.
 Run from the repository root:
 
 ```powershell

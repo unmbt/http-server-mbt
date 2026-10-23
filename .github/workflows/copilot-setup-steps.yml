@@ -32,8 +32,10 @@ jobs:
       - name: Set up MoonBit
         uses: hustcer/setup-moonbit@v1
         with:
-          version: '0.10.16+b1a0e846e'
-          core-version: '0.10.16+b1a0e846e'
+          version: '0.10.17+093cb8f9c'
+          core-version: '0.10.17+093cb8f9c'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify the pinned compiler
         run: moon version --all

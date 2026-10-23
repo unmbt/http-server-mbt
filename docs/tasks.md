@@ -1,5 +1,7 @@
 # http-server-mbt 实施任务与测试迁移清单
 
+2026-10-23 增量：活动工具链更新为 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。补充 C ABI embedded_thread_pool 对 `moonbit_rt_*` 运行时符号的导出与转发，补充 embedded_signal 对应桩；修复 setup-moonbit 的 GITHUB_TOKEN 配置避免 CI 限流。
+
 2026-10-22 增量：现有编号扩展至 T-037；T-024 仍是已撤出的历史量化基准，新增 T-036 为不设门槛的观测型 benchmark，T-023 进入 io_uring 实验实现。Linux 能力、取消和三平台 Actions 证据仍未完成，不能把本机 Windows 结果冒充总验收。活动工具链已更新为 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`；旧验证记录中的版本仅表示当时环境。
 
 2026-10-22 工具链回归修复：按新 moonc 弃用门禁将脚本/Wasm 的 `.to_json()` 迁移为 `Json(value)`，并为共享 owner 预算测试增加异步互斥；候选 Native 测试使用 `--no-parallelize`，保留并行编译。首个失败 run `39778473013` 的错误证据已保存，三平台修复后的 Actions 结果待补入 T-025/T-032，不提前勾选总任务。

@@ -1,5 +1,7 @@
 # http-server-mbt：SDD 开发规范与 Native 重构提案
 
+2026-10-23 增量维护：按用户指令将工具链升级至 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。修复 Actions runner 中 setup-moonbit 请求 Nushell 时的 API 限流，以及 Linux 下 C ABI 构建缺少编译器运行时 `moonbit_rt_*` 转发桩的链接错误。
+
 2026-10-22 增量范围（R-N04/R-N18）：按用户指令恢复可重复的观测型 Native benchmark，并开始实现 T-023 的 Linux io_uring 实验后端。benchmark 只输出本机测量，不恢复已撤出的量化性能门槛；io_uring 保持显式/auto 可选，默认 platform 行为不变。实现使用 Linux io_uring syscall ABI 直接探测和文件读操作，不把 liburing 作为必需依赖；是否使用 liburing 的选择、能力位和受限环境行为记录在 D-21/T-037。活动构建统一升级到 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`，历史验证记录保持原样。
 
 2026-10-22 工具链回归修复：新 moonc 将 `Jsonable.to_json()` 弃用诊断提升为门禁错误，构建脚本与 Wasm bridge 统一改用 `Json(value)`；保留 `core.resolve_path` 的 `Result` 公共契约并对该声明关闭 `result_error_return` 建议。Native 资源测试在候选门禁中顺序执行，避免新测试调度器并行运行共享 owner 预算造成误报；构建仍保持并行。候选 run 39778473013 的首个三平台错误已定位为 Docker 矩阵脚本的弃用调用，修复后的远程 run 待补。

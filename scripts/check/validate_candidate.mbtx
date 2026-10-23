@@ -27,14 +27,14 @@ async fn main {
   }
   let version = @shell.Cmd("moon", ["version", "--all"]).output()
   version.check()
-  if !version.stdout().contains("0.1.20261020") {
+  if !version.stdout().contains("0.1.20261021") {
     fail(
-      "expected Moon 0.1.20261020; dependency upgrades require a reviewed change",
+      "expected Moon 0.1.20261021; dependency upgrades require a reviewed change",
     )
   }
-  if !version.stdout().contains("0.10.16+b1a0e846e") {
+  if !version.stdout().contains("0.10.17+093cb8f9c") {
     fail(
-      "expected moonc 0.10.16+b1a0e846e; toolchain upgrades require a reviewed change",
+      "expected moonc 0.10.17+093cb8f9c; toolchain upgrades require a reviewed change",
     )
   }
   if !@fs.read_file("moon.mod").text().contains("moonbitlang/async@0.21.3") {

@@ -609,6 +609,7 @@ async fn collect_and_stage_objects(
   println("Staging \{matched_objs.length()} objects into \{staging_dir}...")
   let staged_paths : Array[String] = []
   let mut idx = 0
+  let mut embedded_signal_staged = false
   let mut embedded_pool_staged = false
   let ext = match target_os {
     Windows => ".obj"
@@ -616,20 +617,25 @@ async fn collect_and_stage_objects(
   }
   for src in matched_objs {
     let dst = "\{staging_dir}/obj_\{idx}\{ext}"
-    let embedded_signal=src.contains("/internal/event_loop/signal.")
-    // Moon 0.10.16 may emit both the dependency object and a packaged
+    let embedded_signal = src.contains("/internal/event_loop/signal.") ||
+      src.contains("/runtime-signal.")
+    // Moon 0.10.16/0.10.17 may emit both the dependency object and a packaged
     // runtime-thread_pool object. The ABI build embeds one signal-safe copy.
     let embedded_pool = target_os != Windows &&
       (src.contains("/internal/event_loop/thread_pool.") ||
       src.contains("/runtime-thread_pool."))
     if embedded_signal {
-      compile_c_file(tc,"c_abi/runtime/embedded_signal.c",dst)
+      if embedded_signal_staged {
+        continue
+      }
+      embedded_signal_staged = true
+      compile_c_file(tc, "c_abi/runtime/embedded_signal.c", dst)
     } else if embedded_pool {
       if embedded_pool_staged {
         continue
       }
       embedded_pool_staged = true
-      compile_c_file(tc,"c_abi/runtime/embedded_thread_pool.c",dst)
+      compile_c_file(tc, "c_abi/runtime/embedded_thread_pool.c", dst)
     } else {
       @fs.write_file(dst, @fs.read_file(src).binary())
     }

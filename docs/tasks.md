@@ -2,6 +2,8 @@
 
 2026-10-23 增量：活动工具链更新为 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。补充 C ABI embedded_thread_pool 对 `moonbit_rt_*` 运行时符号的导出与转发（校正 `moonbit_rt_wake_worker` 参数签名并对 `moonbit_rt_fetch_completion` 增加非 Windows 保护），补充 embedded_signal 对应桩；排除 `__moonbit_link_core__` 避免多重定义符号，支持本地 MSVC 发现；修复 setup-moonbit 的 GITHUB_TOKEN 配置避免 CI 限流；修复 `validate_candidate.mbtx` 中 `moon check` 导致的 `pkg.generated.mbti` 接口文件更新（传入 `--no-mbti`），并在 `candidate_manifest.mbtx` 增加漂移回退保证候选树干净，GitHub Actions 候选验收流水线 [Run 39936437640](https://github.com/unmbt/http-server-mbt/actions/runs/39936437640)（`windows-2025`、`macos-15`、`ubuntu-24.04` 与 `candidate-gate`）全绿通过。
 
+2026-10-23 增量（T-023/T-036/T-037）：Windows x86_64 使用 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c` 完成 `moon check --target native --deny-warn --no-mbti`、`moon test --target native --deny-warn --no-parallelize`（279/279）和 `moon info --target native`；`internal/native` 的 N-07 显式 backend/auto 测试 4/4，C ABI JSON 的 `io_backend` 白盒回归 2/2。C/Rust/Python/Node consumer 配置已覆盖 `auto`，C/Node 源码语法检查通过（仅现有 MSVC `fopen` 弃用警告）。`benchmarks --io-backend auto` 输出 `backend_selected=platform`、3 次请求、42 字节且成功，受限 Windows 的显式 `io_uring` 以 `NativeError.Unsupported` 在 engine 前退出（exit 1）。候选脚本已接入三平台 workflow，但本机 `moon run scripts/check/check_io_uring.mbtx` 因依赖缓存目录权限未执行；Linux 可用内核、取消和远程 Actions 证据仍待补。
+
 2026-10-22 增量：现有编号扩展至 T-037；T-024 仍是已撤出的历史量化基准，新增 T-036 为不设门槛的观测型 benchmark，T-023 进入 io_uring 实验实现。Linux 能力、取消和三平台 Actions 证据仍未完成，不能把本机 Windows 结果冒充总验收。活动工具链已更新为 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`；旧验证记录中的版本仅表示当时环境。
 
 2026-10-22 工具链回归修复：按新 moonc 弃用门禁将脚本/Wasm 的 `.to_json()` 迁移为 `Json(value)`，并为共享 owner 预算测试增加异步互斥；候选 Native 测试使用 `--no-parallelize`，保留并行编译。首个失败 run `39778473013` 的错误证据已保存，三平台修复后的 Actions 结果待补入 T-025/T-032，不提前勾选总任务。
@@ -153,7 +155,8 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-023 可运行 io_uring 实验后端** — 状态：进行中（2026-10-22，Windows 编译分项；Linux 运行验收待 Actions）。需求：R-N04；设计：D-05、D-21；依赖：T-016、T-017。
   - 交付：Linux 可选后端、opcode 探测、platform/auto/强制选择、实验标识与能力输出；当前直接使用 io_uring syscall ABI，liburing 2.15 不作为必需依赖。
   - 当前实现：Config/CLI 接受 platform|auto|epoll|kqueue|iocp|io_uring；auto 只在启动探测成功时启用 io_uring；实验路径用 IORING_OP_READ，文件发送回退到有界读取；非 Linux 显式选择在监听前失败。
-  - 验收：N-07 及共同 H/S 案例；支持环境真实处理文件请求与取消，受限环境 auto 退回 epoll，强制选择失败前无监听，非 Linux 无伪实现。Linux kernel/opcode、取消和三平台 Actions 证据待补。
+  - 新增验证：`internal/native` 的 N-07 测试在能力可用时通过显式 `Runtime/File::read`，在 Windows/macOS 或受限 Linux 上断言显式选择以 `Unsupported` 失败；同一测试覆盖 `auto` 的稳定回退/实验读取。`scripts/check/check_io_uring.mbtx` 在候选 runner 上运行 auto benchmark，并按能力探针校验显式选择结果。
+  - 验收：N-07 及共同 H/S 案例；支持环境真实处理文件请求与取消，受限环境 auto 退回 epoll，强制选择失败前无监听，非 Linux 无伪实现。Linux kernel/opcode、在途取消和三平台 Actions 证据待补。
 
 - [ ] **T-024 原性能基准交付（已撤出当前范围）** — 状态：未开始。需求：R-N03 的历史量化计划已撤出；设计：D-09；依赖：无。
   - 交付：当前无实施交付，仅保留历史编号，不重用、不计入当前任务分母。
@@ -161,11 +164,11 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 
 - [ ] **T-036 可重复 Native 观测型 benchmark** — 状态：进行中（2026-10-22，Windows 本机分项）。需求：R-N18；设计：D-09、D-21；依赖：T-016。
   - 交付：benchmarks/ Native-only 可执行包，支持 root/path/iterations/warmup/io-backend 参数，使用单调时钟输出请求数、字节数、耗时和吞吐。
-  - 验收：moon run benchmarks --target native --release 在稳定 backend 与 auto 下可运行；结果仅作诊断证据，不设提升倍率、跨机器门槛或发布阻塞。Linux io_uring benchmark 结果随 T-023 补回。
+  - 当前验证：`scripts/check/check_io_uring.mbtx` 检查 auto 输出的 backend、字节数、耗时和能力字段，并在能力可用时运行显式 io_uring；结果仅作诊断证据，不设提升倍率、跨机器门槛或发布阻塞。Linux 可用内核的远程结果随 T-023 补回。
 
 - [ ] **T-037 io_uring 依赖与能力矩阵审计** — 状态：进行中（2026-10-22）。需求：R-N04、R-SDD；设计：D-05、D-21；依赖：T-023。
   - 交付：记录 syscall ABI 与 liburing 2.15 的取舍、setup/opcode/EPERM/ENOSYS 探测位、静态/动态链接影响及受限环境策略。
-  - 当前证据：Windows Native 构建未引入 liburing 链接；WSL FedoraLinux-43 的 `gcc -fsyntax-only -std=c11 -pthread` 通过 `internal/native/native.c`，`pkg-config --modversion liburing` 报未安装。Linux 真实运行与三平台 Actions 证据仍待补。
+  - 当前证据：Windows Native 构建未引入 liburing 链接；探针让内核填充 8 位 `ops_len`，避免把 256 写入造成旧内核截断；`docs/io-uring.md` 补充 Linux UAPI 头文件要求、能力位和 sandbox 行为；候选脚本验证 auto/显式选择契约。WSL FedoraLinux-43 的旧 `gcc -fsyntax-only -std=c11 -pthread` 证据仍保留，Linux 真实运行与三平台 Actions 证据仍待补。
   - 验收：默认三平台构建不出现 liburing 链接；Linux 可用环境真实执行 READ，受限环境 auto 降级、显式选择失败；若未来切换 liburing，先更新设计、依赖清单和 Actions 证据。
 
 - [ ] **T-025 GitHub Actions 完整验证与发布门槛** — 状态：进行中（2026-09-24 校正；Windows 历史验证不代表总交付）。需求：R-SDD、R-COMPAT、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-08、D-10～D-18；依赖：T-001、T-021、T-022、T-023、T-027、T-028、T-029、T-030、T-032、T-033、T-034。

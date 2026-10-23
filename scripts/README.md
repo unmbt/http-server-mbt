@@ -5,7 +5,7 @@
 | 目录 | 入口及用途 |
 |---|---|
 | `build/` | `build_cli.mbtx`、`build_cabi.mbtx`、`build_node.mbtx`、`build_docker.mbtx`：CLI、C 库、Node 插件、Linux 四组合容器 |
-| `check/` | `validate_candidate.mbtx`：Native/核心 wasm-gc、sanitizer、构建和外部消费；`check_automation.mbtx`：递归检查全部维护脚本；`check_external_consumers.mbtx`：Rust/Python；`check_moonbit_consumer.mbtx`：独立 MoonBit 源码消费；`check_native_sanitizers.mbtx`：C 资源回放；`check_node_candidate.mbtx`：离线 npm 候选安装及生命周期 |
+| `check/` | `validate_candidate.mbtx`：Native/核心 wasm-gc、sanitizer、构建和外部消费；`check_automation.mbtx`：递归检查全部维护脚本；`check_io_uring.mbtx`：auto/显式 io_uring benchmark 与受限环境契约；`check_external_consumers.mbtx`：Rust/Python；`check_moonbit_consumer.mbtx`：独立 MoonBit 源码消费；`check_native_sanitizers.mbtx`：C 资源回放；`check_node_candidate.mbtx`：离线 npm 候选安装及生命周期 |
 | `release/` | `candidate_manifest.mbtx`：候选清单；`verify_candidates.mbtx`：三平台同提交/哈希核对；`release_gate.mbtx`：tag/run/版本门禁及发行产物整理；`publish_npm.mbtx`、`publish_mooncakes.mbtx`：发布已验证的包 |
 | `maintenance/` | `gen_version.mbtx`：版本源码；`embed_ca.mbtx`：固定 CA 数据嵌入；`stage_licenses.mbtx`：分发许可证；`vendor_tls.mbtx`：固定来源/哈希的 TLS vendor 再生 |
 | `diagnostics/` | `diagnose_server.mbtx`：逐测试文件定位失败/超时；输出诊断，不替代验收门槛 |

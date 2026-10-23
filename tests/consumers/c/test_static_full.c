@@ -36,7 +36,7 @@ int main(void) {
 
     printf("[test_static_full] Testing server lifecycle...\n");
     hs_server_t* server = NULL;
-    const char* config = "{\"port\": 0, \"root\": \".\", \"silent\": true}";
+    const char* config = "{\"port\": 0, \"root\": \".\", \"io_backend\": \"auto\", \"silent\": true}";
     int32_t start_rc = hs_server_start(config, strlen(config), &server);
     printf("[test_static_full] hs_server_start returned: %d\n", start_rc);
     assert(start_rc == HS_OK);

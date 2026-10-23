@@ -48,6 +48,7 @@ async fn main {
   @shell.Cmd("moon", [
     "test", "--target", "native", "--deny-warn", "--no-parallelize",
   ]).run()
+  @shell.Cmd("moon", ["run", "scripts/check/check_io_uring.mbtx"]).run()
   @shell.Cmd("moon", [
     "check", "core", "--target", "wasm-gc", "--deny-warn", "--no-mbti",
   ]).run()

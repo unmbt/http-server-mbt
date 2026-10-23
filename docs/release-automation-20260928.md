@@ -6,7 +6,7 @@
 
 `v*` push → tag/版本预检 → 复用三平台 Candidate acceptance → 清单/哈希/同 run 校验 → npm 与 Mooncakes → GitHub Release。手动选择 tag 也可启动同一路径；master 不能手动发包。发布 job 通过 needs 等待验证，不使用 continue-on-error 或无条件跳过。
 
-按用户确认，日常版本发布移除全部 T 任务勾选与 `full_release_ready=true` 条件。Native/资源/sanitizer、Node 22/24、干净外部消费、Linux 四容器和三平台哈希门禁保留；总任务、未实现 io_uring/wasm-gc 引擎与最终重构审计继续追踪，清单的 full_release_ready=false 保留为范围说明。
+按用户确认，日常版本发布移除全部 T 任务勾选与 `full_release_ready=true` 条件。Native/资源/sanitizer、Node 22/24、干净外部消费、Linux 四容器和三平台哈希门禁保留；总任务、实验性且证据未完备的 io_uring/wasm-gc 引擎与最终重构审计继续追踪，清单的 full_release_ready=false 保留为范围说明。
 
 发行消费原始 npm tarball 与 Linux 的 MoonBit 源码候选。npm 先三平台包后主包，发布前核对包名、版本及精确平台依赖；预发行用 next。重试只跳过 registry 中 SHA-1 相同的 tarball，网络/认证失败和内容冲突均失败。Mooncakes 独立 job 写入临时凭据、发布后清理。GitHub Release 保留安装脚本要求的六个 CLI 文件名，将 SDK/证据按平台归档，避免重复 basename 冲突。候选清单现在包含之前被宽泛 moonbit-* 过滤器遗漏的 moonbit-consumer.txt；验证拒绝清单外文件。
 

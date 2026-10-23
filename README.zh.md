@@ -26,7 +26,7 @@
 | 平台 | CI 架构 | Actions Runner / Job | 核心传输机制 |
 | :--- | :--- | :--- | :--- |
 | **Windows** | x86_64 | [native (windows-2025)][candidate-runs] | Win32 `TransmitFile` + IOCP |
-| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | 显式偏移 `sendfile(2)` + `epoll` |
+| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | 显式偏移 `sendfile(2)` + `epoll`（默认）；可选 io_uring 文件读取实验 |
 | **macOS** | arm64 | [native (macos-15)][candidate-runs] | Darwin `sendfile` + `kqueue` |
 
 三个平台均执行 Native 测试、资源/sanitizer 检查、Full/Thin 构建、外部消费及 Node 22/24 候选安装验证；Linux 另验证四种容器组合。最终产物门禁核对平台覆盖、提交、版本和哈希，当前检查项以[工作流](.github/workflows/cli.yml)为准。
@@ -132,6 +132,7 @@ http-server-mbt [root] [选项]
 |---|---|---|
 | `[root]` | 静态文件根目录路径 | `.` |
 | `-p`, `--port <port>` | 监听的 TCP 端口（也可通过环境变量 `PORT` 指定） | `8080` |
+| `--io-backend <backend>` | Native I/O 后端：`platform`、`auto`、`epoll`、`kqueue`、`iocp` 或 Linux 实验性 `io_uring` | `platform` |
 | `--base-url <url>` | 挂载的 URL 路径前缀（如 `/docs/`） | `/` |
 | `--base-dir <dir>` | `--base-url` 的别名 | `/` |
 | `--spa` | 启用 SPA 模式：未命中请求回退到根目录的 `index.html`（保留 401/403） | 禁用 |
@@ -151,6 +152,11 @@ http-server-mbt [root] [选项]
 | `-s`, `--silent` | 静默模式，关闭终端请求日志输出 | 禁用 |
 | `-h`, `--help` | 显示命令行帮助信息并退出 | - |
 | `-v`, `--version` | 显示版本信息并退出 | - |
+
+`platform` 保持各平台稳定路径。Linux 的 `auto` 会在启动时探测实验性
+io_uring 文件读取；内核或 sandbox 拒绝时自动回退 epoll。显式选择
+`--io-backend io_uring` 在探测不可用时会在监听前失败；当前实验的文件发送仍
+使用有界读取回退。能力位和 benchmark 命令见 [io_uring 说明](docs/io-uring.md)。
 
 ---
 

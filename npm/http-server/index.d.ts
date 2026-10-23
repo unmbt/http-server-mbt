@@ -12,6 +12,12 @@ export interface ServerConfig {
   port?: number;
 
   /**
+   * Native I/O backend. `auto` enables the experimental Linux io_uring
+   * file-read path when the startup capability probe succeeds.
+   */
+  io_backend?: 'platform' | 'auto' | 'epoll' | 'kqueue' | 'iocp' | 'io_uring';
+
+  /**
    * Enable Single Page Application (SPA) fallback.
    * When enabled, missing routes fallback to index.html.
    */
@@ -96,6 +102,7 @@ export function createServer(options?: ServerConfig | string): HttpServer;
 
 export interface EngineConfig {
   root?: string;
+  io_backend?: 'platform' | 'auto' | 'epoll' | 'kqueue' | 'iocp' | 'io_uring';
   base_url?: string;
   default_ext?: string | null;
   spa?: boolean;

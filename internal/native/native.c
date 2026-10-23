@@ -239,7 +239,8 @@ static int hs_uring_probe_opcode(int ring, unsigned opcode) {
   size_t size = sizeof(struct io_uring_probe) + count * sizeof(struct io_uring_probe_op);
   struct io_uring_probe *probe = calloc(1, size);
   if (!probe) return 0;
-  probe->ops_len = count;
+  /* ops_len is an 8-bit field populated by REGISTER_PROBE.  Do not write
+     the request count here: 256 would wrap to zero on older kernels. */
   int result = (int)syscall(SYS_io_uring_register, ring, IORING_REGISTER_PROBE,
                             probe, count);
   int supported = 0;

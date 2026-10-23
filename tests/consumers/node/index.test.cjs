@@ -88,7 +88,7 @@ async function runTests() {
   const portB = 18771;
 
   console.log('  Starting first server instance on port ' + portA);
-  const serverA = createServer({ port: portA, root: '.', silent: true });
+  const serverA = createServer({ port: portA, root: '.', io_backend: 'auto', silent: true });
   await new Promise(r => setTimeout(r, 100));
 
   const resA = await fetch(`http://127.0.0.1:${portA}/LICENSE`);
@@ -103,7 +103,7 @@ async function runTests() {
   await new Promise(r => setTimeout(r, 100));
 
   console.log('  Starting second server instance on port ' + portB);
-  const serverB = createServer({ port: portB, root: '.', silent: true });
+  const serverB = createServer({ port: portB, root: '.', io_backend: 'auto', silent: true });
   await new Promise(r => setTimeout(r, 100));
 
   const resB = await fetch(`http://127.0.0.1:${portB}/LICENSE`);

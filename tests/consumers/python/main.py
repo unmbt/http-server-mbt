@@ -22,7 +22,7 @@ with socket.socket() as reservation:
     port = reservation.getsockname()[1]
 fixture = Path("consumer-fixture.txt")
 fixture.write_bytes(b"hello consumer\n")
-config = ('{"root":".","port":%d,"silent":true}' % port).encode()
+config = ('{"root":".","port":%d,"io_backend":"auto","silent":true}' % port).encode()
 assert library.hs_server_start(config, len(config), ctypes.byref(server)) == 0
 try:
     client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)

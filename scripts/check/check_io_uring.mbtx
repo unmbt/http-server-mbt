@@ -1,0 +1,59 @@
+///|
+// Exercise the observable Native backend contract on every candidate runner.
+// A restricted Linux runner is a valid environment: auto must still work and
+// explicit io_uring must fail before the engine is opened.
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/shell",
+}
+
+///|
+async fn main {
+  let common = [
+    "run",
+    "benchmarks",
+    "--target",
+    "native",
+    "--release",
+    "--",
+    "--root",
+    "testdata/public",
+    "--path",
+    "/hello.txt",
+    "--iterations",
+    "3",
+    "--warmup",
+    "1",
+  ]
+  let auto = @shell.Cmd("moon", [..common, "--io-backend", "auto"]).output()
+  auto.check()
+  let output = auto.stdout()
+  if !output.contains("backend=auto") ||
+    !output.contains("backend_selected=") ||
+    !output.contains("bytes=42") ||
+    !output.contains("elapsed_ns=") ||
+    !output.contains("io_uring_capabilities=") {
+    fail("auto benchmark did not report a complete backend result")
+  }
+  if output.contains("io_uring_available=true") {
+    if !output.contains("backend_selected=io_uring") {
+      fail("auto benchmark did not select io_uring after a successful probe")
+    }
+  } else if !output.contains("backend_selected=platform") {
+    fail("auto benchmark did not fall back to the platform backend")
+  }
+  let forced = @shell.Cmd(
+    "moon",
+    [..common, "--io-backend", "io_uring"],
+  ).output()
+  if output.contains("io_uring_available=true") {
+    forced.check()
+    if !forced.stdout().contains("backend=io_uring") {
+      fail("available io_uring backend did not run the forced benchmark")
+    }
+  } else if forced.exit_code() == 0 {
+    fail("forced io_uring unexpectedly succeeded without the capability probe")
+  } else {
+    println("io_uring unavailable: explicit backend rejected before engine startup")
+  }
+}

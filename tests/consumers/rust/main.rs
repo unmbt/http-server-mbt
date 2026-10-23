@@ -21,7 +21,7 @@ fn main() {
     let listener=TcpListener::bind(("127.0.0.1",0)).unwrap();
     let port=listener.local_addr().unwrap().port();drop(listener);
     std::fs::write("consumer-fixture.txt",b"hello consumer\n").unwrap();
-    let config=format!("{{\"root\":\".\",\"port\":{port},\"silent\":true}}");
+    let config=format!("{{\"root\":\".\",\"port\":{port},\"io_backend\":\"auto\",\"silent\":true}}");
     let mut server=std::ptr::null_mut();
     unsafe {
         assert_eq!(hs_abi_version() >> 16,1);

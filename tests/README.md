@@ -27,6 +27,10 @@ moon test core --target wasm-gc --deny-warn
 
 `moon test` 自动发现两个资源测试包；`consumers/moonbit` 是嵌套模块，不计入主模块单元测试。C/Rust/Python/Node 和 sanitizer 由 [scripts/check](../scripts/README.md) 的驱动执行，不能把主模块测试通过解释为这些消费者也已验证。
 
+Native consumer smoke configurations use `io_backend: "auto"`, so the same
+cross-platform fallback contract is exercised through the C ABI and Node
+bindings when those consumer checks run.
+
 `server/http_test_helpers_test.mbt` 共享 Content-Length 客户端，供静态 HTTP、acceptor、transport 与代理用例调用。协议分片、chunked 和故障客户端保留专用读写行为，不能为减少代码行数而改变测试刺激。`c_suite_*` 保留原版兼容测试分组，历史文件路径对应关系见[迁移表](../docs/repository-layout-20260925.md#路径迁移)。
 
 句柄计数和共享预算会受到同进程其他测试影响，需要独立包/进程时显式隔离；一般黑盒测试留在源码包即可。禁止通过扩大容差、跳过断言或重跑直至成功来代替缺陷修复。

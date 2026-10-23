@@ -26,7 +26,7 @@ The CI badge above tracks the latest `master` push to **Candidate acceptance**, 
 | Platform | CI Arch | Actions Runner / Job | Core I/O & Transfer Mechanism |
 | :--- | :--- | :--- | :--- |
 | **Windows** | x86_64 | [native (windows-2025)][candidate-runs] | Win32 `TransmitFile` + IOCP |
-| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | `sendfile(2)` explicit-offset path + `epoll` |
+| **Linux** | x86_64 | [native (ubuntu-24.04)][candidate-runs] | `sendfile(2)` explicit-offset path + `epoll` (default); optional io_uring file-read experiment |
 | **macOS** | arm64 | [native (macos-15)][candidate-runs] | Darwin `sendfile` + `kqueue` |
 
 All three jobs run Native tests, resource/sanitizer checks, Full/Thin builds, external consumers and Node 22/24 candidate installation. Linux also verifies the four container variants. The final artifact gate checks platform coverage, commit, version and hashes; see the [workflow](.github/workflows/cli.yml) for the current checks.
@@ -132,6 +132,7 @@ http-server-mbt [root] [options]
 |---|---|---|
 | `[root]` | Filesystem root directory to serve | `.` |
 | `-p`, `--port <port>` | TCP port to listen on (or via `PORT` environment variable) | `8080` |
+| `--io-backend <backend>` | Native I/O backend: `platform`, `auto`, `epoll`, `kqueue`, `iocp`, or experimental Linux `io_uring` | `platform` |
 | `--base-url <url>` | Mount URL prefix (e.g. `/docs/`) | `/` |
 | `--base-dir <dir>` | Alias for `--base-url` | `/` |
 | `--spa` | Enable SPA mode: fallback missing paths to `index.html` (preserves 401/403) | Disabled |
@@ -151,6 +152,12 @@ http-server-mbt [root] [options]
 | `-s`, `--silent` | Suppress log messages in terminal | Disabled |
 | `-h`, `--help` | Show command-line help and exit | - |
 | `-v`, `--version` | Show version information and exit | - |
+
+`platform` keeps the stable per-OS path. On Linux, `auto` probes the experimental
+io_uring file-read path and falls back to epoll when the kernel or sandbox rejects
+it. Explicit `--io-backend io_uring` fails before listening when the probe is not
+available; file sends still use bounded reads in this experiment. See the
+[io_uring guide](docs/io-uring.md) for capability bits and benchmark commands.
 
 ---
 

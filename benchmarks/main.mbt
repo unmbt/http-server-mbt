@@ -51,6 +51,11 @@ async fn main {
   let backend = option(args, "--io-backend", "platform")
   let iterations = positive_int(option(args, "--iterations", "1000"), 1000)
   let warmup = positive_int(option(args, "--warmup", "10"), 10)
+  let io_uring_available = @root.io_uring_available()
+  let selected_backend = match backend {
+    "auto" => if io_uring_available { "io_uring" } else { "platform" }
+    other => other
+  }
   let config = { ..@core.Config::default(root), io_backend: backend, }
   let engine = @root.StaticEngine::open(config)
   defer engine.close()
@@ -87,7 +92,8 @@ async fn main {
     1_000_000_000.0 /
     (elapsed.to_double() * 1024.0 * 1024.0)
   println("backend=\{backend}")
-  println("io_uring_available=\{@root.io_uring_available()}")
+  println("backend_selected=\{selected_backend}")
+  println("io_uring_available=\{io_uring_available}")
   println("io_uring_capabilities=\{@root.io_uring_capabilities()}")
   println("path=\{path}")
   println("iterations=\{iterations}")

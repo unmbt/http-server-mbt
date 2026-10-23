@@ -22,4 +22,7 @@ Directory responses have unknown length and no Content-Length. HTTP/1.1 uses chu
 
 Full now uses the pinned Mozilla roots described in [CA provenance](../full/CA-PROVENANCE.md). Explicit `ca_file` replaces the roots, and only explicit `secure=false` disables verification. Thin has no TLS backend or CA asset. WebSocket upgrades use the configured proxy routing and MbedTLS connector; frames are forwarded as bounded bytes.
 
-C/Node asynchronous embedding, io_uring and the wasm-gc engine remain separate, incomplete tasks. Existing C/Node consumers expose complete-server mode only.
+C/Node asynchronous embedding and the wasm-gc engine remain separate, incomplete
+tasks. The Linux io_uring path is now available as an opt-in Native experiment, but
+its cancellation/fault-injection and three-platform evidence remain incomplete.
+Existing C/Node consumers expose complete-server mode only.

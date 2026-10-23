@@ -97,6 +97,7 @@ HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap);
 {
   "port": 8080,
   "root": "./public",
+  "io_backend": "platform",
   "silent": false,
   "cors": true,
   "spa": true,
@@ -110,6 +111,7 @@ HS_EXPORT size_t hs_error_copy(int32_t code, char* buf, size_t cap);
 
 - `port`: 监听端口（`0` 表示系统自动分配空闲端口）。
 - `root`: 静态资源根目录。
+- `io_backend`: Native I/O 后端，可选 `platform`、`auto`、`epoll`、`kqueue`、`iocp` 或实验性的 Linux `io_uring`。默认 `platform`；`auto` 在探测不可用时回退到平台后端，显式选择当前平台或内核不支持的后端返回 `HS_ERR_UNSUPPORTED`。
 - `silent`: 是否静默运行（抑制控制台日志）。
 - `cors`: 开启 CORS 头支持。
 - `spa`: 开启单页应用回退（404 时自动返回 `index.html`）。

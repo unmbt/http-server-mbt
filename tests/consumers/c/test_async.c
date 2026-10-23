@@ -42,7 +42,7 @@ static hs_span_t span(const char *s) {
 static hs_engine_t *engine(waiter *w) {
   hs_operation_t *op = NULL;
   const char *config =
-      "{\"root\":\".\",\"handle_error\":false,\"cache_control\":\"no-cache\"}";
+      "{\"root\":\".\",\"io_backend\":\"auto\",\"handle_error\":false,\"cache_control\":\"no-cache\"}";
   assert(hs_engine_create_async(config, strlen(config), completed, w, &op) ==
          0);
   hs_event_t e = result(w, op);

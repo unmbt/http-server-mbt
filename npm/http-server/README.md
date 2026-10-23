@@ -8,6 +8,7 @@ High-performance, zero-copy HTTP/HTTPS static file server and reverse proxy Node
 - **Full HTTPS / TLS 1.2 & 1.3**: Integrated MbedTLS 4.2.0, zero external dynamic library dependencies.
 - **Reverse Proxy**: Built-in HTTP proxy and fallback proxy support.
 - **SPA & Fallback**: Native Single Page Application (SPA) routing and `try_files` support.
+- **Optional Linux io_uring**: Set `io_backend: 'auto'` or `'io_uring'` to opt into the experimental file-read path; `auto` falls back when the kernel or sandbox rejects it.
 - **ABI Stable**: Node-API v8; tested support targets Node 22 and 24. OS, CPU and libc must match the prebuilt package.
 - **Prebuilt Binaries**: Shipped via platform-specific `optionalDependencies` for Windows x64, Linux x64, and macOS Apple Silicon (arm64).
 
@@ -33,7 +34,8 @@ const server = createServer({
   spa: true,
   cors: true,
   silent: false,
-  cache_seconds: 3600
+  cache_seconds: 3600,
+  io_backend: 'platform'
 });
 
 console.log('Server is running on http://127.0.0.1:8080');
@@ -106,6 +108,14 @@ Buffers, so framework integration does not claim zero-copy delivery. Mounted
 middleware uses `req.url` after the host strips the mount prefix; do not repeat
 that prefix in engine `base_url`. Next leaves request bodies and response headers
 untouched. Errors after response headers are committed destroy the connection.
+
+`io_backend` accepts `platform`, `auto`, `epoll`, `kqueue`, `iocp`, and
+experimental Linux `io_uring`. The default is `platform`; explicit backends that
+are unavailable on the current platform or kernel reject startup with
+`HS_UNSUPPORTED` from the async engine API (the synchronous `createServer`
+wrapper reports `SERVER_START_ERROR` with the same diagnostic). The io_uring
+experiment uses bounded reads for response bodies and does not claim socket
+zero-copy delivery.
 
 CJS and ESM expose the same API. Linux glibc and musl builds are distinct;
 missing musl builds report the matching package name instead of loading glibc.

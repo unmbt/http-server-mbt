@@ -23,7 +23,7 @@ test('musl loader reports its actual target and never tries a glibc binary', asy
 test('async static engine and native lifecycle', { timeout: 30000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hs-node-中文-'));
   await fs.writeFile(path.join(root, 'hello.txt'), 'hello async\n');
-  const first = await createEngine({ root, handle_error: false, cache_control: 'no-cache' });
+  const first = await createEngine({ root, io_backend: 'auto', handle_error: false, cache_control: 'no-cache' });
   const second = await createEngine({ root, handle_error: false });
   try {
     const response = await first.handle({ method: 'GET', target: '/hello.txt' });

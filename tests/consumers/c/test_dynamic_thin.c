@@ -40,6 +40,12 @@ int main(void) {
     assert(rc_port == HS_ERR_CONFIG);
     assert(s_fail == NULL);
 
+    // Unknown Native I/O backend is a configuration error, not a silent fallback.
+    const char* bad_backend = "{\"io_backend\": \"liburing\"}";
+    int32_t rc_backend = hs_server_start(bad_backend, strlen(bad_backend), &s_fail);
+    assert(rc_backend == HS_ERR_CONFIG);
+    assert(s_fail == NULL);
+
     // Unsupported feature in thin build (TLS cert_file)
     const char* tls_cfg = "{\"cert_file\": \"cert.pem\"}";
     int32_t rc_unsup = hs_server_start(tls_cfg, strlen(tls_cfg), &s_fail);
@@ -48,7 +54,7 @@ int main(void) {
 
     printf("[test_dynamic_thin] Testing hs_server_start, hs_server_stop, hs_server_destroy...\n");
     hs_server_t* server = NULL;
-    const char* config = "{\"port\": 0, \"root\": \".\", \"silent\": true}";
+    const char* config = "{\"port\": 0, \"root\": \".\", \"io_backend\": \"auto\", \"silent\": true}";
     int32_t start_rc = hs_server_start(config, strlen(config), &server);
     printf("[test_dynamic_thin] hs_server_start returned: %d\n", start_rc);
     assert(start_rc == HS_OK);

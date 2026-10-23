@@ -8,6 +8,9 @@ platform；auto 仅在 Linux 启动探测成功时选择实验后端，其他情
 在 StaticEngine::open、监听器创建前失败，不创建监听 socket。进行中的操作不会因为
 错误无声切换后端或重发数据。
 
+C ABI JSON 与 Node 配置使用同名 `io_backend` 字段，并复用这组后端取值和
+启动前能力检查；`auto` 的降级只发生在创建引擎或监听器之前。
+
 实验实现通过 Linux io_uring_setup/io_uring_enter/io_uring_register 直接调用
 内核 ABI，当前把 IORING_OP_READ 用于文件读取；文件发送在实验路径回退到有界
 File::read，不把普通 send 宣称为零拷贝。探测能力位为 setup、READ、SEND、

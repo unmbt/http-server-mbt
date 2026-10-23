@@ -55,6 +55,21 @@ fn decode_config(
   } else {
     @json.parse(@utf8.decode(bytes))
   }
+  decode_config_value(value, thin, server, op=Some(op))
+}
+
+///|
+/// Decode a parsed C ABI configuration object.
+///
+/// Keeping this step separate from the native operation bridge makes the
+/// JSON/configuration contract testable without manufacturing an opaque C
+/// operation handle.
+fn decode_config_value(
+  value : Json,
+  thin : Bool,
+  server : Bool,
+  op~ : Operation? = None,
+) -> @core.Config raise {
   guard value is Object(obj) else { raise InvalidConfig }
   let root = match obj.get("root") {
     Some(v) => str(v)
@@ -68,6 +83,7 @@ fn decode_config(
   for key, v in obj {
     c = match key {
       "root" => { ..c, root: str(v), }
+      "io_backend" => { ..c, io_backend: str(v), }
       "port" => { ..c, port: integer(v), }
       "address" => { ..c, address: str(v), }
       "base_url" => { ..c, base_url: @core.normalize_base_url(str(v)), }
@@ -143,13 +159,17 @@ fn decode_config(
     raise Unsupported
   }
   c.validate()
-  limits(
-    op,
-    c.limits.queued_operations,
-    c.limits.body_block_bytes,
-    c.limits.body_buffer_bytes,
-    c.limits.connections,
-  )
+  match op {
+    Some(op) =>
+      limits(
+        op,
+        c.limits.queued_operations,
+        c.limits.body_block_bytes,
+        c.limits.body_buffer_bytes,
+        c.limits.connections,
+      )
+    None => ()
+  }
   c
 }
 

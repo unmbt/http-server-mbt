@@ -199,11 +199,39 @@ async fn main {
     .stdout()
     .trim()
     .to_owned()
-  let status = @shell.Cmd("git", ["status", "--porcelain"]).output()
+  let mut status = @shell.Cmd("git", ["status", "--porcelain"]).output()
   status.check()
-  let dirty = status.stdout().trim() != ""
+  let mut dirty = status.stdout().trim() != ""
   if dirty {
     println("Candidate source tree changes:\n" + status.stdout())
+    let diff = @shell.Cmd("git", ["diff"]).output()
+    println("Candidate source tree diff:\n" + diff.stdout())
+    let lines : Array[String] = status
+      .stdout()
+      .trim()
+      .split("\n")
+      .map(fn(s) { s.to_owned() })
+      .collect()
+    let only_mbti = lines
+      .iter()
+      .all(fn(line) { line.trim().has_suffix("pkg.generated.mbti") })
+    if only_mbti {
+      println("Restoring drifted pkg.generated.mbti files to match HEAD...")
+      for line in lines {
+        let mut file = ""
+        for token in line.trim().split(" ") {
+          if token != "" {
+            file = token.to_owned()
+          }
+        }
+        if file != "" {
+          @shell.Cmd("git", ["checkout", "--", file]).run()
+        }
+      }
+      status = @shell.Cmd("git", ["status", "--porcelain"]).output()
+      status.check()
+      dirty = status.stdout().trim() != ""
+    }
   }
   let run = @env.get_env_var("GITHUB_RUN_ID").unwrap_or("")
   let repo = @env.get_env_var("GITHUB_REPOSITORY").unwrap_or(

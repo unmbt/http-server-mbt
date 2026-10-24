@@ -12,6 +12,7 @@
 | [design](design.md) | 当前行为、接口、平台与资源契约，按日期修订和稳定 D 编号查阅 |
 | [tasks](tasks.md) | T 编号状态、依赖、原版 42 文件及 C/CC/CE 迁移矩阵 |
 | [实验性 io_uring](io-uring.md) | Native 后端选择、能力探针、benchmark 与受限环境行为 |
+| [WasmGC / io_uring 依赖审计](dependency-audit-20261024.md) | 新增宿主/系统输入、链接边界与分发许可材料 |
 | [C ABI 使用](cabi-usage-guide.md) | 已有 C 静态/动态库消费方式 |
 | [下一次次版本迁移](migration-0.4.md) | 资源所有权与 MoonBit API 迁移说明 |
 | [容器来源](container-provenance.md) | Docker 基础镜像与产物说明 |

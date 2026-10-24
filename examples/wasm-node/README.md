@@ -163,11 +163,13 @@ close barriers, link rejection and a real HTTP server. Saved seeds are in
 `testdata/wasm/seeds.txt`; assertions and scheduling are MoonBit `.mbtx` code.
 Shared planner fixtures also execute on both Native and wasm-gc.
 
-The candidate contains the Wasm binary, host sources/types, MIT license and
-the actual compiler installation's core LICENSE/NOTICE. It requires Node and
-WasmGC/JS string builtins; it is not a Native standalone or zero-copy artifact.
-No Native runtime objects, TLS library or async Wasm event-loop implementation
-are linked into this Wasm engine.
+The candidate contains the Wasm binary, host sources/types, MIT license, the
+project third-party notice, the Wasm dependency audit, and the actual compiler
+installation's core LICENSE/NOTICE. It requires Node and WasmGC/JS string
+builtins; it is not a Native standalone or zero-copy artifact. No Node binary,
+npm package, Native runtime object, TLS library, CA bundle, Node-API addon or
+async Wasm event-loop implementation is linked into or bundled with this Wasm
+engine. The exact boundary is in `licenses/WasmGC-DEPENDENCIES.md`.
 
 ## Troubleshooting
 

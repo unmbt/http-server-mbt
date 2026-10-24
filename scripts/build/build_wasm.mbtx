@@ -58,6 +58,16 @@ async fn main {
   if !@fs.exists("target/wasm/licenses") {
     @fs.mkdir("target/wasm/licenses", recursive=true)
   }
+  for
+    (source, name) in [
+      ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+      ("docs/dependency-audit-20261024.md", "WasmGC-DEPENDENCIES.md"),
+    ] {
+    @fs.write_file(
+      "target/wasm/licenses/" + name,
+      @fs.read_file(source),
+    )
+  }
   let root = toolchain_root()
   for
     (source, name) in [

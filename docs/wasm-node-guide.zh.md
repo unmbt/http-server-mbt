@@ -40,7 +40,7 @@ curl -i -H 'Range: bytes=0-4' http://127.0.0.1:8080/hello.txt
 gh run download 38378097351 --repo unmbt/http-server-mbt --name candidate-Windows-X64 --dir downloaded-candidate
 ```
 
-保留其中的 `engine.wasm`、`app.mjs`、`index.mjs`、`host.mjs`、`loader.mjs`、`index.d.ts`、`README.md`、`LICENSE` 和 `licenses/`。这些是候选产物，未作为 npm 包发布；Actions artifact 有保留期限（当前 14 天），过期后从相同提交构建。
+保留其中的 `engine.wasm`、`app.mjs`、`index.mjs`、`host.mjs`、`loader.mjs`、`index.d.ts`、`README.md`、`LICENSE` 和 `licenses/`。`licenses/` 中包含项目第三方声明、WasmGC 依赖审计以及实际工具链的 core 许可/NOTICE。Wasm 宿主只依赖用户提供的 Node 内置模块，不打包 Node、npm、Native addon、TLS 或 CA 证书；io_uring 也不属于 Wasm 运行时。完整边界见[依赖审计](dependency-audit-20261024.md)。这些是候选产物，未作为 npm 包发布；Actions artifact 有保留期限（当前 14 天），过期后从相同提交构建。
 
 进入 `wasm/` 目录，设置**资源目录的绝对路径**后启动：
 

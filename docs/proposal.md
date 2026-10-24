@@ -1,5 +1,11 @@
 # http-server-mbt：SDD 开发规范与 Native 重构提案
 
+2026-10-24 依赖审计增量（R-SDD/R-N04/R-N10）：复核 Node WasmGC 与 Linux
+io_uring 提交后，确认没有新增第三方包、vendor 源码、静态/动态库或随产物
+分发的 CA 证书。Wasm 仅把 Node 22/24 作为外部 WasmGC 宿主，io_uring 仅依赖
+Linux syscall/UAPI 的编译期头文件；项目新增项目级 notice 和 Wasm 依赖审计
+副本，具体边界见 D-22、T-037 和 [依赖审计](dependency-audit-20261024.md)。
+
 2026-10-23 增量维护：按用户指令将工具链升级至 Moon `0.1.20261021` / moonc `0.10.17+093cb8f9c`。修复 Actions runner 中 setup-moonbit 请求 Nushell 时的 API 限流，以及 Linux 下 C ABI 构建缺少编译器运行时 `moonbit_rt_*` 转发桩的链接错误。
 
 2026-10-22 增量范围（R-N04/R-N18）：按用户指令恢复可重复的观测型 Native benchmark，并开始实现 T-023 的 Linux io_uring 实验后端。benchmark 只输出本机测量，不恢复已撤出的量化性能门槛；io_uring 保持显式/auto 可选，默认 platform 行为不变。实现使用 Linux io_uring syscall ABI 直接探测和文件读操作，不把 liburing 作为必需依赖；是否使用 liburing 的选择、能力位和受限环境行为记录在 D-21/T-037。活动构建统一升级到 Moon `0.1.20261020` / moonc `0.10.16+b1a0e846e`，历史验证记录保持原样。

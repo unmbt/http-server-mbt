@@ -169,6 +169,7 @@ T-002 的 Native 程序、库导出和 wasm-gc 探针分别记录证据；Window
 - [ ] **T-037 io_uring 依赖与能力矩阵审计** — 状态：进行中（2026-10-22）。需求：R-N04、R-SDD；设计：D-05、D-21；依赖：T-023。
   - 交付：记录 syscall ABI 与 liburing 2.15 的取舍、setup/opcode/EPERM/ENOSYS 探测位、静态/动态链接影响及受限环境策略。
   - 当前证据：Windows Native 构建未引入 liburing 链接；探针让内核填充 8 位 `ops_len`，避免把 256 写入造成旧内核截断；`docs/io-uring.md` 补充 Linux UAPI 头文件要求、能力位和 sandbox 行为；候选脚本验证 auto/显式选择契约。WSL FedoraLinux-43 的旧 `gcc -fsyntax-only -std=c11 -pthread` 证据仍保留，Linux 真实运行与三平台 Actions 证据仍待补。
+  - 2026-10-24 依赖审计：复核 Node WasmGC、io_uring、benchmark 的包清单、C include/link 选项和分发脚本；确认没有新增第三方包、vendor 源码、静态/动态库或 CA 证书。Wasm 仅使用外部 Node 内置模块，io_uring 仅使用 Linux syscall/UAPI，`moonbitlang/async@0.21.3` 为既有依赖且不进入 Wasm 包。新增 [dependency-audit-20261024](dependency-audit-20261024.md)，Wasm 目录分发 `THIRD_PARTY_NOTICES.md` 与 `WasmGC-DEPENDENCIES.md`。
   - 验收：默认三平台构建不出现 liburing 链接；Linux 可用环境真实执行 READ，受限环境 auto 降级、显式选择失败；若未来切换 liburing，先更新设计、依赖清单和 Actions 证据。
 
 - [ ] **T-025 GitHub Actions 完整验证与发布门槛** — 状态：进行中（2026-09-24 校正；Windows 历史验证不代表总交付）。需求：R-SDD、R-COMPAT、R-N02、R-N06、R-N08、R-N09、R-N10、R-N11、R-N12、R-N13、R-N14、R-N15、R-N16；设计：D-08、D-10～D-18；依赖：T-001、T-021、T-022、T-023、T-027、T-028、T-029、T-030、T-032、T-033、T-034。

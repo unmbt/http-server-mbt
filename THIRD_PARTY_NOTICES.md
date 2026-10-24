@@ -19,6 +19,26 @@ component: Thin omits TLS and the Mozilla trust store.
 | http-party/http-server | Commit 0d3b7bb5b6e8a59fd450ae2dca65870009cfcd8b | MIT; migrated tests, fixtures and any adapted material |
 | libevent | 2.1.12-stable | BSD-3-Clause and accompanying MIT/ISC notices; C examples only |
 
+## Feature-specific external inputs
+
+The Node WasmGC example uses only Node built-in modules (`node:fs/promises`,
+`node:http`, `node:stream`, `node:url`, `node:path`, `node:events` and
+`node:zlib`). Node 22.21.1 and 24.10.0 are external host runtimes; this project
+does not bundle Node, V8, libuv, npm packages or a Node-API addon in the Wasm
+directory. A party that redistributes a Node runtime must retain Node's own
+license and notice files.
+
+The experimental Linux io_uring path calls the Linux syscall ABI directly and
+includes `<linux/io_uring.h>` only while compiling the Native bridge. It does
+not link or distribute liburing, and no additional third-party license text is
+required for the runtime artifact. The header is supplied by the target Linux
+toolchain/kernel UAPI. `benchmarks/clock.c` likewise uses only Windows/POSIX
+system clock APIs and is not part of the server or Wasm runtime.
+
+The exact dependency and artifact boundary is recorded in
+`docs/dependency-audit-20261024.md`; the Wasm candidate carries a copy at
+`licenses/WasmGC-DEPENDENCIES.md`.
+
 Mbed TLS configuration headers were modified by
 scripts/maintenance/vendor_tls.mbtx: managed feature overrides and ASCII
 comment normalization. Their original notices and modification markers are

@@ -1,5 +1,23 @@
 # http-server-mbt 重构设计
 
+## 2026-10-24 增量设计（D-22：wasm-gc / io_uring 依赖与许可边界）
+
+关联 R-N04/R-N10/R-SDD、T-029/T-037。对 `8fb666c`、`1621f4d` 和 `fc36f85`
+的源码、包清单、Native 链接选项和 Wasm 分发脚本完成审计：没有新增第三方
+MoonBit 包、vendor 源码、静态库或动态库。`moonbitlang/async@0.21.3` 是既有
+根模块依赖，Wasm 包不导入它；Node WasmGC 只使用 Node 内置模块，Node 运行时
+由部署者提供，不随 Wasm 产物分发。io_uring 直接使用 Linux syscall ABI 和
+`<linux/io_uring.h>` 编译期 UAPI，不链接 `liburing`，默认三平台构建不产生
+新的传递链接依赖。benchmark 的时钟桥只调用系统 API。
+
+Wasm 搬移目录必须保留项目 MIT、项目级 `THIRD_PARTY_NOTICES.md`、
+`WasmGC-DEPENDENCIES.md` 以及当前工具链 core 的 LICENSE/NOTICE；不把 Full
+Native 的 Mbed TLS、Mozilla CA、Node-API 或 Native async 材料误列为 Wasm
+链接依赖。依赖和许可边界的逐项证据见
+[dependency-audit-20261024](dependency-audit-20261024.md)。若未来改用
+liburing、打包 Node 或新增 Wasm 第三方库，必须先更新本设计、许可证清单、
+构建脚本和三平台验证证据。
+
 ## 2026-10-22 增量设计（D-21：可选 io_uring 与观测型 benchmark）
 
 本增量实现 R-N04/R-N18。Config.io_backend 和 CLI --io-backend 的默认值为

@@ -36,10 +36,32 @@ async fn main {
   if !@fs.exists(out + "/licenses") {
     @fs.mkdir(out + "/licenses", recursive=true)
   }
+  for
+    (source, name) in [
+      ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+      ("docs/dependency-audit-20261024.md", "WasmGC-DEPENDENCIES.md"),
+  ] {
+    @fs.write_file(
+      out + "/licenses/" + name,
+      @fs.read_file("target/wasm/licenses/" + name),
+    )
+    assert_true(
+      @fs.read_file(out + "/licenses/" + name).text().trim() != "",
+      msg="empty Wasm license/notice: " + name,
+    )
+    assert_eq(
+      @fs.read_file(out + "/licenses/" + name).binary(),
+      @fs.read_file(source).binary(),
+    )
+  }
   for name in ["MoonBit-core-LICENSE.txt", "MoonBit-core-NOTICE.txt"] {
     @fs.write_file(
       out + "/licenses/" + name,
       @fs.read_file("target/wasm/licenses/" + name),
+    )
+    assert_true(
+      @fs.read_file(out + "/licenses/" + name).text().trim() != "",
+      msg="empty Wasm license/notice: " + name,
     )
   }
   let result = @shell.Cmd(

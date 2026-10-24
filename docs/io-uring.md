@@ -35,6 +35,11 @@ C ABI 的 JSON 配置和 Node.js `createServer`/`createEngine` 也使用同一�
 读取建立临时 ring、提交一个请求并同步等待 CQE；尚未共享 ring，也没有把
 `IORING_OP_ASYNC_CANCEL` 接入在途取消，因此这部分仍属于实验完成条件。
 
+这条路径没有新增第三方源码、包或许可证材料：Linux 内核 syscall/UAPI 由
+目标系统和工具链提供，`liburing` 不进入静态/动态链接清单。`benchmarks/`
+中的时钟桥只使用 Windows/POSIX 系统 API，也不随服务端或 Wasm 产物分发。
+依赖、链接和许可边界的逐项记录见[依赖审计](dependency-audit-20261024.md)。
+
 ## 能力探针与验证
 
 MoonBit 根包提供两个 Native 查询：

@@ -17,6 +17,20 @@
 
 实验性 [Node WasmGC 使用指南](docs/wasm-node-guide.zh.md)：包含源码构建、CI 产物直接运行、静态选项和 Node 嵌入示例。Windows x64、Linux x64、macOS arm64 的 Node 22.21.1/24.10.0 均已通过验收；运行时不加载 `.node`。[实现与验证记录](docs/wasm-node-20261013.md)。
 
+## 📊 性能 Benchmark
+
+可复现的性能对比套件位于 [`unmbt/http-server-mbt-benchmark`](https://github.com/unmbt/http-server-mbt-benchmark)。它对比 Full/Thin CLI、Node-API、WasmGC 宿主和原版 Node.js `http-server`，覆盖 Windows 与 WSL Linux 的 `platform`/`epoll`/`io_uring`，HTTP/HTTPS、大文件、海量小文件、CPU/RSS 以及可配置并发量。
+
+克隆 benchmark 仓库后，可直接打开生成的交互式报告：
+
+```bash
+cd http-server-mbt-benchmark
+open records/20261024-comparison/report.html
+open records/20261024-concurrency-comparison/report.html
+```
+
+benchmark 仓库 README 记录了夹具、工具链、WSL 环境、`oha` 参数，以及扩展到 100、200、500、1000、2000、5000 和 10000 并发的命令。
+
 <a id="platform-support"></a>
 
 ## 🖥️ 平台支持矩阵 (Platform Support)

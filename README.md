@@ -17,6 +17,20 @@
 
 Experimental [Node WasmGC static-server example](examples/wasm-node/README.md): build or run a CI artifact, configure a static site, and embed it in Node without a `.node` addon. Validated on Windows x64, Linux x64 and macOS arm64 with Node 22.21.1/24.10.0. [中文使用指南](docs/wasm-node-guide.zh.md) · [Implementation and validation](docs/wasm-node-20261013.md).
 
+## 📊 Performance Benchmark
+
+The reproducible comparison suite is maintained in [`unmbt/http-server-mbt-benchmark`](https://github.com/unmbt/http-server-mbt-benchmark). It compares the Full/Thin CLI, Node-API, WasmGC host, and the original Node.js `http-server` across Windows and WSL Linux `platform`/`epoll`/`io_uring`, HTTP/HTTPS, large files, many small files, CPU/RSS, and configurable concurrency.
+
+To inspect the generated reports locally after cloning the benchmark repository:
+
+```bash
+cd http-server-mbt-benchmark
+open records/20261024-comparison/report.html
+open records/20261024-concurrency-comparison/report.html
+```
+
+The benchmark README documents the fixtures, tool versions, WSL setup, `oha` load parameters, and the commands for extending the scan to 100, 200, 500, 1000, 2000, 5000, or 10000 connections.
+
 <a id="platform-support"></a>
 
 ## 🖥️ Platform Support Matrix

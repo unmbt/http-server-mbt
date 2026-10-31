@@ -2,9 +2,9 @@
 // D-15 / T-030. Four actual containers consume the already audited musl CLIs.
 // No shell inside images and no separate benchmark/demo server.
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/shell",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }

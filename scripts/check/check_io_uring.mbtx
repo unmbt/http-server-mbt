@@ -3,8 +3,8 @@
 // A restricted Linux runner is a valid environment: auto must still work and
 // explicit io_uring must fail before the engine is opened.
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/shell",
 }
 
 ///|

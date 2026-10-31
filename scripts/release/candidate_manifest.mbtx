@@ -1,8 +1,8 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/shell",
   "moonbitlang/core/env",
 }
 
@@ -255,7 +255,7 @@ async fn main {
       "Darwin system runtime"
     },
     "pic": !windows,
-    "async": "0.21.3",
+    "async": "0.22.5",
     "scope": "CLI; ABI 1.1 async engine and complete-server C/Node hosts; libevent/ASGI/Express; owned Native MoonBit engine; experimental Node WasmGC static engine",
     "excluded": [
       "io_uring", "registry publication", "Wasm hostile directory replacement isolation",

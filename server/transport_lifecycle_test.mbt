@@ -343,7 +343,9 @@ async test "transport lifecycle: Process handle count audit shows 0 handle leaks
         // Abrupt connect and close
         let addr = @socket.Addr::new(0x7F000001, port)
         let conn = @socket.Tcp::connect(addr)
-        conn.write("GET /hello.txt HTTP/1.1\r\nHost: localhost\r\n\r\n")
+        conn.write(
+          "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
         conn.close()
       }
       @async.pause()

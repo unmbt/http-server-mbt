@@ -1,6 +1,6 @@
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
 }
 async fn main {
   let names=@fs.read_file("c_abi/exports.txt").text().split("\n").map(s=>s.trim().to_owned()).filter(s=>s!="").to_array()

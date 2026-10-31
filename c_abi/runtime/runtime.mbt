@@ -20,7 +20,7 @@ priv struct Context {
 
 ///|
 fn error_code(e : Error, creating : Bool) -> Int32 {
-  if @async.is_cancellation_error(e) {
+  if @async.is_being_cancelled() {
     return 8
   }
   match e {

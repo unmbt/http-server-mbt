@@ -32,8 +32,8 @@ jobs:
       - name: Set up MoonBit
         uses: hustcer/setup-moonbit@v1
         with:
-          version: '0.10.17+093cb8f9c'
-          core-version: '0.10.17+093cb8f9c'
+          version: '0.10.18+6c83a7f62'
+          core-version: '0.10.18+6c83a7f62'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -5,7 +5,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/cond_var",
   "moonbitlang/async/pipe",
-  "moonbitlang/async/types",
 }
 
 // Values
@@ -21,7 +20,7 @@ pub fn release_body(Int32) -> Unit
 
 pub fn release_connection() -> Unit
 
-pub fn shutdown_write(@types.Fd) -> Bool
+pub fn shutdown_write(Int32) -> Bool
 
 pub fn try_acquire_body(Int32) -> Bool
 
@@ -58,7 +57,7 @@ pub async fn File::close(Self) -> Unit
 pub async fn File::names(Self, Int64) -> (Array[String], Int32)
 pub async fn File::open(Self, String) -> Self
 pub async fn File::read(Self, Int64, Int32) -> Bytes
-pub async fn File::send(Self, @types.Fd, Int64, Int32) -> Int64?
+pub async fn File::send(Self, Int32, Int64, Int32) -> Int64?
 
 type Handle
 

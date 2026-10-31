@@ -1,9 +1,9 @@
 ///|
 // N-18 / T-025: inspect the files users actually receive, not only inputs.
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/shell",
   "moonbitlang/core/env",
 }
 

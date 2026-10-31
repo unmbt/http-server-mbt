@@ -5,7 +5,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
-  "moonbitlang/async/types",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",
   "unmbt/http-server-mbt",
@@ -53,10 +52,11 @@ pub struct Server {
   acceptor : &Acceptor
   upstream_connector : &UpstreamConnector
   proxy_rules : Array[@core.ProxyRule]
-  mut stopped : Bool
+  stopped : @ref.Ref[Bool]
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int32]
+  // private fields
 }
 pub fn Server::acceptor(Self) -> &Acceptor
 pub fn Server::active_request_count(Self) -> Int32
@@ -85,13 +85,13 @@ pub fn TargetUrl::to_repr(Self) -> @debug.Repr
 pub struct Transport {
   reader : &@io.Reader
   writer : &@io.Writer
-  raw_fd : @types.Fd?
+  raw_fd : Int32?
   raw_tcp : @socket.Tcp?
   close_fn : () -> Unit
   shutdown_write_fn : (async () -> Bool)?
 }
 pub fn Transport::close(Self) -> Unit
-pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : @types.Fd, raw_tcp? : @socket.Tcp, shutdown_write_fn? : async () -> Bool) -> Self
+pub fn Transport::custom(&@io.Reader, &@io.Writer, close_fn~ : () -> Unit, raw_fd? : Int32, raw_tcp? : @socket.Tcp, shutdown_write_fn? : async () -> Bool) -> Self
 pub fn Transport::plain(@socket.Tcp) -> Self
 pub async fn Transport::send(Self, &@io.Data) -> Bool
 pub async fn Transport::shutdown_write(Self) -> Bool

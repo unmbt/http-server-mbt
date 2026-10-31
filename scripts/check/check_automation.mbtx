@@ -2,9 +2,9 @@
 // Check all maintained MoonBit automation, including generators and diagnostics.
 // Run from the repository root. Historical rewrite scripts live only in Git.
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/async@0.22.5/shell",
 }
 
 ///|

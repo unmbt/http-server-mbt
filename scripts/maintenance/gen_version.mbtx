@@ -1,9 +1,10 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
+  "unmbt/moon-manifest@0.1.0" @manifest,
 }
 
 ///|
@@ -39,6 +40,10 @@ async fn main {
       "usage: gen_version.mbtx <moon.mod> <output.mbt> | --print <moon.mod> | --consumer <moon.mod> | --sync | --check",
     )
   }
+  if args[1] != "--print" && args[1] != "--consumer" {
+    generate_version(args[1], args[2], name="server_version")
+    return
+  }
   if args[1] == "--print" || args[1] == "--consumer" {
     let version = parse_version(@fs.read_file(args[2]).text())
     println(
@@ -69,6 +74,27 @@ async fn main {
   if existing != generated {
     @fs.write_file(output, generated)
     println("gen_version: wrote \{output} (version \{version})")
+  }
+}
+
+///|
+async fn generate_version(input : String, output : String, name~ : String) -> Unit {
+  let source = @fs.read_file(input).text()
+  let document = @manifest.parse(@manifest.Kind::Mod, source, path=input)
+  guard document.diagnostics.is_empty() else {
+    fail(document.diagnostics[0].message)
+  }
+  guard document.version() is Some(version) else {
+    fail("missing version in " + input)
+  }
+  let generated = if name == "server_version" {
+    generate(version)
+  } else {
+    "const VERSION = " + Json::string(version).stringify() + "\n"
+  }
+  let destination = @fs.realpath(".") + "/" + output
+  if !@fs.exists(destination) || @fs.read_file(destination).text() != generated {
+    @fs.write_file(destination, generated)
   }
 }
 
@@ -136,7 +162,7 @@ fn consumer_manifest(version : String) -> String {
   (
     $|name = "acceptance/consumer"
     $|version = "0.0.0"
-    $|import { "unmbt/http-server-mbt@\{version}", "moonbitlang/async@0.21.3" }
+    $|import { "unmbt/http-server-mbt@\{version}", "moonbitlang/async@0.22.7" }
     $|preferred_target = "native"
     $|
   )

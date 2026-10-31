@@ -2,8 +2,8 @@
 // R-N10 / N-15/N-19/N-20: test logic is MoonBit; JS FFI only accesses the host API.
 // Compile with --target js, then execute the generated script with Node 22/24.
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/js_async",
+  "moonbitlang/async@0.22.5",
+  "moonbitlang/async@0.22.5/js_async",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
 }

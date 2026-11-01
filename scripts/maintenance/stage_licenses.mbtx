@@ -2,9 +2,9 @@
 // R-SDD/R-N02/R-N13, D-08/D-14/D-15, T-025/T-030, N-18.
 // No network access: copy actual build inputs, and fail on missing notices.
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
 

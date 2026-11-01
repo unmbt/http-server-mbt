@@ -2,9 +2,9 @@
 // Candidate tarballs are installed into a new directory with registry access
 // disabled. Run under both Node 22 and 24; never publish from this driver.
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }

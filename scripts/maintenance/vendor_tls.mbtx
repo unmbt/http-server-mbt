@@ -12,9 +12,9 @@
 // temporary directory. The committed tls/mbedtls-4.2.0 tree is the product of
 // this script; do not edit vendored files by hand.
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
 

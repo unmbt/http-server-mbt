@@ -2,9 +2,9 @@
 // R-N13 / D-16 / T-025: needs:candidate is the execution gate. This script
 // additionally binds the immutable artifacts to this tag, commit and run.
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }

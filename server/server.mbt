@@ -244,12 +244,18 @@ pub async fn Server::stop_and_drain(
     } catch {
       _ => ()
     }
+    // Let the accept completion run before propagating cancellation.  The
+    // 0.22 event loop schedules the AcceptEx/epoll completion on the next
+    // tick; cancelling immediately can leave that task waiting forever.
+    @async.pause()
+    self.inner.close()
     if self.accept_task is Some(task) {
       task.cancel()
     }
     if self.task is Some(t) {
       t.cancel()
     }
+    @async.pause()
     for _, tcp in self.connections.val {
       tcp.close()
     }

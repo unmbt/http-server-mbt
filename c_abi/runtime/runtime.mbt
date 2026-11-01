@@ -50,6 +50,10 @@ async fn Context::execute(
     self.tasks.remove(key)
     self.changed.broadcast()
   }
+  // async 0.22 no longer lets `catch` capture cancellation.  Complete the
+  // host operation from errdefer so a cancelled task still delivers its
+  // terminal callback to C consumers.
+  errdefer (if !finished { complete(op, 8, 0) })
   try {
     if command <= 4 && cancelled(op) {
       complete(op, 8, 0)

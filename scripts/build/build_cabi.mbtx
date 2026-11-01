@@ -474,6 +474,9 @@ async fn compile_c_file(
     if moon_inc != "" {
       args.push("/I" + moon_inc)
     }
+    if tc.moon_lib_dir != "" {
+      args.push("/I" + tc.moon_lib_dir)
+    }
     for inc in tc.include_paths {
       args.push("/I")
       args.push(inc)
@@ -491,6 +494,9 @@ async fn compile_c_file(
     ]
     if moon_inc != "" {
       args.push("-I" + moon_inc)
+    }
+    if tc.moon_lib_dir != "" {
+      args.push("-I" + tc.moon_lib_dir)
     }
     args.push(c_src)
     args.push("-o")

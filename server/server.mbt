@@ -13,6 +13,7 @@ pub struct Server {
   active_requests : Ref[Int32]
   priv connections : Ref[Map[@types.Fd, @socket.Tcp]]
   priv connection_active : Ref[Map[@types.Fd, Bool]]
+  priv client_tasks : Ref[Map[@types.Fd, @async.Task[Unit]]]
 }
 
 ///|
@@ -148,6 +149,7 @@ pub async fn with_server_at_with_connector(
     active_requests: { val: 0, },
     connections: { val: Map([]), },
     connection_active: { val: Map([]), },
+    client_tasks: { val: Map([]), },
   }
   defer listener.close()
   @async.with_task_group() <| group => {
@@ -175,13 +177,15 @@ pub async fn with_server_at_with_connector(
             let fd = tcp.fd()
             server.connections.val[fd] = tcp
             server.connection_active.val[fd] = false
-            clients.spawn_bg(allow_failure=true, () => {
+            let client_task = clients.spawn(allow_failure=true, () => {
               defer server.connections.val.remove(fd)
               defer server.connection_active.val.remove(fd)
+              defer server.client_tasks.val.remove(fd)
               defer @native.release_connection()
               defer tcp.close()
               handle_connection(server, tcp)
             })
+            server.client_tasks.val[fd] = client_task
           }
         })
         server.accept_task = Some(accepting)
@@ -207,11 +211,6 @@ pub async fn with_server_at_with_connector(
 pub fn Server::stop(self : Server) -> Unit {
   if !self.stopped.val {
     self.stopped.val = true
-    for fd, tcp in self.connections.val {
-      if !self.connection_active.val.get(fd).unwrap_or(false) {
-        tcp.close()
-      }
-    }
   }
 }
 
@@ -244,15 +243,21 @@ pub async fn Server::stop_and_drain(
     } catch {
       _ => ()
     }
+    // Let the accept completion run before propagating cancellation.  The
+    // 0.22 event loop schedules the AcceptEx/epoll completion on the next
+    // tick; cancelling immediately can leave that task waiting forever.
     if self.accept_task is Some(task) {
       task.cancel()
     }
     if self.task is Some(t) {
       t.cancel()
     }
-    for _, tcp in self.connections.val {
-      tcp.close()
+    for _, task in self.client_tasks.val {
+      task.cancel()
     }
+    @async.pause()
+    self.inner.close()
+    @async.pause()
     if self.task is Some(t) {
       ignore(t.wait() catch { _ => () })
     }

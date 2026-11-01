@@ -248,23 +248,22 @@ pub fn Runtime::release(
 }
 
 ///|
+async fn Runtime::wait_once(self : Runtime, job : Job) -> Unit {
+  self.gate.acquire()
+  // A cancelled native read can interrupt the pipe wait.  Keep the gate
+  // balanced so the cancellation cleanup and later requests can continue to
+  // observe worker notifications.
+  defer self.gate.release()
+  if !done(job) {
+    ignore(self.reader.read_exactly(1))
+    acknowledge(self.pool)
+  }
+}
+
+///|
 async fn Runtime::wait(self : Runtime, job : Job) -> Unit {
   while !done(job) {
-    self.gate.acquire()
-    let result = try {
-      if !done(job) {
-        ignore(self.reader.read_exactly(1))
-        acknowledge(self.pool)
-      }
-      Ok(())
-    } catch {
-      e => Err(e)
-    }
-    self.gate.release()
-    match result {
-      Ok(_) => ()
-      Err(e) => raise e
-    }
+    self.wait_once(job)
   }
 }
 
@@ -283,10 +282,13 @@ async fn[T] Runtime::run(self : Runtime, job : Job, extract : (Job) -> T) -> T {
     self.active -= 1
     self.idle.broadcast()
   }
-  errdefer {
+  // A completed job has already had its notification drained by wait.  Do
+  // not wait for a second byte while translating FILE_CHANGED and other
+  // completed-operation errors.
+  errdefer (if !done(job) {
     cancel(job)
     @async.protect_from_cancel(() => self.wait(job))
-  }
+  })
   self.wait(job)
   match code(job) {
     0 => extract(job)

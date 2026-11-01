@@ -9,7 +9,6 @@ import {
 
 ///|
 
-
 ///|
 async fn main {
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
@@ -52,7 +51,7 @@ async fn main {
       for
         lib in [
           "crypt32", "secur32", "iphlpapi", "ws2_32", "mswsock", "userenv", "advapi32",
-          "synchronization", "dbghelp", "bcrypt", "shell32",
+          "synchronization", "dbghelp", "bcrypt", "shell32", "pathcch",
         ] {
         args.append(["-l", lib])
       }

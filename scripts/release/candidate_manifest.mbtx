@@ -1,10 +1,14 @@
-///|
+----
 import {
   "moonbitlang/async@0.22.7",
   "moonbitlang/async@0.22.7/fs",
   "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
+----
+
+///|
+
 
 ///|
 async fn digest(path : String, windows : Bool, mac : Bool) -> String {

@@ -1,3 +1,12 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
+  "moonbitlang/core/env",
+}
+----
+
 ///|
 // Reproducible vendoring of Mbed TLS for the `tls` package (D-08, T-002/T-012).
 //
@@ -11,12 +20,7 @@
 // Without an argument the tarball is downloaded from the pinned URL into a
 // temporary directory. The committed tls/mbedtls-4.2.0 tree is the product of
 // this script; do not edit vendored files by hand.
-import {
-  "moonbitlang/async@0.22.7",
-  "moonbitlang/async@0.22.7/fs",
-  "moonbitlang/async@0.22.7/shell",
-  "moonbitlang/core/env",
-}
+
 
 ///|
 const MBEDTLS_VERSION : String = "4.2.0"

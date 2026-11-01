@@ -1,5 +1,4 @@
-///|
-// D-14/D-16, T-025/T-030: publish the clean-consumer-tested source archive.
+----
 import {
   "moonbitlang/async@0.22.7",
   "moonbitlang/async@0.22.7/fs",
@@ -7,6 +6,11 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
+
+///|
+// D-14/D-16, T-025/T-030: publish the clean-consumer-tested source archive.
+
 
 ///|
 async fn main {

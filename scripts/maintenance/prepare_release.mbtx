@@ -1,10 +1,14 @@
-///|
-// R-N13 / D-16 / T-025: moon-bump calls this after replacing versions and
-// before committing/tagging. Keep generated metadata in that same commit.
+----
 import {
   "moonbitlang/async@0.22.7",
   "moonbitlang/async@0.22.7/shell",
 }
+----
+
+///|
+// R-N13 / D-16 / T-025: moon-bump calls this after replacing versions and
+// before committing/tagging. Keep generated metadata in that same commit.
+
 
 ///|
 async fn main {

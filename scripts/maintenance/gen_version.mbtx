@@ -1,4 +1,4 @@
-///|
+----
 import {
   "moonbitlang/async@0.22.7",
   "moonbitlang/async@0.22.7/fs",
@@ -6,6 +6,11 @@ import {
   "moonbitlang/core/json",
   "unmbt/moon-manifest@0.1.1" @manifest,
 }
+----
+
+///|
+// Version generation is kept in a standalone script so release consumers can
+// regenerate their own module metadata without importing the server package.
 
 ///|
 suberror GenVersionError {

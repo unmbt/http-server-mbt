@@ -1,11 +1,15 @@
-///|
-// Exercise the observable Native backend contract on every candidate runner.
-// A restricted Linux runner is a valid environment: auto must still work and
-// explicit io_uring must fail before the engine is opened.
+----
 import {
   "moonbitlang/async@0.22.7",
   "moonbitlang/async@0.22.7/shell",
 }
+----
+
+///|
+// Exercise the observable Native backend contract on every candidate runner.
+// A restricted Linux runner is a valid environment: auto must still work and
+// explicit io_uring must fail before the engine is opened.
+
 
 ///|
 async fn main {

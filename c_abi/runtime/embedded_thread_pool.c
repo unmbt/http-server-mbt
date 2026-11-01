@@ -1,4 +1,4 @@
-/* ABI-only policy around pinned async 0.21.3's thread pool. Keep its job and
+/* ABI-only policy around async 0.22.7's thread pool. Keep its job and
  * join protocol, but never install process-wide SIGPIPE/SIGUSR2 dispositions.
  * Cancellation of a POSIX blocking job drains its normal completion instead
  * of interrupting it with a host-owned signal. The static engine's file pool

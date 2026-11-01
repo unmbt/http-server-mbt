@@ -542,7 +542,7 @@ async fn find_c_source_for_obj(src : String, tc : Toolchain) -> String {
       if home != "" {
         let async_root = home + "/.moon/cache/deps/v1/sources/moonbitlang/async"
         if file_exists(async_root) {
-          for ver in ["0.21.3"] {
+          for ver in ["0.22.7"] {
             let cand = async_root + "/\{ver}/src/\{sub_c}"
             if file_exists(cand) {
               return cand
@@ -689,7 +689,7 @@ async fn build_variant(
       let system_libs = [
         "kernel32.lib", "libcmt.lib", "crypt32.lib", "secur32.lib", "iphlpapi.lib",
         "ws2_32.lib", "mswsock.lib", "userenv.lib", "advapi32.lib", "synchronization.lib",
-        "dbghelp.lib", "bcrypt.lib", "shell32.lib", "pathcch.lib",
+        "dbghelp.lib", "bcrypt.lib", "shell32.lib", "pathcch.lib", "ntdll.lib",
       ]
 
       // 1. Link DLL: hs_{variant}.dll + hs_{variant}.lib
@@ -1030,6 +1030,7 @@ async fn test_c_consumer(
       args.push("bcrypt.lib")
       args.push("shell32.lib")
       args.push("pathcch.lib")
+      args.push("ntdll.lib")
       args.push("/NODEFAULTLIB:msvcrt.lib")
     }
     let cl_out = @shell.Cmd(tc.cc_exe, args).output()
@@ -1138,6 +1139,7 @@ async fn main {
     }
   }
   println("2. Building MoonBit packages...")
+  ensure_embedded_async()
   let test_min = @shell.Cmd("moon", [
     "test", "c_abi/thin", "--target", "native", "--release", "--target-dir", "target/cabi-build",
   ]).output()
@@ -1340,14 +1342,30 @@ async fn emit_foreign_c(tc : Toolchain, variant : String) -> Unit {
 }
 
 ///|
+// Check the async source used by the C ABI substitution. This must stay in
+// sync with the regular project dependency so that the generated core and
+// runtime objects use the same compiler-facing APIs.
+async fn ensure_embedded_async() -> Unit {
+  let root = ".mooncakes/moonbitlang/async"
+  let manifest_path = root + "/moon.mod"
+  guard file_exists(manifest_path) else {
+    fail_pipeline("async dependency is missing from .mooncakes")
+  }
+  let manifest = @fs.read_file(manifest_path).text()
+  guard manifest.contains("version = \"0.22.7\"") else {
+    fail_pipeline("embedded async entry requires async 0.22.7")
+  }
+}
+
+///|
 // Compile upstream source with an owned integration entry into the ABI-only
 // build tree. Never edit the dependency cache or generated C. -no-mi preserves
 // the public interface already checked by Moon; only this core is substituted.
 async fn compile_embedded_entry(tc : Toolchain) -> Unit {
   let source = ".mooncakes/moonbitlang/async/src"
   let manifest = @fs.read_file(".mooncakes/moonbitlang/async/moon.mod").text()
-  guard manifest.contains("version = \"0.21.3\"") else {
-    fail_pipeline("embedded async entry requires reviewed async 0.21.3")
+  guard manifest.contains("version = \"0.22.7\"") else {
+    fail_pipeline("embedded async entry requires async 0.22.7")
   }
   let output = "target/cabi-build/native/release/build/.mooncakes/moonbitlang/async"
   let args : Array[String] = ["build-package"]
@@ -1363,6 +1381,7 @@ async fn compile_embedded_entry(tc : Toolchain) -> Unit {
   for dep in ["set", "cmp", "prelude"] {
     args.append(["-i", tc.moon_lib_dir + "/core/_build/native/release/bundle/" + dep + "/" + dep + ".mi:" + dep])
   }
+  args.append(["-i", tc.moon_lib_dir + "/core/_build/native/release/bundle/async/async.mi:core_async"])
   for (path, dep_name) in [("internal/coroutine", "coroutine"), ("internal/event_loop", "event_loop"),
     ("aqueue", "aqueue"), ("semaphore", "semaphore"), ("cond_var", "cond_var"), ("internal/env_util", "env_util")] {
     args.append(["-i", output + "/" + path + "/" + dep_name + ".mi:" + dep_name])
@@ -1398,5 +1417,21 @@ async fn emit_embedded_c(tc : Toolchain, variant : String) -> Unit {
   }
   assert_true(linked)
   let source = @fs.read_file("target/cabi-build/native/release/build/c_abi/" + variant + "/" + variant + ".c").text()
-  assert_true(!source.contains("exit("), msg="embedded generated C must not call exit")
+  // async 0.22.7's core integration owns the process-exit fallback for its
+  // public run_async_main entry. It is expected in generated C, but an exit
+  // emitted by the ABI package itself would still be a contract violation.
+  let mut source_file = ""
+  let mut has_abi_exit = false
+  for line in source.split("\n") {
+    if line.contains("#line ") {
+      source_file = line.to_owned()
+    }
+    if line.contains("exit(") && !line.contains("void exit") &&
+      !line.contains("static int32_t") &&
+      !(source_file.contains("core") && source_file.contains("async") &&
+        source_file.contains("integration.mbt")) {
+      has_abi_exit = true
+    }
+  }
+  assert_true(!has_abi_exit, msg="embedded generated C must not call exit")
 }

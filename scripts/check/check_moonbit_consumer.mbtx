@@ -1,12 +1,16 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
+  "moonbitlang/core/env",
+}
+----
+
 ///|
 // D-14 / T-030: consume candidate source from a separate workspace, never
 // patch .mooncakes or link a prebuilt server library into the consumer.
-import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/core/env",
-}
+
 
 ///|
 async fn main {

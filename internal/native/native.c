@@ -55,7 +55,8 @@ typedef struct hs_budget hs_budget;
 typedef struct hs_pool {
   hs_mutex mutex;
   hs_cond cond;
-  int stopping, count, capacity, worker_limit, active, notified, connection_limit;
+  int stopping, count, capacity, worker_limit, active, connection_limit;
+  uint64_t notifications;
   hs_fd notify;
   hs_budget *budget;
   struct hs_pool *budget_next;
@@ -660,11 +661,7 @@ static int hs_send(hs_job *j) {
   return hs_stat(j->file,0);
 }
 
-static void hs_notify(hs_pool *p) {
-  LOCK(&p->mutex);
-  if (p->notified) { UNLOCK(&p->mutex); return; }
-  p->notified = 1;
-  UNLOCK(&p->mutex);
+static void hs_write_notification(hs_pool *p) {
   unsigned char byte=1;
 #ifdef _WIN32
   /* A zero-buffer named pipe write can remain pending until the owner reads.
@@ -675,6 +672,12 @@ static void hs_notify(hs_pool *p) {
 #else
   ssize_t n; do {n=write(p->notify,&byte,1);} while(n<0 && errno==EINTR);
 #endif
+}
+static void hs_notify(hs_pool *p) {
+  LOCK(&p->mutex);
+  int signal = p->notifications++ == 0;
+  UNLOCK(&p->mutex);
+  if (signal) hs_write_notification(p);
 }
 static void hs_wait(hs_cond *cond, hs_mutex *mutex) {
 #ifdef _WIN32
@@ -823,7 +826,7 @@ MOONBIT_FFI_EXPORT void hs_io_pool_free(hs_pool *p) {
     hs_owner_budget=NULL;free(b);
   }
 #ifdef _WIN32
-  if(p->notified){DWORD wrote;CancelIoEx(p->notify,&p->notification);GetOverlappedResult(p->notify,&p->notification,&wrote,TRUE);}
+  if(p->notifications){DWORD wrote;CancelIoEx(p->notify,&p->notification);GetOverlappedResult(p->notify,&p->notification,&wrote,TRUE);}
   CloseHandle(p->notification_event);
 #else
   pthread_mutex_destroy(&p->mutex);
@@ -910,7 +913,9 @@ MOONBIT_FFI_EXPORT void hs_io_ack(hs_pool *p){
   DWORD wrote;
   GetOverlappedResult(p->notify,&p->notification,&wrote,TRUE);
 #endif
-  p->notified=0;UNLOCK(&p->mutex);
+  int signal = p->notifications && --p->notifications;
+  UNLOCK(&p->mutex);
+  if (signal) hs_write_notification(p);
 }
 MOONBIT_FFI_EXPORT int hs_io_done(hs_job *j){LOCK(&j->pool->mutex);int d=j->done;UNLOCK(&j->pool->mutex);return d;}
 MOONBIT_FFI_EXPORT void hs_io_cancel(hs_job *j){LOCK(&j->pool->mutex);j->cancelled=1;UNLOCK(&j->pool->mutex);}

@@ -1,11 +1,15 @@
-///|
-// R-N10 / D-13 / T-029. One build entrypoint for local development and CI.
+----
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
+----
+
+///|
+// R-N10 / D-13 / T-029. One build entrypoint for local development and CI.
+
 
 ///|
 async fn toolchain_root() -> String {

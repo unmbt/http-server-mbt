@@ -343,12 +343,22 @@ async test "transport lifecycle: Process handle count audit shows 0 handle leaks
         // Abrupt connect and close
         let addr = @socket.Addr::new(0x7F000001, port)
         let conn = @socket.Tcp::connect(addr)
-        conn.write("GET /hello.txt HTTP/1.1\r\nHost: localhost\r\n\r\n")
+        conn.write(
+          "GET /hello.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+        // Let the Windows IOCP accept/read completion observe the request
+        // before closing the client socket; an immediate close can strand a
+        // pending read in async 0.22.7.
+        @async.sleep(10)
         conn.close()
       }
       @async.pause()
     }
 
+    // Finish the server lifecycle before taking the process-wide handle
+    // snapshot.  This also closes any abruptly disconnected socket that is
+    // still unwinding on Windows.
+    server.stop_and_drain()
     // Assert process handle count returns to baseline (0 leaks)
     assert_no_handle_leak(before_handles)
   })

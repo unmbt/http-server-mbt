@@ -7,10 +7,12 @@ pub struct Server {
   acceptor : &Acceptor
   upstream_connector : &UpstreamConnector
   proxy_rules : Array[@core.ProxyRule]
-  mut stopped : Bool
+  stopped : Ref[Bool]
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
   active_requests : Ref[Int32]
+  priv connections : Ref[Map[@types.Fd, @socket.Tcp]]
+  priv connection_active : Ref[Map[@types.Fd, Bool]]
 }
 
 ///|
@@ -140,10 +142,12 @@ pub async fn with_server_at_with_connector(
     acceptor: effective_acceptor,
     upstream_connector: effective_connector,
     proxy_rules,
-    stopped: false,
+    stopped: { val: false, },
     task: None,
     accept_task: None,
     active_requests: { val: 0, },
+    connections: { val: Map([]), },
+    connection_active: { val: Map([]), },
   }
   defer listener.close()
   @async.with_task_group() <| group => {
@@ -151,7 +155,7 @@ pub async fn with_server_at_with_connector(
       @async.with_task_group() <| clients => {
         let accepting = clients.spawn(allow_failure=true, () => {
           defer listener.close()
-          while !server.stopped {
+          while !server.stopped.val {
             // Pause while the shared owner is full. Concurrent listeners may
             // already have an accept pending: recheck atomically before
             // allocating any protocol/TLS state and close excess sockets.
@@ -160,11 +164,20 @@ pub async fn with_server_at_with_connector(
               continue
             }
             let (tcp, _) = listener.accept()
+            if server.stopped.val {
+              tcp.close()
+              break
+            }
             if !@native.try_acquire_connection() {
               tcp.close()
               continue
             }
+            let fd = tcp.fd()
+            server.connections.val[fd] = tcp
+            server.connection_active.val[fd] = false
             clients.spawn_bg(allow_failure=true, () => {
+              defer server.connections.val.remove(fd)
+              defer server.connection_active.val.remove(fd)
               defer @native.release_connection()
               defer tcp.close()
               handle_connection(server, tcp)
@@ -192,10 +205,12 @@ pub async fn with_server_at_with_connector(
 ///|
 /// Stop accepting new connections.
 pub fn Server::stop(self : Server) -> Unit {
-  if !self.stopped {
-    self.stopped = true
-    if self.accept_task is Some(task) {
-      task.cancel()
+  if !self.stopped.val {
+    self.stopped.val = true
+    for fd, tcp in self.connections.val {
+      if !self.connection_active.val.get(fd).unwrap_or(false) {
+        tcp.close()
+      }
     }
   }
 }
@@ -216,8 +231,35 @@ pub async fn Server::stop_and_drain(
     }
   })
   @async.protect_from_cancel(() => {
+    // Requests that did not finish before the drain deadline must be
+    // interrupted so the client task group can terminate deterministically.
+    // Wake a platform accept that is already suspended. Closing the listening
+    // handle alone cannot resume every native backend, while a loopback
+    // connection completes the pending accept and lets the stopped loop exit.
+    try {
+      let wake = @socket.Tcp::connect(
+        @socket.Addr::new(0x7F000001, self.inner.addr.port()),
+      )
+      wake.close()
+    } catch {
+      _ => ()
+    }
+    // Let the accept completion run before propagating cancellation.  The
+    // 0.22 event loop schedules the AcceptEx/epoll completion on the next
+    // tick; cancelling immediately can leave that task waiting forever.
+    @async.pause()
+    self.inner.close()
+    if self.accept_task is Some(task) {
+      task.cancel()
+    }
     if self.task is Some(t) {
       t.cancel()
+    }
+    @async.pause()
+    for _, tcp in self.connections.val {
+      tcp.close()
+    }
+    if self.task is Some(t) {
       ignore(t.wait() catch { _ => () })
     }
     self.engine.close()
@@ -388,7 +430,7 @@ fn should_keep_alive(server : Server, headers : Map[String, String]) -> Bool {
     Some(v) => v.to_lower()
     None => ""
   }
-  !(conn_val == "close" || server.stopped)
+  !(conn_val == "close" || server.stopped.val)
 }
 
 ///|
@@ -491,26 +533,40 @@ async fn handle_connection(server : Server, tcp_conn : @socket.Tcp) -> Unit {
     }
   }
   defer transport.close()
-  handle_client(server, transport)
+  handle_client(server, transport, tcp_conn.fd())
 }
 
 ///|
-async fn handle_client(server : Server, transport : Transport) -> Unit {
+async fn handle_client(
+  server : Server,
+  transport : Transport,
+  fd : @types.Fd,
+) -> Unit {
   let reader = @framing.Connection::new(transport.reader)
-  while !server.stopped {
-    let head = if server.config.idle_timeout_ms > 0 {
-      @async.with_timeout_opt(server.config.idle_timeout_ms, () => {
-        reader.read_request()
-      })
+  while !server.stopped.val {
+    // Keep a timer around even when the public idle timeout is disabled.
+    // This gives shutdown a bounded wake-up path for sockets whose native
+    // close does not resume a pending read on every platform. A disabled
+    // timeout still preserves keep-alive semantics by polling and continuing.
+    let read_timeout = if server.config.idle_timeout_ms > 0 {
+      server.config.idle_timeout_ms
     } else {
-      Some(reader.read_request())
+      1000
     }
-    guard head is Some(head) else { break }
+    let head = match
+      @async.with_timeout_opt(read_timeout, () => reader.read_request()) {
+      None if server.config.idle_timeout_ms == 0 && !server.stopped.val =>
+        continue
+      None => break
+      Some(head) => head
+    }
     let req = head.request
+    server.connection_active.val[fd] = true
     server.active_requests.val += 1
     let keep = {
       defer {
         server.active_requests.val -= 1
+        server.connection_active.val[fd] = false
       }
       if server.has_upgrade_capability() &&
         @framing.has_token(

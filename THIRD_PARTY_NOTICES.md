@@ -8,7 +8,7 @@ component: Thin omits TLS and the Mozilla trust store.
 
 | Component | Source / version | License and scope |
 |---|---|---|
-| moonbitlang/async | https://github.com/moonbitlang/async, 0.21.3 | Apache-2.0; Native async I/O |
+| moonbitlang/async | https://github.com/moonbitlang/async, 0.22.7 | Apache-2.0; Native async I/O |
 | MoonBit core and Native runtime | Actual compiler installation recorded in BUILD-PROVENANCE.txt | Apache-2.0, plus core NOTICE; standard library/runtime incorporated into binaries |
 | simdutf | https://github.com/simdutf/simdutf; object supplied by the MoonBit toolchain | MIT option; notice text pinned separately in third_party/PROVENANCE.md |
 | libbacktrace | MoonBit toolchain backtrace.h | BSD-3-Clause; retained conservatively with runtime notices |

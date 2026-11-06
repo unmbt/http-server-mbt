@@ -1,3 +1,12 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
+  "moonbitlang/core/env",
+}
+----
+
 ///|
 // Build script for Node-API native addon (@unmbt/http-server-mbt).
 //
@@ -9,12 +18,7 @@
 //   moon run scripts/build/build_node.mbtx
 //
 
-import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/core/env",
-}
+
 
 ///|
 enum TargetOs {

@@ -168,6 +168,12 @@ async test "HTTP semantics: Negative offsets, lengths, non-existent files and in
     )
     assert_true(r11 < 0)
 
+    // The socket is only a raw handle probe; close it before issuing the
+    // server requests so the Windows IOCP accept task has no idle read to
+    // drain when the server scope shuts down.
+    conn.close()
+    @async.sleep(20)
+
     // 2. Server socket HTTP requests with edge cases
     // Non-existent file -> 404
     let (s_404, _h_404, b_404) = ch2_test_request(

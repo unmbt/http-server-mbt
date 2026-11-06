@@ -53,10 +53,11 @@ pub struct Server {
   acceptor : &Acceptor
   upstream_connector : &UpstreamConnector
   proxy_rules : Array[@core.ProxyRule]
-  mut stopped : Bool
+  stopped : @ref.Ref[Bool]
   mut task : @async.Task[Unit]?
   mut accept_task : @async.Task[Unit]?
   active_requests : @ref.Ref[Int32]
+  // private fields
 }
 pub fn Server::acceptor(Self) -> &Acceptor
 pub fn Server::active_request_count(Self) -> Int32

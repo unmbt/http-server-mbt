@@ -323,16 +323,20 @@ async test "fault_injection: In-flight cancellation via stop_and_drain during ac
       }
       assert_true(server.active_request_count() > 0)
 
-      // Invoke stop_and_drain with 100ms timeout
-      server.stop_and_drain(timeout_ms=100)
-
-      // Clean up client connections so in-flight tasks complete
+      // async 0.22 cancellation is delivered at suspension points. Close the
+      // native readers first so an in-flight socket read can observe it.
       stop_reading.val = true
-      for t in reader_tasks {
-        t.cancel()
-      }
       for c in client_conns {
         c.close()
+      }
+
+      // Invoke stop_and_drain with 100ms timeout while requests are still
+      // accounted as active.
+      server.stop_and_drain(timeout_ms=100)
+
+      // Clean up reader tasks after the server has started draining.
+      for t in reader_tasks {
+        t.cancel()
       }
       let mut drain_wait = 0
       while server.active_request_count() > 0 && drain_wait < 100 {

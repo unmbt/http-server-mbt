@@ -20,7 +20,7 @@ priv struct Context {
 
 ///|
 fn error_code(e : Error, creating : Bool) -> Int32 {
-  if @async.is_cancellation_error(e) {
+  if @async.is_being_cancelled() {
     return 8
   }
   match e {
@@ -50,6 +50,10 @@ async fn Context::execute(
     self.tasks.remove(key)
     self.changed.broadcast()
   }
+  // async 0.22 no longer lets `catch` capture cancellation.  Complete the
+  // host operation from errdefer so a cancelled task still delivers its
+  // terminal callback to C consumers.
+  errdefer (if !finished { complete(op, 8, 0) })
   try {
     if command <= 4 && cancelled(op) {
       complete(op, 8, 0)

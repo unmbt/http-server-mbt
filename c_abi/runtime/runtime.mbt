@@ -4,8 +4,8 @@ priv suberror Closed
 ///|
 priv struct ServerScope {
   wake : @async.CondVar
-  mut stopping : Bool
-  mut done : Bool
+  stopping : Ref[Bool]
+  done : Ref[Bool]
 }
 
 ///|
@@ -20,7 +20,7 @@ priv struct Context {
 
 ///|
 fn error_code(e : Error, creating : Bool) -> Int32 {
-  if @async.is_cancellation_error(e) {
+  if @async.is_being_cancelled() {
     return 8
   }
   match e {
@@ -50,6 +50,10 @@ async fn Context::execute(
     self.tasks.remove(key)
     self.changed.broadcast()
   }
+  // async 0.22 no longer lets `catch` capture cancellation.  Complete the
+  // host operation from errdefer so a cancelled task still delivers its
+  // terminal callback to C consumers.
+  errdefer (if !finished { complete(op, 8, 0) })
   try {
     if command <= 4 && cancelled(op) {
       complete(op, 8, 0)
@@ -73,12 +77,12 @@ async fn Context::execute(
         let config = decode_config(op, thin, true)
         let scope = {
           wake: @async.CondVar::Cond(),
-          stopping: false,
-          done: false,
+          stopping: { val: false, },
+          done: { val: false, },
         }
         self.servers[owner] = scope
         defer {
-          scope.done = true
+          scope.done.val = true
           scope.wake.broadcast()
           self.servers.remove(owner)
         }
@@ -86,7 +90,7 @@ async fn Context::execute(
           self.tasks.remove(key)
           finished = true
           complete(op, 0, 2)
-          while !scope.stopping {
+          while !scope.stopping.val {
             scope.wake.wait()
           }
         })
@@ -156,9 +160,9 @@ async fn Context::execute(
           }
         }
         if self.servers.get(owner) is Some(scope) {
-          scope.stopping = true
+          scope.stopping.val = true
           scope.wake.broadcast()
-          while !scope.done {
+          while !scope.done.val {
             scope.wake.wait()
           }
         }

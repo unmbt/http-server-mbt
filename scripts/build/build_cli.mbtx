@@ -1,11 +1,15 @@
-///|
-// R-N02 / D-08: release CLIs, dependency audits and no rebuild during release.
+----
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
+----
+
+///|
+// R-N02 / D-08: release CLIs, dependency audits and no rebuild during release.
+
 
 ///|
 async fn main {

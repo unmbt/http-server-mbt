@@ -13,7 +13,7 @@ priv enum Body {
 }
 
 ///|
-// async 0.21.3 requires ReaderBuffer to implement its public Reader trait.
+// async 0.22.5 requires ReaderBuffer to implement its public Reader trait.
 // Keep this allowance on the adapter, never on a package or the build.
 #warnings("-alert_internal")
 pub struct Connection {

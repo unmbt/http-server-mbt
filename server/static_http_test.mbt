@@ -266,5 +266,7 @@ async test "transmit_file parameter validation error handling" {
       10L,
     )
     assert_true(ret4 < 0)
+    conn.close()
+    @async.sleep(20)
   })
 }

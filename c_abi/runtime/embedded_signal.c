@@ -1,4 +1,4 @@
-/* C ABI-only substitute for async@0.21.3 signal.c. The host owns signals.
+/* C ABI-only substitute for async@0.22.7 signal.c. The host owns signals.
  * These symbols are hidden by the ABI export whitelist. CLI builds continue
  * to use the unmodified upstream object. No managed pointers are retained. */
 #include <stdint.h>

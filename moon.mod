@@ -3,7 +3,9 @@ name = "unmbt/http-server-mbt"
 version = "0.5.0"
 
 import {
-  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.22.7",
+  "unmbt/moon-manifest@0.1.1",
+  "unmbt/native-toolchain@0.1.1",
 }
 
 readme = "README.md"

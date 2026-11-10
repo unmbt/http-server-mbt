@@ -1,8 +1,8 @@
 # ABI-only async integration
 
 The companion source replaces `src/integration.mbt` from
-`moonbitlang/async@0.21.3` only during the isolated C ABI build. The upstream
-file SHA-256 is `34b8623e6f6c0a30556c4b2c1c52f6a5144612ba2b69c1f540e0a4e4595010ea`
+`moonbitlang/async@0.22.7` only during the isolated C ABI build. The upstream
+file SHA-256 is `18f6e0c6e6938de1454603518e080e92bdccf41ef7782156d3993f9e798aedea`
 (the original LF file). Source: <https://github.com/moonbitlang/async>.
 Copyright 2025 International Digital Economy Academy; Apache-2.0, as in the
 dependency's LICENSE and the repository's dependency license inventory.

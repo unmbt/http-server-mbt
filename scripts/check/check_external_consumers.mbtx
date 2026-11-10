@@ -1,10 +1,13 @@
-///|
+----
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
+----
+
+///|
 
 ///|
 async fn main {
@@ -48,7 +51,7 @@ async fn main {
       for
         lib in [
           "crypt32", "secur32", "iphlpapi", "ws2_32", "mswsock", "userenv", "advapi32",
-          "synchronization", "dbghelp", "bcrypt", "shell32",
+          "synchronization", "dbghelp", "bcrypt", "shell32", "pathcch",
         ] {
         args.append(["-l", lib])
       }

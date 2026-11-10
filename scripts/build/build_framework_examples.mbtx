@@ -1,9 +1,13 @@
+----
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
   "moonbitlang/core/env",
 }
+----
+
+
 async fn main {
   let windows=@env.get_env_var("OS")==Some("Windows_NT")
   let mac= !windows && @shell.Cmd("uname",["-s"]).output().stdout().trim()=="Darwin"

@@ -1,6 +1,9 @@
+----
+import { "moonbitlang/core/env" }
+----
+
 // D-08/D-14: Native configuration is computed in the consuming module's
 // environment. No build output or absolute path is written into source.
-import { "moonbitlang/core/env" }
 
 fn main {
   let windows=@env.get_env_var("OS")==Some("Windows_NT")

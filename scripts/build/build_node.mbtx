@@ -1,3 +1,12 @@
+----
+import {
+  "moonbitlang/async@0.22.7",
+  "moonbitlang/async@0.22.7/fs",
+  "moonbitlang/async@0.22.7/shell",
+  "moonbitlang/core/env",
+}
+----
+
 ///|
 // Build script for Node-API native addon (@unmbt/http-server-mbt).
 //
@@ -8,13 +17,6 @@
 // Usage:
 //   moon run scripts/build/build_node.mbtx
 //
-
-import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/core/env",
-}
 
 ///|
 enum TargetOs {
@@ -115,10 +117,8 @@ async fn find_msvc_root_dir() -> String {
   }
 
   let roots = [
-    "D:/devenv/msvc/VC/Tools/MSVC", "E:/Program Files/msvc/VC/Tools/MSVC",
-    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
-    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC",
-    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
+    "D:/devenv/msvc/VC/Tools/MSVC", "E:/Program Files/msvc/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC",
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC", "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC",
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Tools/MSVC",
@@ -424,6 +424,8 @@ async fn main {
         "dbghelp.lib",
         "bcrypt.lib",
         "shell32.lib",
+        "pathcch.lib",
+        "ntdll.lib",
         "/NODEFAULTLIB:msvcrt.lib",
       ]
       if @env.get_env_var("HS_NODE_ASAN") == Some("1") {

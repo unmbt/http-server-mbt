@@ -206,12 +206,18 @@ async test "C022 ~ C025: ShowDir href/search encoding and trailing slash suppres
     assert_true(
       @utf8.decode_lossy(b_plus1).contains("href=\"./aname%2Baplus.txt\""),
     )
+    // Let the server finish releasing the listing resources before the next
+    // connection.  macOS can schedule the final chunk completion after the
+    // client has consumed the body, which otherwise makes the next listing
+    // observe a transient native I/O error.
+    @async.sleep(20)
 
     let (s_plus2, _, b_plus2) = dirsec_get(port, "/subfolder/")
     assert_eq(s_plus2, 200)
     assert_true(
       @utf8.decode_lossy(b_plus2).contains("href=\"./aname%2Baplus.txt\""),
     )
+    @async.sleep(20)
 
     // C023: ShowDir query preservation with XML/HTML entity encoding
     let (s_query, _, b_query) = dirsec_get(port, "/?a=1&b=2")

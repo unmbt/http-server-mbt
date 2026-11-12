@@ -1,9 +1,10 @@
 ///|
 /// An HTTP Entity Tag (RFC 7232 §2.3).
+#derive(Eq, Debug)
 pub(all) struct EntityTag {
   tag : String // Entity tag enclosed in double quotes: e.g. "\"123-456\""
   is_weak : Bool // True if prefixed with W/
-} derive(Eq, Debug)
+}
 
 ///|
 /// Construct an EntityTag from a raw tag string and weak flag.
@@ -368,11 +369,12 @@ pub fn should_return_304(
 
 ///|
 /// Cache-Control header strategy.
+#derive(Eq, Debug)
 pub(all) enum CachePolicy {
   MaxAge(Int32)
   NoCache
   Exact(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Format CachePolicy to header string value.

@@ -95,6 +95,7 @@ pub fn validate_uri_encoding(String) -> Bool
 pub fn verify_basic_auth(String?, (String, String)) -> Bool
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror ConfigError {
   InvalidBaseUrl(String)
   InvalidRoot(String)
@@ -109,7 +110,7 @@ pub(all) suberror ConfigError {
   InvalidTls(String)
   InvalidLimits(String)
   InvalidIoBackend(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ConfigError::equal(Self, Self) -> Bool
 pub fn ConfigError::not_equal(Self, Self) -> Bool
 pub fn ConfigError::output(Self, &Logger) -> Unit
@@ -117,34 +118,38 @@ pub fn ConfigError::to_repr(Self) -> @debug.Repr
 pub fn ConfigError::to_string(Self) -> String
 pub impl Show for ConfigError
 
+#derive(Eq, @debug.Debug)
 pub(all) suberror PathError {
   MalformedUri(String)
   OutsideBaseUrl(String)
   TraversalForbidden(String)
   NotFound(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn PathError::equal(Self, Self) -> Bool
 pub fn PathError::not_equal(Self, Self) -> Bool
 pub fn PathError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
-} derive(Eq, @debug.Debug)
+}
 pub fn ByteRange::equal(Self, Self) -> Bool
 pub fn ByteRange::not_equal(Self, Self) -> Bool
 pub fn ByteRange::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum CachePolicy {
   MaxAge(Int32)
   NoCache
   Exact(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn CachePolicy::equal(Self, Self) -> Bool
 pub fn CachePolicy::not_equal(Self, Self) -> Bool
 pub fn CachePolicy::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub(all) struct Config {
   limits : RuntimeLimits
   io_backend : String
@@ -190,7 +195,7 @@ pub(all) struct Config {
   mime_types : Map[String, String]
   log_ip : Bool
   silent : Bool
-} derive(@debug.Debug)
+}
 pub fn Config::default(String) -> Self
 pub fn Config::effective_cache_control(Self) -> String
 pub fn Config::fallback_mode(Self) -> FallbackMode
@@ -204,10 +209,11 @@ pub fn Config::proxy_targets_include_https(Self) -> Bool
 pub fn Config::to_repr(Self) -> @debug.Repr
 pub fn Config::validate(Self) -> Unit raise ConfigError
 
+#derive(Eq, @debug.Debug)
 pub(all) struct EntityTag {
   tag : String
   is_weak : Bool
-} derive(Eq, @debug.Debug)
+}
 pub fn EntityTag::equal(Self, Self) -> Bool
 pub fn EntityTag::from_metadata(Int64, Int64, Bool) -> Self
 pub fn EntityTag::new(String, Bool) -> Self
@@ -216,20 +222,22 @@ pub fn EntityTag::parse(String) -> Self?
 pub fn EntityTag::to_header_value(Self) -> String
 pub fn EntityTag::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FallbackMode {
   None
   Spa
   TryFiles(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn FallbackMode::equal(Self, Self) -> Bool
 pub fn FallbackMode::not_equal(Self, Self) -> Bool
 pub fn FallbackMode::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Method {
   Get
   Head
   Other(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn Method::equal(Self, Self) -> Bool
 pub fn Method::not_equal(Self, Self) -> Bool
 pub fn Method::to_repr(Self) -> @debug.Repr
@@ -243,20 +251,22 @@ pub fn MimeRegistry::register(Self, String, String) -> Unit
 pub fn MimeRegistry::set(Self, String, String) -> Unit
 pub fn MimeRegistry::set_all(Self, Map[String, String]) -> Unit
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ProxyRule {
   pattern : String
   target : String
   path_rewrite : Array[(String, String)]
-} derive(Eq, @debug.Debug)
+}
 pub fn ProxyRule::equal(Self, Self) -> Bool
 pub fn ProxyRule::not_equal(Self, Self) -> Bool
 pub fn ProxyRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum RangeResult {
   Satisfiable(ByteRange)
   NotSatisfiable
   NotApplicable
-} derive(Eq, @debug.Debug)
+}
 pub fn RangeResult::equal(Self, Self) -> Bool
 pub fn RangeResult::not_equal(Self, Self) -> Bool
 pub fn RangeResult::to_repr(Self) -> @debug.Repr
@@ -267,16 +277,18 @@ pub(all) struct Request {
   headers : Map[String, String]
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ResponseBody {
   Empty
   Bytes(Bytes)
   FileRegion(String, Int64, Int64)
-} derive(Eq, @debug.Debug)
+}
 pub fn ResponseBody::equal(Self, Self) -> Bool
 pub fn ResponseBody::length(Self) -> Int32
 pub fn ResponseBody::not_equal(Self, Self) -> Bool
 pub fn ResponseBody::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct RuntimeLimits {
   file_workers : Int32
   queued_operations : Int32
@@ -284,19 +296,20 @@ pub(all) struct RuntimeLimits {
   body_block_bytes : Int32
   body_buffer_bytes : Int32
   directory_metadata_bytes : Int32
-} derive(Eq, @debug.Debug)
+}
 pub fn RuntimeLimits::default() -> Self
 pub fn RuntimeLimits::equal(Self, Self) -> Bool
 pub fn RuntimeLimits::not_equal(Self, Self) -> Bool
 pub fn RuntimeLimits::to_repr(Self) -> @debug.Repr
 pub fn RuntimeLimits::validate(Self) -> Unit raise ConfigError
 
+#derive(@debug.Debug)
 pub(all) enum SecurityDecision {
   Proceed
   Unauthorized(Map[String, String], Bytes)
   Forbidden(Map[String, String], Bytes)
   Preflight(Map[String, String])
-} derive(@debug.Debug)
+}
 pub fn SecurityDecision::to_repr(Self) -> @debug.Repr
 
 // Type aliases

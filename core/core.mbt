@@ -1,10 +1,11 @@
 ///|
 /// HTTP methods supported by the static engine.
+#derive(Eq, Debug)
 pub(all) enum Method {
   Get
   Head
   Other(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// A parsed HTTP request used by the static engine.
@@ -16,11 +17,12 @@ pub(all) struct Request {
 
 ///|
 /// Representation of an HTTP response body.
+#derive(Eq, Debug)
 pub(all) enum ResponseBody {
   Empty
   Bytes(Bytes)
   FileRegion(String, Int64, Int64)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Return the total byte length of the response body.

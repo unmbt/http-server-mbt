@@ -1,10 +1,11 @@
 ///|
 /// Active fallback mode for unrouted requests.
+#derive(Eq, Debug)
 pub(all) enum FallbackMode {
   None
   Spa
   TryFiles(String)
-} derive(Eq, Debug)
+}
 
 ///|
 /// Normalize a URL mount prefix per D-04.
@@ -103,11 +104,12 @@ pub fn format_dir_redirect(raw_path : String, raw_query : String?) -> String {
 
 ///|
 /// A route-based proxy rule.
+#derive(Debug, Eq)
 pub(all) struct ProxyRule {
   pattern : String
   target : String
   path_rewrite : Array[(String, String)]
-} derive(Debug, Eq)
+}
 
 ///|
 /// Check if a request path matches a glob or prefix pattern.

@@ -1,11 +1,12 @@
 ///|
 /// Parsed target URL components.
+#derive(Debug, Eq)
 pub struct TargetUrl {
   scheme : String
   host : String
   port : Int32
   base_path : String
-} derive(Debug, Eq)
+}
 
 ///|
 pub fn TargetUrl::scheme(self : TargetUrl) -> String {

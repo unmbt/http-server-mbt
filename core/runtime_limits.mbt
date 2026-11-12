@@ -1,5 +1,6 @@
 ///|
 /// D-05/D-06: finite Native resources. Budgets include all instances sharing an owner.
+#derive(Debug, Eq)
 pub(all) struct RuntimeLimits {
   file_workers : Int32
   queued_operations : Int32
@@ -7,7 +8,7 @@ pub(all) struct RuntimeLimits {
   body_block_bytes : Int32
   body_buffer_bytes : Int32
   directory_metadata_bytes : Int32
-} derive(Debug, Eq)
+}
 
 ///|
 pub fn RuntimeLimits::default() -> RuntimeLimits {

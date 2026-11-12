@@ -1,10 +1,11 @@
 ///|
 /// CLI action resulting from command-line argument parsing.
+#derive(Debug)
 pub enum CliAction {
   Help(String)
   Version(String)
   Run(@core.Config, Int32)
-} derive(Debug)
+}
 
 ///|
 pub extend CliAction with Debug::{to_repr}

@@ -92,7 +92,7 @@ async fn main {
   println("External source candidate: " + workspace)
   @shell.Cmd(
     "moon",
-    ["run", ".", "--target", "native", "--deny-warn"],
+    ["run", ".", "--target", "native", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax"],
     cwd=workspace + "/consumer",
   ).run()
   if !@fs.exists("target/candidate") {

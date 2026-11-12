@@ -1,9 +1,10 @@
 ///|
 /// D-08: shared bounded HTTP framing, preserving bytes read past headers.
+#derive(Debug)
 pub suberror ProtocolError {
   Invalid
   Limit
-} derive(Debug)
+}
 
 ///|
 priv enum Body {

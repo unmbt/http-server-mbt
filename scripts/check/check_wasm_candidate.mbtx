@@ -24,7 +24,7 @@ async fn main {
   @shell.Cmd("moon", ["run", "scripts/build/build_wasm.mbtx"]).run()
   @shell.Cmd("moon", [
     "build", "scripts/check/check_wasm_host.mbtx", "--target", "js", "--release",
-    "--deny-warn", "--target-dir", "target/wasm-host-test",
+    "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", "--target-dir", "target/wasm-host-test",
   ]).run()
   let out = "target/candidate/wasm"
   if !@fs.exists(out) {

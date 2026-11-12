@@ -1,12 +1,13 @@
 ///|
 /// TLS layer error. `code` is the raw MbedTLS/PSA error code (negative) or a
 /// bridge-specific code; `message` is the library-provided description.
+#derive(Debug)
 pub suberror TlsError {
   TlsError(code~ : Int32, message~ : String)
   /// Underlying transport reached EOF without a TLS close_notify: a
   /// truncated flow, rejected instead of reporting clean EOF (RFC 8446 6.1).
   TlsUnexpectedEof
-} derive(Debug)
+}
 
 ///|
 impl Show for TlsError with fn output(self, logger) {

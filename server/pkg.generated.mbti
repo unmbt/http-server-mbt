@@ -70,12 +70,13 @@ pub fn Server::stop(Self) -> Unit
 pub async fn Server::stop_and_drain(Self, timeout_ms? : Int32) -> Unit
 pub fn Server::upstream_connector(Self) -> &UpstreamConnector
 
+#derive(Eq, @debug.Debug)
 pub struct TargetUrl {
   scheme : String
   host : String
   port : Int32
   base_path : String
-} derive(Eq, @debug.Debug)
+}
 pub fn TargetUrl::equal(Self, Self) -> Bool
 pub fn TargetUrl::host(Self) -> String
 pub fn TargetUrl::not_equal(Self, Self) -> Bool

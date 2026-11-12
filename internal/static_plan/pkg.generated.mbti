@@ -2,13 +2,14 @@
 package "unmbt/http-server-mbt/internal/static_plan"
 
 import {
+  "moonbitlang/core/json",
   "unmbt/http-server-mbt/core",
 }
 
 // Values
 pub fn compare_entries(ListingEntry, ListingEntry) -> Int32
 
-pub fn decode_config(Json) -> @core.Config raise
+pub fn decode_config(@json.Json) -> @core.Config raise
 
 pub fn escape_html(String) -> String
 

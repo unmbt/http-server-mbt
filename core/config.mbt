@@ -1,6 +1,7 @@
 ///|
 /// Configuration validation error hierarchy.
 /// All errors are detected and raised during pre-listen startup.
+#derive(Eq, Debug)
 pub(all) suberror ConfigError {
   InvalidBaseUrl(String)
   InvalidRoot(String)
@@ -15,7 +16,7 @@ pub(all) suberror ConfigError {
   InvalidTls(String)
   InvalidLimits(String)
   InvalidIoBackend(String)
-} derive(Eq, Debug)
+}
 
 ///|
 pub fn ConfigError::to_string(self : ConfigError) -> String {
@@ -45,6 +46,7 @@ pub impl Show for ConfigError with fn output(self, logger) {
 /// Normalized static-server configuration model.
 /// Contains all configuration settings for protocol, static resolution,
 /// routing mounts, SPA fallback, security policies, and upstream proxies.
+#derive(Debug)
 pub(all) struct Config {
   limits : RuntimeLimits
   // --- Native I/O backend ---
@@ -115,7 +117,7 @@ pub(all) struct Config {
   // --- Logging & Output ---
   log_ip : Bool // Enable logging of client IP address (default false)
   silent : Bool // Suppress console log messages (default false)
-} derive(Debug)
+}
 
 ///|
 /// Build Server & CLI defaults for a filesystem root directory.

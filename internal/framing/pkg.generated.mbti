@@ -11,10 +11,11 @@ import {
 pub fn has_token(String, String) -> Bool
 
 // Errors
+#derive(@debug.Debug)
 pub suberror ProtocolError {
   Invalid
   Limit
-} derive(@debug.Debug)
+}
 pub fn ProtocolError::to_repr(Self) -> @debug.Repr
 
 // Types and methods

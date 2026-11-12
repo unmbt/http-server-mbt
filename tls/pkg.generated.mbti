@@ -15,10 +15,11 @@ pub fn tls_conn_count() -> Int32
 pub fn tls_global_init() -> Unit raise TlsError
 
 // Errors
+#derive(@debug.Debug)
 pub suberror TlsError {
   TlsError(code~ : Int32, message~ : String)
   TlsUnexpectedEof
-} derive(@debug.Debug)
+}
 pub fn TlsError::to_repr(Self) -> @debug.Repr
 
 // Types and methods

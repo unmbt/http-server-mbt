@@ -1,17 +1,19 @@
 ///|
 /// A response body range, inclusive at both ends.
+#derive(Eq, Debug)
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
-} derive(Eq, Debug)
+}
 
 ///|
 /// Result of evaluating an HTTP Range request.
+#derive(Eq, Debug)
 pub(all) enum RangeResult {
   Satisfiable(ByteRange)
   NotSatisfiable
   NotApplicable
-} derive(Eq, Debug)
+}
 
 ///|
 /// Parse an HTTP Range header string according to RFC 7233 and ecstatic compatibility.

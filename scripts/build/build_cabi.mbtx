@@ -1318,7 +1318,7 @@ async fn emit_foreign_c(tc : Toolchain, variant : String) -> Unit {
     "--target",
     "native",
     "--release",
-    "--deny-warn",
+    "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
     "--target-dir",
     "target/cabi-build",
   ]).output()

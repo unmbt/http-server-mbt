@@ -1,11 +1,12 @@
 ///|
 /// Errors resulting from path resolution and traversal defense.
+#derive(Eq, Debug)
 pub(all) suberror PathError {
   MalformedUri(String) // Maps to 400 Bad Request
   OutsideBaseUrl(String) // Maps to 403 Forbidden with empty body (C042.21)
   TraversalForbidden(String) // Maps to 403 Forbidden
   NotFound(String) // Maps to 404 Not Found
-} derive(Eq, Debug)
+}
 
 ///|
 fn find_char_str(s : String, c : Char) -> Int32? {
@@ -498,12 +499,13 @@ pub fn apply_security_headers(
 
 ///|
 /// Result of preliminary security policy evaluation.
+#derive(Debug)
 pub(all) enum SecurityDecision {
   Proceed
   Unauthorized(Map[String, String], Bytes)
   Forbidden(Map[String, String], Bytes)
   Preflight(Map[String, String])
-} derive(Debug)
+}
 
 ///|
 /// Execute security policies in the documented priority order:

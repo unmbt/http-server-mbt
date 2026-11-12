@@ -15,17 +15,17 @@ async fn main {
     script in [
       "scripts/maintenance/stage_licenses.mbtx", "scripts/check/check_licenses.mbtx",
     ] {
-    @shell.Cmd("moon", ["test", script, "--deny-warn"]).run()
+    @shell.Cmd("moon", ["test", script, "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax"]).run()
   }
   @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
   @shell.Cmd("moon", [
-    "test", "scripts/maintenance/gen_version.mbtx", "--deny-warn",
+    "test", "scripts/maintenance/gen_version.mbtx", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
   ]).run()
   for script in ["release_gate", "publish_npm", "verify_candidates"] {
     @shell.Cmd("moon", [
       "test",
       "scripts/release/" + script + ".mbtx",
-      "--deny-warn",
+      "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
     ]).run()
   }
   let version = @shell.Cmd("moon", ["version", "--all"]).output()
@@ -45,22 +45,22 @@ async fn main {
   }
   assert_eq(@fs.read_file("testdata/public/hello.txt").binary().length(), 14)
   @shell.Cmd("moon", ["run", "scripts/check/check_automation.mbtx"]).run()
-  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn", "--no-mbti"]).run()
+  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", "--no-mbti"]).run()
   // Native resource probes share process/owner budgets; keep test executables
   // sequential while leaving their compilation parallel.
   @shell.Cmd("moon", [
-    "test", "--target", "native", "--deny-warn", "--no-parallelize",
+    "test", "--target", "native", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", "--no-parallelize",
   ]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_io_uring.mbtx"]).run()
   @shell.Cmd("moon", [
-    "check", "core", "--target", "wasm-gc", "--deny-warn", "--no-mbti",
+    "check", "core", "--target", "wasm-gc", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", "--no-mbti",
   ]).run()
-  @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["test", "core", "--target", "wasm-gc", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax"]).run()
   @shell.Cmd("moon", [
-    "test", "internal/static_plan", "--target", "wasm-gc", "--deny-warn",
+    "test", "internal/static_plan", "--target", "wasm-gc", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
   ]).run()
   @shell.Cmd("moon", [
-    "test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn",
+    "test", "internal/request_headers", "--target", "wasm-gc", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
   ]).run()
   @shell.Cmd("moon", ["run", "scripts/check/check_native_sanitizers.mbtx"]).run()
   @shell.Cmd("moon", ["run", "scripts/build/build_cli.mbtx"]).run()

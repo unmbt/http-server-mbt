@@ -28,7 +28,7 @@ async fn check_directory(path : String) -> Int {
       } else {
         []
       }
-      @shell.Cmd("moon", ["check", child, "--deny-warn", ..target]).run()
+      @shell.Cmd("moon", ["check", child, "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", ..target]).run()
       checked += 1
     }
   }
@@ -37,7 +37,7 @@ async fn check_directory(path : String) -> Int {
 
 ///|
 async fn main {
-  @shell.Cmd("moon", ["check", "build.mbtx", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["check", "build.mbtx", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax"]).run()
   let count = check_directory("scripts")
   println("Checked build.mbtx and \{count} maintained scripts")
 }

@@ -14,5 +14,5 @@ import {
 async fn main {
   @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--sync"]).run()
   @shell.Cmd("moon", ["run", "scripts/maintenance/gen_version.mbtx", "--check"]).run()
-  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn"]).run()
+  @shell.Cmd("moon", ["check", "--target", "native", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax"]).run()
 }

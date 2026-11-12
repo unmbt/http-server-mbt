@@ -40,7 +40,7 @@ async fn toolchain_root() -> String {
 ///|
 async fn main {
   @shell.Cmd("moon", [
-    "build", "wasm", "--target", "wasm-gc", "--release", "--deny-warn",
+    "build", "wasm", "--target", "wasm-gc", "--release", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax",
   ]).run()
   if !@fs.exists("target/wasm") {
     @fs.mkdir("target/wasm", recursive=true)

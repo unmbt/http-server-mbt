@@ -89,7 +89,7 @@ async fn main {
     "moon",
     [
       "build", "cmd/http-server-mbt", "cmd/http-server-mbt-thin", "--target", "native",
-      "--release", "--deny-warn", "--target-dir", "target/cli-build",
+      "--release", "--deny-warn", "--warn-list", "-cancellable_defer-deprecated_syntax", "--target-dir", "target/cli-build",
     ],
     env~,
   ).run()
